@@ -31,6 +31,7 @@ class User(AbstractUser):
         max_length=10,
         choices=[("EMAIL", "Email"), ("SMS", "SMS")],
         blank=True,
+        default="EMAIL",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
