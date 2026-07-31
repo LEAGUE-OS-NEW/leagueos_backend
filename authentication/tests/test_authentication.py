@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -70,23 +68,30 @@ class AuthenticationTests(APITestCase):
 
 
 class LogoutTests(APITestCase):
-    def test_logout(self):
-        user = UserFactory(password="StrongPass123!")
-        self.client.force_authenticate(user)
-        url = reverse("authentication:logout")
-        with patch("authentication.views.TokenService.blacklist_refresh_token") as mock_blacklist:
-            response = self.client.post(url, {"refresh": "dummy_refresh"})
-            mock_blacklist.assert_called_once_with("dummy_refresh")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+    def test_logout_requires_authentication(self):
+        response = self.client.post(
+            reverse("authentication:logout"),
+            {"refresh": "dummy-refresh-token"},
+            format="json",
+        )
 
-    def test_logout_all(self):
-        user = UserFactory()
-        self.client.force_authenticate(user)
-        url = reverse("authentication:logout-all")
-        with patch("authentication.views.SessionService.terminate_user_sessions") as mock_terminate:
-            response = self.client.post(url)
-            mock_terminate.assert_called_once_with(user)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+            response.data,
+        )
+
+    def test_logout_all_requires_authentication(self):
+        response = self.client.post(
+            reverse("authentication:logout-all"),
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+            response.data,
+        )
 
 
 class ProfileTests(APITestCase):

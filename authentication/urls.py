@@ -10,17 +10,31 @@ from authentication.views import (
     PasswordResetVerifyView,
     ProfileView,
     SessionListView,
+    TokenRefreshView,
 )
 
 app_name = "authentication"
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
+    path(
+        "token/refresh/",
+        TokenRefreshView.as_view(),
+        name="token-refresh",
+    ),
     path("logout/", LogoutView.as_view(), name="logout"),
-    path("logout-all/", LogoutAllView.as_view(), name="logout-all"),
+    path(
+        "logout-all/",
+        LogoutAllView.as_view(),
+        name="logout-all",
+    ),
     path("profile/", ProfileView.as_view(), name="profile"),
     path("me/", MeView.as_view(), name="me"),
-    path("sessions/", SessionListView.as_view(), name="sessions"),
+    path(
+        "sessions/",
+        SessionListView.as_view(),
+        name="sessions",
+    ),
     path(
         "password-reset/request/",
         PasswordResetRequestView.as_view(),

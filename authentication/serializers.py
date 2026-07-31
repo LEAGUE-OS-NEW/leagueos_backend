@@ -37,10 +37,10 @@ class ProfileSerializer(serializers.ModelSerializer):
             "permissions",
         ]
 
-    def get_roles(self, obj):
+    def get_roles(self, obj) -> list[str]:
         return list(obj.user_roles.values_list("role__name", flat=True))
 
-    def get_permissions(self, obj):
+    def get_permissions(self, obj) -> list[str]:
         role_ids = obj.user_roles.values_list("role_id", flat=True)
         from authentication.models import RolePermission
 
@@ -121,3 +121,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if attrs["password"] != attrs["confirm_password"]:
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
         return attrs
+
+
+class EmptySerializer(serializers.Serializer):
+    pass

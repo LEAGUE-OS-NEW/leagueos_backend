@@ -1,18 +1,28 @@
-from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
+from rest_framework.permissions import BasePermission
 
-from authentication.services.permission_service import PermissionService
+from authentication.services.permission_service import (
+    PermissionService,
+)
 
-User = get_user_model()
 
+class HasPermission(BasePermission):
+    message = "You do not have permission to perform this action."
 
-class HasPermission:
-    """Generic permission engine that checks database-backed permissions."""
+    def has_permission(self, request, view) -> bool:
+        required_permission = getattr(
+            view,
+            "required_permission",
+            None,
+        )
 
-    def __init__(self, permission_name: str):
-        self.permission_name = permission_name
+        if not required_permission:
+            raise ImproperlyConfigured(
+                f"{view.__class__.__name__} must define "
+                "'required_permission' when using HasPermission."
+            )
 
-    def __call__(self, request, view, obj=None) -> bool:
-        user = getattr(request, "user", None)
-        if not user or not user.is_authenticated:
-            return False
-        return PermissionService.has_permission(user, self.permission_name)
+        return PermissionService.has_permission(
+            request.user,
+            required_permission,
+        )
