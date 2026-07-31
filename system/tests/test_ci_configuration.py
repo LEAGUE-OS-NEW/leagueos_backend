@@ -26,3 +26,4 @@ def test_ci_validates_openapi_schema():
 
     assert "python manage.py spectacular" in workflow
     assert "--validate" in workflow
+    assert "--fail-on-warn" in workflow
