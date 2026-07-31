@@ -10,9 +10,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import AuditLog, OTPVerification, User, VerificationAttempt
 from accounts.serializers import (
+    RegistrationStatusQuerySerializer,
     RegistrationStatusSerializer,
+    ResendOTPSerializer,
     UserProfileSerializer,
     UserRegistrationSerializer,
+    VerifyOTPSerializer,
     build_response,
 )
 from accounts.services.email_service import EmailService
@@ -39,6 +42,7 @@ def log_audit(user, action, ip_address=None, user_agent="", metadata=None):
 
 
 class RegisterView(APIView):
+    serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -95,6 +99,7 @@ class RegisterView(APIView):
 
 
 class VerifyOTPView(APIView):
+    serializer_class = VerifyOTPSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -205,6 +210,7 @@ class VerifyOTPView(APIView):
 
 
 class ResendOTPView(APIView):
+    serializer_class = ResendOTPSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -370,6 +376,7 @@ class ProfileView(APIView):
 
 
 class RegistrationStatusView(APIView):
+    serializer_class = RegistrationStatusQuerySerializer
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from accounts.models import User
+from accounts.services.username_service import UsernameService
 
 
 def build_response(success: bool, message: str, data=None, errors=None):
@@ -100,9 +101,26 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password")
         channel = "SMS" if validated_data.get("phone_number") else "EMAIL"
         validated_data["verification_channel"] = channel
-        email = validated_data.get("email", "")
-        validated_data.setdefault("username", email.split("@")[0])
-        user = User.objects.create_user(password=password, **validated_data)
+        validated_data["username"] = UsernameService.generate_unique_username(
+            email=validated_data.get("email", ""),
+            phone_number=validated_data.get(
+                "phone_number",
+                "",
+            ),
+            first_name=validated_data.get(
+                "first_name",
+                "",
+            ),
+            last_name=validated_data.get(
+                "last_name",
+                "",
+            ),
+        )
+
+        user = User.objects.create_user(
+            password=password,
+            **validated_data,
+        )
         return user
 
 
@@ -132,3 +150,19 @@ class RegistrationStatusSerializer(serializers.ModelSerializer):
             "verification_channel",
         ]
         read_only_fields = fields
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(
+        min_length=6,
+        max_length=6,
+    )
+
+
+class ResendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class RegistrationStatusQuerySerializer(serializers.Serializer):
+    email = serializers.EmailField()
