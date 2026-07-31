@@ -3,6 +3,8 @@ import logging
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import AuditLog, User
@@ -108,31 +110,99 @@ class LoginView(APIView):
         )
 
 
-class LogoutView(APIView):
+class TokenRefreshView(APIView):
+    authentication_classes = []
     permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = TokenRefreshSerializer(
+            data=request.data,
+        )
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError:
+            return Response(
+                build_response(
+                    success=False,
+                    message="Invalid, expired or revoked refresh token.",
+                ),
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        return Response(
+            build_response(
+                success=True,
+                message="Token refreshed successfully.",
+                data=dict(serializer.validated_data),
+            ),
+            status=status.HTTP_200_OK,
+        )
+
+
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         refresh_token = serializer.validated_data["refresh"]
-        TokenService.blacklist_refresh_token(refresh_token)
 
-        user = getattr(request, "user", None)
-        if user and user.is_authenticated:
-            try:
-                jti = RefreshToken(refresh_token).get("jti")
-                session = UserSession.objects.filter(refresh_token_jti=jti, user=user).first()
-                if session:
-                    SessionService.terminate_session(session)
-            except Exception:
-                pass
+        try:
+            token = RefreshToken(refresh_token)
+            jti = str(token["jti"])
+        except TokenError:
+            return Response(
+                build_response(
+                    success=False,
+                    message="Invalid or expired refresh token.",
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            LoginHistoryService.record_logout(user)
-            log_audit(user, "LOGOUT", ip_address=get_client_ip(request))
+        session = UserSession.objects.filter(
+            refresh_token_jti=jti,
+            user=request.user,
+            is_active=True,
+        ).first()
+
+        if session is None:
+            return Response(
+                build_response(
+                    success=False,
+                    message="Refresh token does not belong to the authenticated session.",
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            TokenService.blacklist_refresh_token(
+                refresh_token,
+            )
+        except TokenError:
+            return Response(
+                build_response(
+                    success=False,
+                    message="Invalid or expired refresh token.",
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        SessionService.terminate_session(session)
+        LoginHistoryService.record_logout(request.user)
+        log_audit(
+            request.user,
+            "LOGOUT",
+            ip_address=get_client_ip(request),
+            metadata={"session_id": str(session.id)},
+        )
 
         return Response(
-            build_response(success=True, message="Logged out successfully."),
+            build_response(
+                success=True,
+                message="Logged out successfully.",
+            ),
             status=status.HTTP_200_OK,
         )
 
@@ -142,6 +212,8 @@ class LogoutAllView(APIView):
 
     def post(self, request):
         user = request.user
+
+        TokenService.blacklist_user_refresh_tokens(user)
         SessionService.terminate_user_sessions(user)
 
         LoginHistoryService.record_logout(user)

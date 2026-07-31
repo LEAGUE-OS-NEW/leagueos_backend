@@ -1,22 +1,40 @@
-import logging
-
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 from rest_framework_simplejwt.tokens import RefreshToken
-
-logger = logging.getLogger(__name__)
 
 
 class TokenService:
     @staticmethod
     def generate_tokens(user) -> tuple[str, str]:
         refresh = RefreshToken.for_user(user)
-        access = str(refresh.access_token)
-        refresh_str = str(refresh)
-        return access, refresh_str
+
+        return str(refresh.access_token), str(refresh)
 
     @staticmethod
-    def blacklist_refresh_token(refresh_token: str) -> None:
-        try:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-        except Exception as exc:
-            logger.error("Failed to blacklist refresh token: %s", exc)
+    def blacklist_refresh_token(refresh_token: str) -> str:
+        token = RefreshToken(refresh_token)
+        jti = str(token["jti"])
+
+        token.blacklist()
+
+        return jti
+
+    @staticmethod
+    def blacklist_user_refresh_tokens(user) -> int:
+        blacklisted_count = 0
+
+        outstanding_tokens = OutstandingToken.objects.filter(
+            user=user,
+        )
+
+        for outstanding_token in outstanding_tokens:
+            _, created = BlacklistedToken.objects.get_or_create(
+                token=outstanding_token,
+            )
+
+            if created:
+                blacklisted_count += 1
+
+        return blacklisted_count
