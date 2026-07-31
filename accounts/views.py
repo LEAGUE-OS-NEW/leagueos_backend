@@ -77,7 +77,6 @@ class RegisterView(APIView):
         )
 
         response_data = {
-            "message": "Account created. Verification code sent.",
             "verification_channel": channel,
         }
         if channel == "EMAIL":
@@ -87,7 +86,9 @@ class RegisterView(APIView):
 
         return Response(
             build_response(
-                success=True, message="Account created. Verification code sent.", data=response_data
+                success=True,
+                message="Registration successful. Please check your email to verify your account.",
+                data=response_data,
             ),
             status=status.HTTP_201_CREATED,
         )

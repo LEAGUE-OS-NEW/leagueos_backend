@@ -30,6 +30,10 @@ class RegistrationTests(APITestCase):
         self.assertFalse(User.objects.get(email=data["email"]).is_verified)
         self.assertEqual(response.data["data"]["verification_channel"], "EMAIL")
         self.assertEqual(response.data["success"], True)
+        self.assertEqual(
+            response.data["message"],
+            "Registration successful. Please check your email to verify your account.",
+        )
 
     def test_duplicate_email_rejected(self):
         User.objects.create_user(
@@ -174,6 +178,32 @@ class ResendOTPTests(APITestCase):
         url = reverse("accounts:resend-otp")
         response = self.client.post(url, {"email": "ratelimit@example.com"})
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_resend_verification_alias(self):
+        """Test that resend-verification endpoint works as alias for resend-otp."""
+        from accounts.services.otp_service import OTPService
+
+        user = User.objects.create_user(
+            username="aliasuser",
+            email="alias@example.com",
+            password="StrongPass123!",
+            first_name="Alias",
+            last_name="User",
+        )
+        otp, code = OTPService.create_otp_record(user, purpose="REGISTER", channel="EMAIL")
+        OTPVerification.objects.filter(id=otp.id).update(
+            created_at=timezone.now() - timedelta(minutes=10)
+        )
+
+        url = reverse("accounts:resend-verification")
+        with patch(
+            "accounts.services.email_service.EmailService.send_verification_email"
+        ) as mock_send:
+            response = self.client.post(url, {"email": "alias@example.com"})
+            mock_send.assert_called_once()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("expires_in", response.data["data"])
 
 
 class LoginTests(APITestCase):

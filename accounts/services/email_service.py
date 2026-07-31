@@ -11,11 +11,13 @@ logger = logging.getLogger(__name__)
 class EmailService:
     @staticmethod
     def send_verification_email(user, otp_code: str) -> None:
-        subject = "League OS Account Verification"
+        subject = "Verify Your League OS Email Address"
         context = {
             "first_name": user.first_name or "Fan",
             "otp_code": otp_code,
-            "expires_in": settings.OTP_EXPIRY_MINUTES * 60,
+            "expiry_minutes": settings.OTP_EXPIRY_MINUTES,
+            "support_email": getattr(settings, "SUPPORT_EMAIL", "support@leagueos.com"),
+            "website": getattr(settings, "WEBSITE_URL", "https://leagueos.com"),
             "current_year": timezone.now().year,
         }
 
