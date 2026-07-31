@@ -41,6 +41,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     "accounts",
+    "authentication",
     "system",
 ]
 
@@ -170,3 +171,7 @@ OTP_RESEND_COOLDOWN_MINUTES = 2
 OTP_MAX_DAILY_RESENDS = 5
 OTP_MAX_VERIFICATION_ATTEMPTS = 5
 OTP_EXPIRY_MINUTES = 10
+
+# Login Throttling Settings
+LOGIN_MAX_FAILED_ATTEMPTS = 5
+LOGIN_LOCK_MINUTES = 15
