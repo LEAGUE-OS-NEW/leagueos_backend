@@ -273,6 +273,76 @@ class SeedRolesCommandTests(APITestCase):
                     },
                 )
 
+    def test_fan_receives_general_fan_permissions(self):
+        call_command("seed_roles", verbosity=0)
+
+        permission_names = set(
+            RolePermission.objects.filter(
+                role__name="Fan",
+            ).values_list(
+                "permission__name",
+                flat=True,
+            )
+        )
+
+        self.assertEqual(
+            permission_names,
+            {
+                "buy_ticket",
+                "join_fantasy",
+            },
+        )
+
+    def test_verified_market_user_only_receives_market_access(self):
+        call_command("seed_roles", verbosity=0)
+
+        permission_names = set(
+            RolePermission.objects.filter(
+                role__name="Verified Market User",
+            ).values_list(
+                "permission__name",
+                flat=True,
+            )
+        )
+
+        self.assertEqual(
+            permission_names,
+            {
+                "participate_market",
+            },
+        )
+
+    def test_seed_roles_removes_obsolete_system_mappings(self):
+        call_command("seed_roles", verbosity=0)
+
+        role = Role.objects.get(
+            name="Verified Market User",
+        )
+        obsolete_permission = Permission.objects.get(
+            name="buy_ticket",
+        )
+
+        RolePermission.objects.create(
+            role=role,
+            permission=obsolete_permission,
+        )
+
+        self.assertTrue(
+            RolePermission.objects.filter(
+                role=role,
+                permission=obsolete_permission,
+            ).exists()
+        )
+
+        call_command("seed_roles", verbosity=0)
+
+        self.assertFalse(
+            RolePermission.objects.filter(
+                role=role,
+                permission=obsolete_permission,
+            ).exists()
+        )
+
     def test_seed_roles_gives_super_admin_all_permissions(self):
         call_command("seed_roles", verbosity=0)
 

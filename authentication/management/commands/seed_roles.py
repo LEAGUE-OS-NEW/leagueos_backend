@@ -221,8 +221,6 @@ ROLE_PERMISSIONS = {
         "join_fantasy",
     ],
     "Verified Market User": [
-        "buy_ticket",
-        "join_fantasy",
         "participate_market",
     ],
     "Fantasy Manager": [
@@ -333,6 +331,15 @@ class Command(BaseCommand):
                     f"'{role_name}': "
                     f"{sorted(missing_permission_names)}"
                 )
+
+            managed_permission_names = [permission["name"] for permission in SYSTEM_PERMISSIONS]
+
+            RolePermission.objects.filter(
+                role=role,
+                permission__name__in=managed_permission_names,
+            ).exclude(
+                permission__name__in=permission_names,
+            ).delete()
 
             for permission_name in permission_names:
                 RolePermission.objects.get_or_create(
