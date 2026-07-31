@@ -189,7 +189,7 @@ class LoginTests(APITestCase):
         )
 
     def test_login_success(self):
-        url = reverse("accounts:login")
+        url = reverse("authentication:login")
         data = {"email": "login@example.com", "password": "StrongPass123!"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -198,7 +198,7 @@ class LoginTests(APITestCase):
     def test_login_blocks_unverified_account(self):
         self.user.is_verified = False
         self.user.save()
-        url = reverse("accounts:login")
+        url = reverse("authentication:login")
         data = {"email": "login@example.com", "password": "StrongPass123!"}
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

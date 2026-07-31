@@ -1,0 +1,194 @@
+import logging
+
+from rest_framework import permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from accounts.models import AuditLog, User
+from authentication.models import UserSession
+from authentication.serializers import (
+    LoginSerializer,
+    LogoutSerializer,
+    ProfileSerializer,
+    SessionSerializer,
+)
+from authentication.services.authentication_service import AuthenticationService
+from authentication.services.login_history_service import LoginHistoryService
+from authentication.services.role_service import RoleService
+from authentication.services.session_service import SessionService
+from authentication.services.token_service import TokenService
+
+logger = logging.getLogger(__name__)
+
+
+def get_client_ip(request):
+    x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded:
+        return x_forwarded.split(",")[0]
+    return request.META.get("REMOTE_ADDR")
+
+
+def log_audit(user, action, ip_address=None, user_agent="", metadata=None):
+    AuditLog.objects.create(
+        user=user,
+        action=action,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        metadata=metadata or {},
+    )
+
+
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        password = serializer.validated_data["password"]
+        ip_address = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+
+        # First check if the account is locked before attempting authentication
+        user = User.objects.filter(email__iexact=email).first()
+        if user and AuthenticationService.is_account_locked(user):
+            log_audit(
+                user,
+                "LOGIN_LOCKED",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                metadata={"locked_until": str(user.locked_until)},
+            )
+            return Response(
+                build_response(success=False, message="Account temporarily locked."),
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        user = AuthenticationService.authenticate(email, password, ip_address, user_agent)
+        if not user:
+            return Response(
+                build_response(success=False, message="Invalid email or password."),
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        access, refresh = TokenService.generate_tokens(user)
+        session = SessionService.create_session(user, refresh, ip_address, user_agent)
+        LoginHistoryService.record_login(user, ip_address, user_agent, successful=True)
+
+        log_audit(
+            user,
+            "LOGIN_SUCCESS",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            metadata={"session_id": str(session.id)},
+        )
+
+        profile = ProfileSerializer(user).data
+        highest_role = RoleService.get_highest_priority_role(user)
+        dashboard_url = highest_role.dashboard_url if highest_role else ""
+
+        return Response(
+            build_response(
+                success=True,
+                message="Login successful.",
+                data={
+                    "access": access,
+                    "refresh": refresh,
+                    "dashboard_url": dashboard_url,
+                    "user": profile,
+                },
+            ),
+            status=status.HTTP_200_OK,
+        )
+
+
+class LogoutView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = LogoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        refresh_token = serializer.validated_data["refresh"]
+        TokenService.blacklist_refresh_token(refresh_token)
+
+        user = getattr(request, "user", None)
+        if user and user.is_authenticated:
+            try:
+                jti = RefreshToken(refresh_token).get("jti")
+                session = UserSession.objects.filter(refresh_token_jti=jti, user=user).first()
+                if session:
+                    SessionService.terminate_session(session)
+            except Exception:
+                pass
+
+            LoginHistoryService.record_logout(user)
+            log_audit(user, "LOGOUT", ip_address=get_client_ip(request))
+
+        return Response(
+            build_response(success=True, message="Logged out successfully."),
+            status=status.HTTP_200_OK,
+        )
+
+
+class LogoutAllView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        SessionService.terminate_user_sessions(user)
+
+        LoginHistoryService.record_logout(user)
+        log_audit(user, "LOGOUT_ALL", ip_address=get_client_ip(request))
+
+        return Response(
+            build_response(success=True, message="Logged out from all devices."),
+            status=status.HTTP_200_OK,
+        )
+
+
+class ProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        serializer = ProfileSerializer(request.user)
+        return Response(
+            build_response(
+                success=True, message="Profile fetched.", data={"user": serializer.data}
+            ),
+            status=status.HTTP_200_OK,
+        )
+
+
+class MeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        serializer = ProfileSerializer(request.user)
+        return Response(
+            build_response(success=True, message="Current user.", data={"user": serializer.data}),
+            status=status.HTTP_200_OK,
+        )
+
+
+class SessionListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        sessions = SessionService.get_active_sessions(request.user)
+        serializer = SessionSerializer(sessions, many=True)
+        return Response(
+            build_response(
+                success=True, message="Sessions fetched.", data={"sessions": serializer.data}
+            ),
+            status=status.HTTP_200_OK,
+        )
+
+
+def build_response(success: bool, message: str, data=None):
+    payload = {"success": success, "message": message}
+    if data is not None:
+        payload["data"] = data
+    return payload

@@ -33,6 +33,9 @@ class User(AbstractUser):
         blank=True,
         default="EMAIL",
     )
+    failed_attempts = models.IntegerField(default=0)
+    last_failed_attempt = models.DateTimeField(null=True, blank=True)
+    locked_until = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

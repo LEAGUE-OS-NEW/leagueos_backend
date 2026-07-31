@@ -1,6 +1,6 @@
 # League OS Backend
 
-Fan registration and email OTP verification API built with Django, Django REST Framework, PostgreSQL, JWT authentication, and drf-spectacular.
+Fan registration, email OTP verification, authentication, authorization, session management, and role-based access control API built with Django, Django REST Framework, PostgreSQL, JWT authentication, and drf-spectacular.
 
 ## Features
 
@@ -11,6 +11,11 @@ Fan registration and email OTP verification API built with Django, Django REST F
 - Rate-limited OTP resend
 - Registration status endpoint
 - Audit logging
+- Login throttling and account locking
+- Session management
+- Login history tracking
+- Role-based access control (RBAC)
+- Generic permission engine
 - OpenAPI schema with drf-spectacular
 
 ## Requirements
@@ -48,7 +53,12 @@ Fan registration and email OTP verification API built with Django, Django REST F
    python manage.py migrate
    ```
 
-4. Start the server:
+4. Seed initial system roles:
+   ```bash
+   python manage.py seed_roles
+   ```
+
+5. Start the server:
    ```bash
    python manage.py runserver
    ```
@@ -123,12 +133,53 @@ Request body:
 }
 ```
 
+### Logout
+
+Blacklist refresh token and terminate session.
+
+```bash
+POST /api/v1/auth/logout/
+```
+
+Request body:
+```json
+{
+  "refresh": "<refresh_token>"
+}
+```
+
+### Logout All Devices
+
+Terminate all active sessions.
+
+```bash
+POST /api/v1/auth/logout-all/
+```
+
 ### Profile
 
 Get the authenticated fan profile.
 
 ```bash
 GET /api/v1/auth/profile/
+Authorization: Bearer <access_token>
+```
+
+### Current User
+
+Get current user profile.
+
+```bash
+GET /api/v1/auth/me/
+Authorization: Bearer <access_token>
+```
+
+### Sessions
+
+Get active sessions.
+
+```bash
+GET /api/v1/auth/sessions/
 Authorization: Bearer <access_token>
 ```
 
@@ -144,7 +195,12 @@ GET /api/v1/auth/registration-status/?email=faith.akiror@gmail.com
 
 Run tests:
 ```bash
-python -m pytest accounts/tests/test_registration.py -v
+python -m pytest accounts/tests/test_registration.py authentication/tests/test_authentication.py -v
+```
+
+Run tests with coverage:
+```bash
+python -m pytest --cov=accounts --cov=authentication --cov-report=term-missing --cov-report=xml
 ```
 
 Format code:
@@ -154,6 +210,11 @@ ruff format .
 ruff check .
 ```
 
+Seed roles:
+```bash
+python manage.py seed_roles
+```
+
 ## Security
 
 - OTPs are hashed before storage.
@@ -161,3 +222,6 @@ ruff check .
 - Account activation requires verified email.
 - Rate limiting prevents brute-force verification attempts.
 - Email is normalized to lowercase before storage.
+- Login throttling locks accounts after repeated failures.
+- Refresh token rotation and blacklisting supported.
+- All timestamps are timezone-aware.
