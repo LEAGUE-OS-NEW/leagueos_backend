@@ -93,6 +93,7 @@ class MarketAdmin(admin.ModelAdmin):
         "created_by",
         "approved_by",
         "resolved_by",
+        "winning_outcome",
     )
     inlines = (MarketOutcomeInline,)
 
@@ -142,6 +143,7 @@ class MarketStatusTransitionAdmin(admin.ModelAdmin):
         "actor",
         "actor_email",
         "notes",
+        "metadata",
         "created_at",
         "updated_at",
     )

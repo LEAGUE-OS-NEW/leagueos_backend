@@ -13,6 +13,10 @@ from markets.lifecycle_views import (
     MarketSubmitView,
     MarketSuspendView,
 )
+from markets.resolution_views import (
+    MarketResolveView,
+    MarketVoidView,
+)
 from markets.views import (
     MarketCategoryListView,
     MarketDetailView,
@@ -66,6 +70,16 @@ urlpatterns = [
         ("market-admin/markets/" "<uuid:market_id>/close/"),
         MarketCloseView.as_view(),
         name="admin-market-close",
+    ),
+    path(
+        ("market-admin/markets/" "<uuid:market_id>/resolve/"),
+        MarketResolveView.as_view(),
+        name="admin-market-resolve",
+    ),
+    path(
+        ("market-admin/markets/" "<uuid:market_id>/void/"),
+        MarketVoidView.as_view(),
+        name="admin-market-void",
     ),
     path(
         "markets/categories/",

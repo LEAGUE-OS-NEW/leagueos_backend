@@ -41,6 +41,7 @@ class MarketAdminQuerysetMixin:
             "created_by",
             "approved_by",
             "resolved_by",
+            "winning_outcome",
         ).prefetch_related(
             "outcomes",
             "status_transitions__actor",

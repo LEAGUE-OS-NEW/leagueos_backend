@@ -5,13 +5,27 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from authentication.tests.factories import (
+    PermissionFactory,
+    RoleFactory,
+    RolePermissionFactory,
+    UserFactory,
+    UserRoleFactory,
+)
 from markets.models import (
     Market,
     MarketCategory,
+    MarketOutcome,
     MarketScope,
 )
 from markets.services.catalog_service import (
     MarketCatalogService,
+)
+from markets.services.lifecycle_service import (
+    MarketLifecycleService,
+)
+from markets.services.resolution_service import (
+    MarketResolutionService,
 )
 from sports.models import (
     Competition,
@@ -238,4 +252,166 @@ class PublicMarketAPITests(APITestCase):
         self.assertNotIn(
             str(self.inactive_category.id),
             category_ids,
+        )
+
+
+class PublicResolvedMarketAPITests(APITestCase):
+    def setUp(self):
+        self.now = timezone.now()
+
+        manage_permission = PermissionFactory(
+            name="manage_market",
+            resource="market",
+            action="manage",
+        )
+        approve_permission = PermissionFactory(
+            name="approve_market",
+            resource="market",
+            action="approve",
+        )
+
+        operations_role = RoleFactory(
+            name="Market Operations Admin",
+            display_name="Market Operations Admin",
+        )
+        approval_role = RoleFactory(
+            name="Market Approval Admin",
+            display_name="Market Approval Admin",
+        )
+
+        RolePermissionFactory(
+            role=operations_role,
+            permission=manage_permission,
+        )
+        RolePermissionFactory(
+            role=approval_role,
+            permission=approve_permission,
+        )
+
+        self.operations_user = UserFactory()
+        self.approver_user = UserFactory()
+
+        UserRoleFactory(
+            user=self.operations_user,
+            role=operations_role,
+        )
+        UserRoleFactory(
+            user=self.approver_user,
+            role=approval_role,
+        )
+
+        football = Sport.objects.create(
+            name="Football",
+            code="FOOTBALL",
+        )
+        category = MarketCategory.objects.create(
+            name="Match Result",
+        )
+        competition = Competition.objects.create(
+            sport=football,
+            name="Uganda Premier League",
+            country_code="UG",
+            is_verified=True,
+        )
+        event = SportingEvent.objects.create(
+            sport=football,
+            competition=competition,
+            event_type=SportingEvent.EventType.MATCH,
+            name="KCCA FC vs Vipers SC",
+            starts_at=self.now + timedelta(days=2),
+            status=SportingEvent.Status.SCHEDULED,
+            is_verified=True,
+            verified_at=self.now,
+        )
+
+        market = MarketCatalogService.create_market(
+            sport=football,
+            category=category,
+            scope_type=MarketScope.EVENT,
+            sporting_event=event,
+            question="Will KCCA FC beat Vipers SC?",
+            description="Match result market.",
+            rules=("Resolve YES if KCCA FC wins " "in regulation time."),
+            resolution_source=("Official competition result"),
+            resolution_criteria=("Use the verified final score."),
+            status=Market.Status.DRAFT,
+            opens_at=self.now - timedelta(hours=1),
+            closes_at=self.now + timedelta(hours=1),
+            created_by=self.operations_user,
+            yes_label="KCCA FC wins",
+            no_label="Draw or Vipers SC",
+        )
+
+        market = MarketLifecycleService.submit(
+            market_id=market.id,
+            actor=self.operations_user,
+            notes="Ready for review.",
+        )
+        market = MarketLifecycleService.approve(
+            market_id=market.id,
+            actor=self.approver_user,
+            notes="Market verified.",
+        )
+        market = MarketLifecycleService.open(
+            market_id=market.id,
+            actor=self.approver_user,
+            notes="Trading opened.",
+        )
+        market = MarketLifecycleService.close(
+            market_id=market.id,
+            actor=self.approver_user,
+            notes="Trading completed.",
+        )
+
+        self.winner = market.outcomes.get(
+            side=MarketOutcome.Side.YES,
+        )
+
+        self.resolved_market = MarketResolutionService.resolve(
+            market_id=market.id,
+            actor=self.approver_user,
+            winning_outcome_id=self.winner.id,
+            notes="Official result confirmed.",
+            evidence=("Official match report: " "KCCA FC 2-1 Vipers SC."),
+        )
+
+    def test_resolved_market_exposes_winning_outcome(
+        self,
+    ):
+        response = self.client.get(
+            reverse(
+                "markets:market-detail",
+                kwargs={
+                    "market_id": (self.resolved_market.id),
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+            response.data,
+        )
+        self.assertEqual(
+            response.data["status"],
+            Market.Status.RESOLVED,
+        )
+        self.assertEqual(
+            response.data["winning_outcome"],
+            str(self.winner.id),
+        )
+
+        outcome_ids = {outcome["id"] for outcome in response.data["outcomes"]}
+
+        self.assertIn(
+            str(self.winner.id),
+            outcome_ids,
+        )
+        self.assertNotIn(
+            "resolution_evidence",
+            response.data,
+        )
+        self.assertNotIn(
+            "resolution_notes",
+            response.data,
         )

@@ -53,6 +53,7 @@ class MarketStatusTransitionSerializer(serializers.ModelSerializer):
             "actor",
             "actor_email",
             "notes",
+            "metadata",
             "created_at",
         ]
 
@@ -81,7 +82,9 @@ class MarketAdminReadSerializer(MarketPublicSerializer):
             "approval_notes",
             "resolved_by",
             "resolved_at",
+            "winning_outcome",
             "resolution_notes",
+            "resolution_evidence",
             "status_transitions",
         ]
 
@@ -339,6 +342,29 @@ class MarketAdminWriteSerializer(serializers.Serializer):
 
 class MarketLifecycleActionSerializer(serializers.Serializer):
     notes = serializers.CharField(
+        allow_blank=False,
+        trim_whitespace=True,
+    )
+
+
+class MarketResolveSerializer(serializers.Serializer):
+    winning_outcome_id = serializers.UUIDField()
+    notes = serializers.CharField(
+        allow_blank=False,
+        trim_whitespace=True,
+    )
+    evidence = serializers.CharField(
+        allow_blank=False,
+        trim_whitespace=True,
+    )
+
+
+class MarketVoidSerializer(serializers.Serializer):
+    notes = serializers.CharField(
+        allow_blank=False,
+        trim_whitespace=True,
+    )
+    evidence = serializers.CharField(
         allow_blank=False,
         trim_whitespace=True,
     )

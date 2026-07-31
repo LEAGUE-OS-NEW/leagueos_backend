@@ -57,6 +57,7 @@ class PublicMarketQuerysetMixin:
                 "competition__sport",
                 "participant",
                 "participant__sport",
+                "winning_outcome",
             )
             .prefetch_related(
                 "outcomes",

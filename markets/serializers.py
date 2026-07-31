@@ -94,6 +94,11 @@ class MarketPublicSerializer(serializers.ModelSerializer):
         read_only=True,
     )
     subject = serializers.SerializerMethodField()
+    winning_outcome = serializers.UUIDField(
+        source="winning_outcome_id",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = Market
@@ -118,6 +123,7 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "custom_subject",
             "subject",
             "outcomes",
+            "winning_outcome",
             "created_at",
             "updated_at",
         ]
