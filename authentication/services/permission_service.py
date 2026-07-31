@@ -1,22 +1,70 @@
-import logging
-
-from django.contrib.auth import get_user_model
-
-from authentication.models import RolePermission
-
-logger = logging.getLogger(__name__)
-User = get_user_model()
+from authentication.models import Permission, RolePermission
 
 
 class PermissionService:
     @staticmethod
     def get_user_permissions(user) -> list[str]:
-        role_ids = user.user_roles.values_list("role_id", flat=True)
-        permission_names = RolePermission.objects.filter(role_id__in=role_ids).values_list(
-            "permission__name", flat=True
+        if user is None or not user.is_authenticated or not user.is_active:
+            return []
+
+        if user.is_superuser:
+            return list(
+                Permission.objects.order_by("name").values_list(
+                    "name",
+                    flat=True,
+                )
+            )
+
+        return list(
+            RolePermission.objects.filter(
+                role__user_roles__user=user,
+            )
+            .order_by("permission__name")
+            .values_list(
+                "permission__name",
+                flat=True,
+            )
+            .distinct()
         )
-        return list(permission_names)
 
     @staticmethod
-    def has_permission(user, permission_name: str) -> bool:
-        return permission_name in PermissionService.get_user_permissions(user)
+    def has_permission(
+        user,
+        permission_name: str,
+    ) -> bool:
+        if user is None or not user.is_authenticated or not user.is_active:
+            return False
+
+        if user.is_superuser:
+            return True
+
+        return RolePermission.objects.filter(
+            role__user_roles__user=user,
+            permission__name=permission_name,
+        ).exists()
+
+    @staticmethod
+    def has_any_permission(
+        user,
+        permission_names: list[str] | tuple[str, ...],
+    ) -> bool:
+        return any(
+            PermissionService.has_permission(
+                user,
+                permission_name,
+            )
+            for permission_name in permission_names
+        )
+
+    @staticmethod
+    def has_all_permissions(
+        user,
+        permission_names: list[str] | tuple[str, ...],
+    ) -> bool:
+        return all(
+            PermissionService.has_permission(
+                user,
+                permission_name,
+            )
+            for permission_name in permission_names
+        )
