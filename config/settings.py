@@ -163,6 +163,32 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
         "MarketScopeEnum": ("markets.models.MarketScope.choices"),
+        "MarketStatusEnum": [
+            ("DRAFT", "Draft"),
+            (
+                "PENDING_APPROVAL",
+                "Pending approval",
+            ),
+            ("APPROVED", "Approved"),
+            ("OPEN", "Open"),
+            ("SUSPENDED", "Suspended"),
+            ("CLOSED", "Closed"),
+            ("RESOLVED", "Resolved"),
+            ("VOIDED", "Voided"),
+            ("REJECTED", "Rejected"),
+        ],
+        "MarketTransitionActionEnum": [
+            (
+                "SUBMIT",
+                "Submit for approval",
+            ),
+            ("APPROVE", "Approve"),
+            ("REJECT", "Reject"),
+            ("OPEN", "Open"),
+            ("SUSPEND", "Suspend"),
+            ("REOPEN", "Reopen"),
+            ("CLOSE", "Close"),
+        ],
     },
 }
 
