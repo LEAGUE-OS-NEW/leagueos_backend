@@ -77,10 +77,17 @@ jobs:
       - name: Apply migrations
         run: python manage.py migrate --noinput
 
+      - name: Validate OpenAPI schema
+        run: >
+          python manage.py spectacular
+          --file /tmp/leagueos-openapi.yml
+          --validate
+
       - name: Run tests
         run: >
           pytest
           --cov=accounts
+          --cov=authentication
           --cov=system
           --cov-report=term-missing
           --cov-report=xml
