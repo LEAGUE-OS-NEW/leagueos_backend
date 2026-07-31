@@ -58,6 +58,11 @@ Fan registration, email OTP verification, authentication, authorization, session
    python manage.py seed_roles
    ```
 
+5. Seed initial lookup data (countries, languages, etc.):
+   ```bash
+   python manage.py seed_lookups
+   ```
+
 5. Start the server:
    ```bash
    python manage.py runserver
@@ -200,7 +205,7 @@ python -m pytest accounts/tests/test_registration.py authentication/tests/test_a
 
 Run tests with coverage:
 ```bash
-python -m pytest --cov=accounts --cov=authentication --cov-report=term-missing --cov-report=xml
+python -m pytest --cov=accounts --cov=authentication --cov=profiles --cov-report=term-missing --cov-report=xml
 ```
 
 Format code:

@@ -38,6 +38,8 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = [
     "accounts",
+    "authentication",
     "config",
+    "profiles",
     "system",
 ]

@@ -82,5 +82,6 @@ jobs:
           pytest
           --cov=accounts
           --cov=system
+          --cov=profiles
           --cov-report=term-missing
           --cov-report=xml
