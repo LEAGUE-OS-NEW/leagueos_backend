@@ -13,6 +13,14 @@ from markets.lifecycle_views import (
     MarketSubmitView,
     MarketSuspendView,
 )
+from markets.participation_views import (
+    MarketOrderCancelView,
+    MarketOrderCreateView,
+    MarketOrderDetailView,
+    MarketOrderListView,
+    MarketPositionDetailView,
+    MarketPositionListView,
+)
 from markets.resolution_views import (
     MarketResolveView,
     MarketVoidView,
@@ -26,6 +34,36 @@ from markets.views import (
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "market-positions/",
+        MarketPositionListView.as_view(),
+        name="market-position-list",
+    ),
+    path(
+        "market-positions/<uuid:position_id>/",
+        MarketPositionDetailView.as_view(),
+        name="market-position-detail",
+    ),
+    path(
+        "market-orders/",
+        MarketOrderListView.as_view(),
+        name="market-order-list",
+    ),
+    path(
+        "market-orders/<uuid:order_id>/",
+        MarketOrderDetailView.as_view(),
+        name="market-order-detail",
+    ),
+    path(
+        "market-orders/<uuid:order_id>/cancel/",
+        MarketOrderCancelView.as_view(),
+        name="market-order-cancel",
+    ),
+    path(
+        "markets/<uuid:market_id>/orders/",
+        MarketOrderCreateView.as_view(),
+        name="market-order-create",
+    ),
     path(
         "market-admin/markets/",
         MarketAdminListCreateView.as_view(),

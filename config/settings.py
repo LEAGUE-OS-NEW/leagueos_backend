@@ -191,6 +191,14 @@ SPECTACULAR_SETTINGS = {
             ("RESOLVE", "Resolve"),
             ("VOID", "Void"),
         ],
+        "MarketOutcomeSideEnum": [
+            ("YES", "Yes"),
+            ("NO", "No"),
+        ],
+        "MarketOrderSideEnum": [
+            ("BUY", "Buy"),
+            ("SELL", "Sell"),
+        ],
     },
 }
 
