@@ -82,12 +82,15 @@ jobs:
           python manage.py spectacular
           --file /tmp/leagueos-openapi.yml
           --validate
+          --fail-on-warn
 
       - name: Run tests
         run: >
           pytest
           --cov=accounts
           --cov=authentication
+          --cov=markets
+          --cov=sports
           --cov=system
           --cov-report=term-missing
           --cov-report=xml

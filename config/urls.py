@@ -28,6 +28,14 @@ urlpatterns = [
         name="api-redoc",
     ),
     path(
+        "api/v1/",
+        include("markets.urls"),
+    ),
+    path(
+        "api/v1/",
+        include("sports.urls"),
+    ),
+    path(
         "api/v1/system/",
         include("system.urls"),
     ),

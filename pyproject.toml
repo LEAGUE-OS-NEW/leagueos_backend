@@ -40,5 +40,7 @@ known-first-party = [
     "accounts",
     "authentication",
     "config",
+    "markets",
+    "sports",
     "system",
 ]

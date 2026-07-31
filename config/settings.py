@@ -44,6 +44,8 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "accounts",
     "authentication",
+    "markets",
+    "sports",
     "system",
 ]
 
@@ -159,6 +161,9 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Sports, fantasy, ticketing and markets platform API",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "ENUM_NAME_OVERRIDES": {
+        "MarketScopeEnum": ("markets.models.MarketScope.choices"),
+    },
 }
 
 
