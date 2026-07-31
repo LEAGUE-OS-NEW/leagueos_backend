@@ -17,10 +17,11 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from markets.models import Market, MarketOrder
+from markets.models import Market, MarketOrder, MarketPosition
 from markets.participation_serializers import (
     MarketOrderCreateSerializer,
     MarketOrderReadSerializer,
+    MarketPositionReadSerializer,
 )
 from markets.services.participation_service import (
     MarketParticipationService,
@@ -187,6 +188,78 @@ class MarketOrderDetailView(RetrieveAPIView):
 
     @extend_schema(
         responses=MarketOrderReadSerializer,
+        tags=["Market Participation"],
+    )
+    def get(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
+        return super().get(
+            request,
+            *args,
+            **kwargs,
+        )
+
+
+class MarketPositionListView(ListAPIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+    serializer_class = MarketPositionReadSerializer
+    pagination_class = PublicCatalogPagination
+
+    def get_queryset(self):
+        return (
+            MarketPosition.objects.filter(
+                user=self.request.user,
+            )
+            .select_related(
+                "market",
+                "outcome",
+            )
+            .order_by(
+                "-created_at",
+                "-id",
+            )
+        )
+
+    @extend_schema(
+        responses=MarketPositionReadSerializer(many=True),
+        tags=["Market Participation"],
+    )
+    def get(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
+        return super().get(
+            request,
+            *args,
+            **kwargs,
+        )
+
+
+class MarketPositionDetailView(RetrieveAPIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+    serializer_class = MarketPositionReadSerializer
+    lookup_field = "id"
+    lookup_url_kwarg = "position_id"
+
+    def get_queryset(self):
+        return MarketPosition.objects.filter(
+            user=self.request.user,
+        ).select_related(
+            "market",
+            "outcome",
+        )
+
+    @extend_schema(
+        responses=MarketPositionReadSerializer,
         tags=["Market Participation"],
     )
     def get(

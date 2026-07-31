@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from markets.models import MarketOrder
+from markets.models import MarketOrder, MarketPosition
 
 
 class MarketOrderCreateSerializer(serializers.Serializer):
@@ -53,6 +53,40 @@ class MarketOrderReadSerializer(serializers.ModelSerializer):
             "filled_quantity",
             "average_fill_price",
             "status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class MarketPositionReadSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(
+        read_only=True,
+    )
+    user = serializers.UUIDField(
+        source="user_id",
+        read_only=True,
+    )
+    market = serializers.UUIDField(
+        source="market_id",
+        read_only=True,
+    )
+    outcome = serializers.UUIDField(
+        source="outcome_id",
+        read_only=True,
+    )
+
+    class Meta:
+        model = MarketPosition
+        fields = [
+            "id",
+            "user",
+            "market",
+            "outcome",
+            "quantity",
+            "average_entry_price",
+            "total_cost",
+            "realized_pnl",
             "created_at",
             "updated_at",
         ]

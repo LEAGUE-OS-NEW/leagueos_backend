@@ -18,6 +18,8 @@ from markets.participation_views import (
     MarketOrderCreateView,
     MarketOrderDetailView,
     MarketOrderListView,
+    MarketPositionDetailView,
+    MarketPositionListView,
 )
 from markets.resolution_views import (
     MarketResolveView,
@@ -32,6 +34,16 @@ from markets.views import (
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "market-positions/",
+        MarketPositionListView.as_view(),
+        name="market-position-list",
+    ),
+    path(
+        "market-positions/<uuid:position_id>/",
+        MarketPositionDetailView.as_view(),
+        name="market-position-detail",
+    ),
     path(
         "market-orders/",
         MarketOrderListView.as_view(),
