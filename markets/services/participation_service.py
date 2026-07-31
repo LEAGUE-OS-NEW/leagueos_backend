@@ -61,6 +61,75 @@ class MarketParticipationService:
         return order
 
     @classmethod
+    @transaction.atomic
+    def cancel_order(
+        cls,
+        *,
+        user,
+        order_id,
+    ) -> MarketOrder:
+        cls._require_permission(user)
+        cls._require_verified_user(user)
+
+        order = cls._get_locked_order(order_id)
+
+        cls._require_order_owner(
+            order=order,
+            user=user,
+        )
+        cls._require_cancellable_order(order)
+
+        order.status = MarketOrder.Status.CANCELLED
+        order.full_clean()
+        order.save(
+            update_fields=[
+                "status",
+                "updated_at",
+            ]
+        )
+
+        return order
+
+    @staticmethod
+    def _get_locked_order(
+        order_id,
+    ) -> MarketOrder:
+        return (
+            MarketOrder.objects.select_for_update(
+                of=("self",),
+            )
+            .select_related(
+                "user",
+                "market",
+                "outcome",
+            )
+            .get(id=order_id)
+        )
+
+    @staticmethod
+    def _require_order_owner(
+        *,
+        order: MarketOrder,
+        user,
+    ) -> None:
+        if order.user_id != user.id:
+            raise PermissionDenied("You may only cancel your own " "market orders.")
+
+    @staticmethod
+    def _require_cancellable_order(
+        order: MarketOrder,
+    ) -> None:
+        cancellable_statuses = {
+            MarketOrder.Status.OPEN,
+            MarketOrder.Status.PARTIALLY_FILLED,
+        }
+
+        if order.status not in cancellable_statuses:
+            raise ValidationError(
+                {"status": ("Only open or partially " "filled orders can be " "cancelled.")}
+            )
+
+    @classmethod
     def _require_permission(
         cls,
         user,
