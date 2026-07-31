@@ -7,7 +7,6 @@ via environment configuration. All operations are backend-agnostic.
 from __future__ import annotations
 
 import logging
-import os
 import uuid
 
 from django.conf import settings

@@ -6,7 +6,6 @@ from io import StringIO
 
 import pytest
 from django.core.management import call_command
-from django.core.management.base import CommandError
 
 from profiles.models import Country, Gender, Language, Timezone
 

@@ -1,9 +1,6 @@
-"""Tests for profiles models."""
+ ."""Tests for profiles models."""
 
 from __future__ import annotations
-
-import uuid
-from datetime import date
 
 import pytest
 from django.contrib.auth import get_user_model

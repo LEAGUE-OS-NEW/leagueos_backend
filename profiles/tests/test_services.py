@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
-from unittest import mock
-
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -16,7 +13,6 @@ from profiles.tests.factories import (
     CountryFactory,
     GenderFactory,
     LanguageFactory,
-    ProfileFactory,
     TimezoneFactory,
     UserFactory,
 )
@@ -72,6 +68,8 @@ class TestProfileService:
 
     def test_validate_date_of_birth_too_young(self):
         from django.conf import settings
+
+        from datetime import date
 
         min_age = getattr(settings, "PROFILE_MIN_AGE_YEARS", 13)
         young = date(

@@ -9,18 +9,13 @@ from __future__ import annotations
 
 import io
 import logging
-from datetime import timedelta
 from typing import Any
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import AuditLog
-from profiles.models import Profile
-from profiles.services.image_validation_service import ImageValidationService, ValidationError
+from profiles.services.image_validation_service import ImageValidationService
 from profiles.services.profile_service import ProfileService
 from profiles.services.storage_service import StorageService
 

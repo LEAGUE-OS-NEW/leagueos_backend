@@ -1,3 +1,4 @@
+
 "Factory Boy factories for profiles app models."
 
 from __future__ import annotations
@@ -7,7 +8,6 @@ import uuid
 import factory
 from factory.django import DjangoModelFactory
 
-from accounts.models import User
 from profiles.models import Club, Country, Gender, Language, Profile, Timezone
 
 
