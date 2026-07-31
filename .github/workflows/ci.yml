@@ -88,6 +88,7 @@ jobs:
           pytest
           --cov=accounts
           --cov=authentication
+          --cov=sports
           --cov=system
           --cov-report=term-missing
           --cov-report=xml
