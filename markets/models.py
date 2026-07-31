@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -612,6 +613,265 @@ class MarketOutcome(TimeStampedUUIDModel):
 
         if not self.label.strip():
             errors["label"] = "Outcome label cannot be blank."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class MarketOrder(TimeStampedUUIDModel):
+    class Side(models.TextChoices):
+        BUY = "BUY", "Buy"
+        SELL = "SELL", "Sell"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        OPEN = "OPEN", "Open"
+        PARTIALLY_FILLED = (
+            "PARTIALLY_FILLED",
+            "Partially filled",
+        )
+        FILLED = "FILLED", "Filled"
+        CANCELLED = "CANCELLED", "Cancelled"
+        REJECTED = "REJECTED", "Rejected"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_orders",
+    )
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="orders",
+    )
+    outcome = models.ForeignKey(
+        MarketOutcome,
+        on_delete=models.PROTECT,
+        related_name="orders",
+    )
+    side = models.CharField(
+        max_length=10,
+        choices=Side.choices,
+        default=Side.BUY,
+        db_index=True,
+    )
+    quantity = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+    )
+    limit_price = models.DecimalField(
+        max_digits=6,
+        decimal_places=5,
+    )
+    filled_quantity = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        default=Decimal("0"),
+    )
+    average_fill_price = models.DecimalField(
+        max_digits=6,
+        decimal_places=5,
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+
+    class Meta:
+        ordering = [
+            "-created_at",
+            "-id",
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(quantity__gt=0),
+                name="market_order_quantity_positive",
+            ),
+            models.CheckConstraint(
+                condition=(Q(limit_price__gt=0) & Q(limit_price__lt=1)),
+                name="market_order_limit_price_valid",
+            ),
+            models.CheckConstraint(
+                condition=Q(filled_quantity__gte=0),
+                name=("market_order_filled_quantity_" "non_negative"),
+            ),
+            models.CheckConstraint(
+                condition=Q(filled_quantity__lte=models.F("quantity")),
+                name=("market_order_filled_quantity_" "within_order"),
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(average_fill_price__isnull=True)
+                    | (Q(average_fill_price__gt=0) & Q(average_fill_price__lt=1))
+                ),
+                name=("market_order_average_fill_" "price_valid"),
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "user",
+                    "status",
+                    "created_at",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "market",
+                    "status",
+                    "created_at",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "outcome",
+                    "side",
+                    "status",
+                    "limit_price",
+                ],
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id}: {self.side} " f"{self.quantity} @ {self.limit_price}"
+
+    def clean(self):
+        errors = {}
+
+        if self.outcome_id and self.market_id and self.outcome.market_id != self.market_id:
+            errors["outcome"] = "The selected outcome must belong " "to this market."
+
+        if self.quantity is None or self.quantity <= 0:
+            errors["quantity"] = "Order quantity must be positive."
+
+        if self.limit_price is None or self.limit_price <= 0 or self.limit_price >= 1:
+            errors["limit_price"] = "Limit price must be greater than " "0 and less than 1."
+
+        if self.filled_quantity is not None and self.filled_quantity < 0:
+            errors["filled_quantity"] = "Filled quantity cannot be negative."
+        elif (
+            self.quantity is not None
+            and self.filled_quantity is not None
+            and self.filled_quantity > self.quantity
+        ):
+            errors["filled_quantity"] = "Filled quantity cannot exceed " "the order quantity."
+
+        if self.average_fill_price is not None:
+            if self.average_fill_price <= 0 or self.average_fill_price >= 1:
+                errors["average_fill_price"] = (
+                    "Average fill price must be " "greater than 0 and less than 1."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class MarketPosition(TimeStampedUUIDModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_positions",
+    )
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="positions",
+    )
+    outcome = models.ForeignKey(
+        MarketOutcome,
+        on_delete=models.PROTECT,
+        related_name="positions",
+    )
+    quantity = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        default=Decimal("0"),
+    )
+    average_entry_price = models.DecimalField(
+        max_digits=6,
+        decimal_places=5,
+        default=Decimal("0"),
+    )
+    total_cost = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        default=Decimal("0"),
+    )
+    realized_pnl = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        default=Decimal("0"),
+    )
+
+    class Meta:
+        ordering = [
+            "-updated_at",
+            "-id",
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "user",
+                    "market",
+                    "outcome",
+                ],
+                name=("unique_user_market_outcome_" "position"),
+            ),
+            models.CheckConstraint(
+                condition=Q(quantity__gte=0),
+                name=("market_position_quantity_" "non_negative"),
+            ),
+            models.CheckConstraint(
+                condition=Q(total_cost__gte=0),
+                name=("market_position_total_cost_" "non_negative"),
+            ),
+            models.CheckConstraint(
+                condition=(Q(average_entry_price__gte=0) & Q(average_entry_price__lt=1)),
+                name=("market_position_average_entry_" "price_valid"),
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "user",
+                    "market",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "market",
+                    "outcome",
+                ],
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id}: " f"{self.outcome_id} " f"({self.quantity})"
+
+    def clean(self):
+        errors = {}
+
+        if self.outcome_id and self.market_id and self.outcome.market_id != self.market_id:
+            errors["outcome"] = "The selected outcome must belong " "to this market."
+
+        if self.quantity is None or self.quantity < 0:
+            errors["quantity"] = "Position quantity cannot be " "negative."
+
+        if (
+            self.average_entry_price is None
+            or self.average_entry_price < 0
+            or self.average_entry_price >= 1
+        ):
+            errors["average_entry_price"] = (
+                "Average entry price must be at " "least 0 and less than 1."
+            )
+
+        if self.total_cost is None or self.total_cost < 0:
+            errors["total_cost"] = "Position total cost cannot be " "negative."
 
         if errors:
             raise ValidationError(errors)
