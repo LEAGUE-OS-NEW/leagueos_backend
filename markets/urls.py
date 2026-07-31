@@ -1,5 +1,9 @@
 from django.urls import path
 
+from markets.admin_views import (
+    MarketAdminDetailView,
+    MarketAdminListCreateView,
+)
 from markets.views import (
     MarketCategoryListView,
     MarketDetailView,
@@ -9,6 +13,16 @@ from markets.views import (
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "market-admin/markets/",
+        MarketAdminListCreateView.as_view(),
+        name="admin-market-list",
+    ),
+    path(
+        "market-admin/markets/<uuid:market_id>/",
+        MarketAdminDetailView.as_view(),
+        name="admin-market-detail",
+    ),
     path(
         "markets/categories/",
         MarketCategoryListView.as_view(),
