@@ -10,6 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from accounts.models import AuditLog, User
 from authentication.models import UserSession
 from authentication.serializers import (
+    EmptySerializer,
     LoginSerializer,
     LogoutSerializer,
     PasswordResetConfirmSerializer,
@@ -46,6 +47,7 @@ def log_audit(user, action, ip_address=None, user_agent="", metadata=None):
 
 
 class LoginView(APIView):
+    serializer_class = LoginSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -111,6 +113,7 @@ class LoginView(APIView):
 
 
 class TokenRefreshView(APIView):
+    serializer_class = TokenRefreshSerializer
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
@@ -141,6 +144,7 @@ class TokenRefreshView(APIView):
 
 
 class LogoutView(APIView):
+    serializer_class = LogoutSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -208,6 +212,7 @@ class LogoutView(APIView):
 
 
 class LogoutAllView(APIView):
+    serializer_class = EmptySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -226,6 +231,7 @@ class LogoutAllView(APIView):
 
 
 class ProfileView(APIView):
+    serializer_class = ProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -239,6 +245,7 @@ class ProfileView(APIView):
 
 
 class MeView(APIView):
+    serializer_class = ProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -250,6 +257,7 @@ class MeView(APIView):
 
 
 class SessionListView(APIView):
+    serializer_class = SessionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -264,6 +272,7 @@ class SessionListView(APIView):
 
 
 class PasswordResetRequestView(APIView):
+    serializer_class = PasswordResetRequestSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -283,6 +292,7 @@ class PasswordResetRequestView(APIView):
 
 
 class PasswordResetVerifyView(APIView):
+    serializer_class = PasswordResetVerifySerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -308,6 +318,7 @@ class PasswordResetVerifyView(APIView):
 
 
 class PasswordResetConfirmView(APIView):
+    serializer_class = PasswordResetConfirmSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):

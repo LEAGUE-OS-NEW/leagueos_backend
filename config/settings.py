@@ -36,6 +36,7 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "corsheaders",
+    "drf_spectacular",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
 ]
@@ -155,7 +156,7 @@ SIMPLE_JWT = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "League OS API",
-    "DESCRIPTION": "Fan registration and verification API",
+    "DESCRIPTION": "Sports, fantasy, ticketing and markets platform API",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }

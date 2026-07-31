@@ -150,3 +150,19 @@ class RegistrationStatusSerializer(serializers.ModelSerializer):
             "verification_channel",
         ]
         read_only_fields = fields
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(
+        min_length=6,
+        max_length=6,
+    )
+
+
+class ResendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class RegistrationStatusQuerySerializer(serializers.Serializer):
+    email = serializers.EmailField()
