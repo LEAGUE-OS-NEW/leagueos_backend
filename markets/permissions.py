@@ -25,3 +25,23 @@ class HasMarketAdminAccess(BasePermission):
             request.user,
             "manage_market",
         )
+
+
+class HasManageMarketPermission(BasePermission):
+    message = "You do not have the manage_market " "permission."
+
+    def has_permission(self, request, view) -> bool:
+        return PermissionService.has_permission(
+            request.user,
+            "manage_market",
+        )
+
+
+class HasApproveMarketPermission(BasePermission):
+    message = "You do not have the approve_market " "permission."
+
+    def has_permission(self, request, view) -> bool:
+        return PermissionService.has_permission(
+            request.user,
+            "approve_market",
+        )

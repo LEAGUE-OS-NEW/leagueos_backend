@@ -335,3 +335,10 @@ class MarketAdminWriteSerializer(serializers.Serializer):
                 "non_field_errors": (error.messages),
             }
         ) from error
+
+
+class MarketLifecycleActionSerializer(serializers.Serializer):
+    notes = serializers.CharField(
+        allow_blank=False,
+        trim_whitespace=True,
+    )
