@@ -188,6 +188,8 @@ SPECTACULAR_SETTINGS = {
             ("SUSPEND", "Suspend"),
             ("REOPEN", "Reopen"),
             ("CLOSE", "Close"),
+            ("RESOLVE", "Resolve"),
+            ("VOID", "Void"),
         ],
     },
 }

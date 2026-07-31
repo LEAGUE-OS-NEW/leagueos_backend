@@ -270,6 +270,9 @@ class Market(TimeStampedUUIDModel):
     resolution_notes = models.TextField(
         blank=True,
     )
+    resolution_evidence = models.TextField(
+        blank=True,
+    )
     is_featured = models.BooleanField(
         default=False,
         db_index=True,
@@ -292,6 +295,13 @@ class Market(TimeStampedUUIDModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         related_name="resolved_markets",
+        null=True,
+        blank=True,
+    )
+    winning_outcome = models.ForeignKey(
+        "MarketOutcome",
+        on_delete=models.PROTECT,
+        related_name="winning_markets",
         null=True,
         blank=True,
     )
@@ -386,6 +396,8 @@ class Market(TimeStampedUUIDModel):
         self.rules = self.rules.strip()
         self.resolution_source = self.resolution_source.strip()
         self.resolution_criteria = self.resolution_criteria.strip()
+        self.resolution_notes = self.resolution_notes.strip()
+        self.resolution_evidence = self.resolution_evidence.strip()
 
         super().save(*args, **kwargs)
 
@@ -433,6 +445,7 @@ class Market(TimeStampedUUIDModel):
             self.Status.SUSPENDED,
             self.Status.CLOSED,
             self.Status.RESOLVED,
+            self.Status.VOIDED,
         }
 
         if self.status in public_statuses:
@@ -464,6 +477,37 @@ class Market(TimeStampedUUIDModel):
 
             if self.competition_id and not self.competition.is_verified:
                 errors["competition"] = "The contextual competition " "must be verified."
+
+        if self.winning_outcome_id:
+            if self.winning_outcome.market_id != self.pk:
+                errors["winning_outcome"] = "The winning outcome must belong " "to this market."
+
+        terminal_statuses = {
+            self.Status.RESOLVED,
+            self.Status.VOIDED,
+        }
+
+        if self.status == self.Status.RESOLVED:
+            if not self.winning_outcome_id:
+                errors["winning_outcome"] = "A resolved market requires " "a winning outcome."
+        elif self.status == self.Status.VOIDED:
+            if self.winning_outcome_id:
+                errors["winning_outcome"] = "A voided market cannot have " "a winning outcome."
+        elif self.winning_outcome_id:
+            errors["winning_outcome"] = "Only resolved markets can have " "a winning outcome."
+
+        if self.status in terminal_statuses:
+            if not self.resolved_by_id:
+                errors["resolved_by"] = "A terminal market requires " "a resolving administrator."
+
+            if self.resolved_at is None:
+                errors["resolved_at"] = "A terminal market requires " "a resolution timestamp."
+
+            if not self.resolution_notes.strip():
+                errors["resolution_notes"] = "Resolution notes are required."
+
+            if not self.resolution_evidence.strip():
+                errors["resolution_evidence"] = "Resolution evidence is required."
 
         if errors:
             raise ValidationError(errors)
@@ -582,6 +626,8 @@ class MarketStatusTransition(TimeStampedUUIDModel):
         SUSPEND = "SUSPEND", "Suspend"
         REOPEN = "REOPEN", "Reopen"
         CLOSE = "CLOSE", "Close"
+        RESOLVE = "RESOLVE", "Resolve"
+        VOID = "VOID", "Void"
 
     market = models.ForeignKey(
         Market,
@@ -610,6 +656,10 @@ class MarketStatusTransition(TimeStampedUUIDModel):
     )
     actor_email = models.EmailField()
     notes = models.TextField()
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+    )
 
     class Meta:
         ordering = [
