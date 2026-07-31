@@ -10,11 +10,15 @@ from authentication.models import UserSession
 from authentication.serializers import (
     LoginSerializer,
     LogoutSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+    PasswordResetVerifySerializer,
     ProfileSerializer,
     SessionSerializer,
 )
 from authentication.services.authentication_service import AuthenticationService
 from authentication.services.login_history_service import LoginHistoryService
+from authentication.services.password_reset_service import PasswordResetService
 from authentication.services.role_service import RoleService
 from authentication.services.session_service import SessionService
 from authentication.services.token_service import TokenService
@@ -184,6 +188,78 @@ class SessionListView(APIView):
                 success=True, message="Sessions fetched.", data={"sessions": serializer.data}
             ),
             status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        ip_address = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+
+        result = PasswordResetService.request_password_reset(email, ip_address, user_agent)
+
+        return Response(
+            build_response(success=result["success"], message=result["message"]),
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetVerifyView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        otp = serializer.validated_data["otp"]
+        ip_address = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+
+        result = PasswordResetService.verify_reset_token(email, otp, ip_address, user_agent)
+
+        if result["success"]:
+            return Response(
+                build_response(success=True, message=result["message"]),
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            build_response(success=False, message=result["message"]),
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        otp = serializer.validated_data["otp"]
+        password = serializer.validated_data["password"]
+        ip_address = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+
+        result = PasswordResetService.confirm_password_reset(
+            email, otp, password, ip_address, user_agent
+        )
+
+        if result["success"]:
+            return Response(
+                build_response(success=True, message=result["message"]),
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            build_response(success=False, message=result["message"]),
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
 

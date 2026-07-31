@@ -118,6 +118,14 @@ class AuditLog(models.Model):
         ("ACCOUNT_ACTIVATED", "Account activated"),
         ("OTP_RESENT", "OTP resent"),
         ("FAILED_VERIFICATION", "Failed verification"),
+        ("PASSWORD_RESET_REQUESTED", "Password reset requested"),
+        ("PASSWORD_RESET_EMAIL_SENT", "Password reset email sent"),
+        ("PASSWORD_RESET_VERIFIED", "Password reset verified"),
+        ("PASSWORD_RESET_SUCCESS", "Password reset successful"),
+        ("PASSWORD_RESET_FAILED", "Password reset failed"),
+        ("PASSWORD_RESET_EXPIRED", "Password reset token expired"),
+        ("PASSWORD_RESET_TOKEN_REUSED", "Password reset token reused"),
+        ("ALL_SESSIONS_TERMINATED", "All sessions terminated"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
