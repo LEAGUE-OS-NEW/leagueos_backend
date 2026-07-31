@@ -4,6 +4,7 @@ from markets.models import (
     Market,
     MarketCategory,
     MarketOutcome,
+    MarketStatusTransition,
     MarketTemplate,
 )
 
@@ -110,3 +111,57 @@ class MarketOutcomeAdmin(admin.ModelAdmin):
         "label",
     )
     autocomplete_fields = ("market",)
+
+
+@admin.register(MarketStatusTransition)
+class MarketStatusTransitionAdmin(admin.ModelAdmin):
+    list_display = (
+        "market",
+        "action",
+        "from_status",
+        "to_status",
+        "actor_email",
+        "created_at",
+    )
+    list_filter = (
+        "action",
+        "from_status",
+        "to_status",
+    )
+    search_fields = (
+        "market__question",
+        "actor_email",
+        "notes",
+    )
+    readonly_fields = (
+        "id",
+        "market",
+        "action",
+        "from_status",
+        "to_status",
+        "actor",
+        "actor_email",
+        "notes",
+        "created_at",
+        "updated_at",
+    )
+
+    def has_add_permission(
+        self,
+        request,
+    ) -> bool:
+        return False
+
+    def has_change_permission(
+        self,
+        request,
+        obj=None,
+    ) -> bool:
+        return False
+
+    def has_delete_permission(
+        self,
+        request,
+        obj=None,
+    ) -> bool:
+        return False

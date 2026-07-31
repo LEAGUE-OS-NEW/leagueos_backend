@@ -571,3 +571,96 @@ class MarketOutcome(TimeStampedUUIDModel):
 
         if errors:
             raise ValidationError(errors)
+
+
+class MarketStatusTransition(TimeStampedUUIDModel):
+    class Action(models.TextChoices):
+        SUBMIT = "SUBMIT", "Submit for approval"
+        APPROVE = "APPROVE", "Approve"
+        REJECT = "REJECT", "Reject"
+        OPEN = "OPEN", "Open"
+        SUSPEND = "SUSPEND", "Suspend"
+        REOPEN = "REOPEN", "Reopen"
+        CLOSE = "CLOSE", "Close"
+
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.CASCADE,
+        related_name="status_transitions",
+    )
+    action = models.CharField(
+        max_length=20,
+        choices=Action.choices,
+        db_index=True,
+    )
+    from_status = models.CharField(
+        max_length=30,
+        choices=Market.Status.choices,
+    )
+    to_status = models.CharField(
+        max_length=30,
+        choices=Market.Status.choices,
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="market_status_transitions",
+        null=True,
+        blank=True,
+    )
+    actor_email = models.EmailField()
+    notes = models.TextField()
+
+    class Meta:
+        ordering = [
+            "created_at",
+            "id",
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "market",
+                    "created_at",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "action",
+                    "created_at",
+                ],
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.market.question}: " f"{self.from_status} → {self.to_status}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Market status history is immutable.")
+
+        self.notes = self.notes.strip()
+
+        if self.actor_id and not self.actor_email:
+            self.actor_email = self.actor.email
+
+        self.full_clean()
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Market status history cannot be deleted.")
+
+    def clean(self):
+        errors = {}
+
+        if self.from_status == self.to_status:
+            errors["to_status"] = "A status transition must change " "the market status."
+
+        if not self.actor_email.strip():
+            errors["actor_email"] = "An actor email snapshot is required."
+
+        if not self.notes.strip():
+            errors["notes"] = "Transition notes are required."
+
+        if errors:
+            raise ValidationError(errors)
