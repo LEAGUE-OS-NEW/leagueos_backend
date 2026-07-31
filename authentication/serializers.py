@@ -1,70 +1,24 @@
+import re
+
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from authentication.models import LoginHistory, Permission, Role, UserSession
-from authentication.services.permission_service import PermissionService
-from authentication.services.role_service import RoleService
+from authentication.models import LoginHistory, UserSession
 
 User = get_user_model()
-
-
-def build_response(success: bool, message: str, data=None):
-    payload = {"success": success, "message": message}
-    if data is not None:
-        payload["data"] = data
-    return payload
 
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
+    def validate_email(self, value):
+        return value.lower().strip()
+
 
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField()
-
-
-class RefreshSerializer(serializers.Serializer):
-    refresh = serializers.CharField()
-
-
-class PermissionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Permission
-        fields = ["id", "name", "resource", "action", "description"]
-        read_only_fields = fields
-
-
-class RoleSerializer(serializers.ModelSerializer):
-    permissions = PermissionSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Role
-        fields = ["id", "name", "display_name", "description", "dashboard_url", "is_system"]
-        read_only_fields = fields
-
-
-class SessionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserSession
-        fields = [
-            "id",
-            "ip_address",
-            "device",
-            "browser",
-            "operating_system",
-            "is_active",
-            "login_time",
-            "last_activity",
-        ]
-        read_only_fields = fields
-
-
-class LoginHistorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LoginHistory
-        fields = ["id", "login_time", "logout_time", "ip_address", "successful", "failure_reason"]
-        read_only_fields = fields
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -79,17 +33,91 @@ class ProfileSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "is_verified",
-            "is_active",
             "roles",
             "permissions",
-            "created_at",
-            "updated_at",
         ]
-        read_only_fields = fields
 
-    def get_roles(self, user):
-        roles = RoleService.get_user_roles(user)
-        return RoleSerializer(roles, many=True).data
+    def get_roles(self, obj):
+        return list(obj.user_roles.values_list("role__name", flat=True))
 
-    def get_permissions(self, user):
-        return PermissionService.get_user_permissions(user)
+    def get_permissions(self, obj):
+        role_ids = obj.user_roles.values_list("role_id", flat=True)
+        from authentication.models import RolePermission
+
+        return list(
+            RolePermission.objects.filter(role_id__in=role_ids).values_list(
+                "permission__name", flat=True
+            )
+        )
+
+
+class SessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserSession
+        fields = [
+            "id",
+            "ip_address",
+            "user_agent",
+            "device",
+            "browser",
+            "operating_system",
+            "is_active",
+            "login_time",
+            "last_activity",
+        ]
+
+
+class LoginHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LoginHistory
+        fields = ["id", "login_time", "ip_address", "user_agent", "successful", "failure_reason"]
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value.lower().strip()
+
+
+class PasswordResetVerifySerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6, min_length=6)
+
+    def validate_email(self, value):
+        return value.lower().strip()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6, min_length=6)
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate_email(self, value):
+        return value.lower().strip()
+
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        if not re.search(r"[A-Z]", value):
+            raise serializers.ValidationError(
+                "Password must contain at least one uppercase letter."
+            )
+        if not re.search(r"[a-z]", value):
+            raise serializers.ValidationError(
+                "Password must contain at least one lowercase letter."
+            )
+        if not re.search(r"\d", value):
+            raise serializers.ValidationError("Password must contain at least one number.")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-+=\[\]\\/]", value):
+            raise serializers.ValidationError(
+                "Password must contain at least one special character."
+            )
+        validate_password(value)
+        return value
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+        return attrs

@@ -5,6 +5,9 @@ from authentication.views import (
     LogoutAllView,
     LogoutView,
     MeView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    PasswordResetVerifyView,
     ProfileView,
     SessionListView,
 )
@@ -18,4 +21,19 @@ urlpatterns = [
     path("profile/", ProfileView.as_view(), name="profile"),
     path("me/", MeView.as_view(), name="me"),
     path("sessions/", SessionListView.as_view(), name="sessions"),
+    path(
+        "password-reset/request/",
+        PasswordResetRequestView.as_view(),
+        name="password-reset-request",
+    ),
+    path(
+        "password-reset/verify/",
+        PasswordResetVerifyView.as_view(),
+        name="password-reset-verify",
+    ),
+    path(
+        "password-reset/confirm/",
+        PasswordResetConfirmView.as_view(),
+        name="password-reset-confirm",
+    ),
 ]
