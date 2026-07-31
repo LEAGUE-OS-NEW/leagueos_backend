@@ -16,6 +16,7 @@ def test_ci_measures_authentication_coverage():
 
     assert "--cov=accounts" in workflow
     assert "--cov=authentication" in workflow
+    assert "--cov=markets" in workflow
     assert "--cov=sports" in workflow
     assert "--cov=system" in workflow
 
