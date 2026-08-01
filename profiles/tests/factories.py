@@ -31,7 +31,7 @@ class CountryFactory(DjangoModelFactory):
 
     id = factory.LazyFunction(uuid.uuid4)
     name = factory.Sequence(lambda n: f"Country {n}")
-    iso_code = factory.Sequence(lambda n: f"C{n:02d}")
+    iso_code = factory.Sequence(lambda n: f"{chr(65 + n % 26)}{chr(65 + (n // 26) % 26)}")
     is_active = True
 
 
