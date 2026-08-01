@@ -139,6 +139,16 @@ class AuditLog(models.Model):
         ("AVATAR_UPDATED", "Avatar updated"),
         ("AVATAR_DELETED", "Avatar deleted"),
         ("UPLOAD_FAILED", "Upload failed"),
+        ("ONBOARDING_STARTED", "Onboarding started"),
+        ("COUNTRY_SELECTED", "Country selected"),
+        ("SPORT_SELECTED", "Sport selected"),
+        ("COMPETITION_SELECTED", "Competition selected"),
+        ("CLUB_SELECTED", "Club selected"),
+        ("STEP_SKIPPED", "Onboarding step skipped"),
+        ("ONBOARDING_RESUMED", "Onboarding resumed"),
+        ("ONBOARDING_COMPLETED", "Onboarding completed"),
+        ("PREFERENCES_UPDATED", "Preferences updated"),
+        ("DASHBOARD_CONFIGURATION_GENERATED", "Dashboard configuration generated"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
