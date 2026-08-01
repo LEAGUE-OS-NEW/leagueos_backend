@@ -41,6 +41,7 @@ known-first-party = [
     "authentication",
     "config",
     "markets",
+    "onboarding",
     "profiles",
     "sports",
     "system",

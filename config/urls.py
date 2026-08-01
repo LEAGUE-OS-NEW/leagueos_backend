@@ -30,6 +30,7 @@ urlpatterns = [
         include("markets.urls"),
     ),
     path("api/v1/", include("profiles.urls")),
+    path("api/v1/", include("onboarding.urls")),
     path(
         "api/v1/",
         include("sports.urls"),

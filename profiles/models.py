@@ -77,11 +77,27 @@ class Club(models.Model):
     """Model representing a sports club.
 
     Used as the favourite club selection for user profiles.
+    Optionally linked to a sport and competition for validation
+    during onboarding preference selection.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, unique=True)
     slug = models.SlugField(max_length=200, unique=True)
+    sport = models.ForeignKey(
+        "sports.Sport",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clubs",
+    )
+    competition = models.ForeignKey(
+        "sports.Competition",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clubs",
+    )
     founded = models.PositiveIntegerField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -89,6 +105,10 @@ class Club(models.Model):
 
     class Meta:
         ordering = ["name"]
+        indexes = [
+            models.Index(fields=["sport", "is_active"]),
+            models.Index(fields=["competition", "is_active"]),
+        ]
 
     def __str__(self) -> str:
         return self.name
