@@ -216,19 +216,19 @@ class OnboardingSerializer(serializers.ModelSerializer):
     def get_completion_percentage(self, obj: UserOnboarding) -> int:
         return obj.completion_percentage
 
-    def get_preferred_country(self, obj: UserOnboarding):
+    def get_preferred_country(self, obj: UserOnboarding) -> dict | None:
         country = self.context.get("preferred_country")
         return CountryCatalogueSerializer(country).data if country else None
 
-    def get_favourite_sports(self, obj: UserOnboarding):
+    def get_favourite_sports(self, obj: UserOnboarding) -> list[dict]:
         sports = self.context.get("favourite_sports", [])
         return SportCatalogueSerializer(sports, many=True).data
 
-    def get_favourite_competitions(self, obj: UserOnboarding):
+    def get_favourite_competitions(self, obj: UserOnboarding) -> list[dict]:
         competitions = self.context.get("favourite_competitions", [])
         return CompetitionCatalogueSerializer(competitions, many=True).data
 
-    def get_favourite_clubs(self, obj: UserOnboarding):
+    def get_favourite_clubs(self, obj: UserOnboarding) -> list[dict]:
         clubs = self.context.get("favourite_clubs", [])
         return ClubCatalogueSerializer(clubs, many=True).data
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -125,8 +126,13 @@ class ClubCatalogueView(generics.ListAPIView):
 class OnboardingStatusView(APIView):
     """Return the current onboarding status and saved preferences."""
 
+    serializer_class = OnboardingSerializer
     permission_classes = [IsAuthenticated, IsOnboardingOwner]
 
+    @extend_schema(
+        summary="Get onboarding status",
+        responses=OnboardingSerializer,
+    )
     def get(self, request: Request) -> Response:
         onboarding = OnboardingService.get_onboarding_status(request.user)
         serializer = OnboardingSerializer(
@@ -148,8 +154,14 @@ class OnboardingStatusView(APIView):
 class CountrySelectionView(APIView):
     """Select the user's preferred country during onboarding."""
 
+    serializer_class = CountrySelectionSerializer
     permission_classes = [IsAuthenticated, IsOnboardingOwner]
 
+    @extend_schema(
+        summary="Select preferred country",
+        request=CountrySelectionSerializer,
+        responses=CountrySelectionSerializer,
+    )
     def post(self, request: Request) -> Response:
         serializer = CountrySelectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -174,8 +186,14 @@ class CountrySelectionView(APIView):
 class SportSelectionView(APIView):
     """Select the user's favourite sports during onboarding."""
 
+    serializer_class = SportSelectionSerializer
     permission_classes = [IsAuthenticated, IsOnboardingOwner]
 
+    @extend_schema(
+        summary="Select favourite sports",
+        request=SportSelectionSerializer,
+        responses=SportSelectionSerializer,
+    )
     def post(self, request: Request) -> Response:
         serializer = SportSelectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -200,8 +218,14 @@ class SportSelectionView(APIView):
 class CompetitionSelectionView(APIView):
     """Select the user's favourite competitions during onboarding."""
 
+    serializer_class = CompetitionSelectionSerializer
     permission_classes = [IsAuthenticated, IsOnboardingOwner]
 
+    @extend_schema(
+        summary="Select favourite competitions",
+        request=CompetitionSelectionSerializer,
+        responses=CompetitionSelectionSerializer,
+    )
     def post(self, request: Request) -> Response:
         serializer = CompetitionSelectionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -230,8 +254,14 @@ class CompetitionSelectionView(APIView):
 class ClubSelectionView(APIView):
     """Select the user's favourite clubs during onboarding."""
 
+    serializer_class = ClubSelectionSerializer
     permission_classes = [IsAuthenticated, IsOnboardingOwner]
 
+    @extend_schema(
+        summary="Select favourite clubs",
+        request=ClubSelectionSerializer,
+        responses=ClubSelectionSerializer,
+    )
     def post(self, request: Request) -> Response:
         serializer = ClubSelectionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -256,8 +286,14 @@ class ClubSelectionView(APIView):
 class SkipStepView(APIView):
     """Skip an onboarding step."""
 
+    serializer_class = SkipStepSerializer
     permission_classes = [IsAuthenticated, IsOnboardingOwner]
 
+    @extend_schema(
+        summary="Skip onboarding step",
+        request=SkipStepSerializer,
+        responses=SkipStepSerializer,
+    )
     def post(self, request: Request) -> Response:
         serializer = SkipStepSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -280,8 +316,13 @@ class SkipStepView(APIView):
 class CompleteOnboardingView(APIView):
     """Complete the onboarding flow and return the dashboard configuration."""
 
+    serializer_class = DashboardConfigurationSerializer
     permission_classes = [IsAuthenticated, IsOnboardingOwner]
 
+    @extend_schema(
+        summary="Complete onboarding",
+        responses=DashboardConfigurationSerializer,
+    )
     def post(self, request: Request) -> Response:
         OnboardingService.complete_onboarding(request.user, ip_address=get_client_ip(request))
         configuration = DashboardConfigurationService.generate_dashboard_configuration(
@@ -302,8 +343,13 @@ class CompleteOnboardingView(APIView):
 class DashboardConfigurationView(APIView):
     """Return the personalized dashboard configuration."""
 
+    serializer_class = DashboardConfigurationSerializer
     permission_classes = [IsAuthenticated, IsOnboardingOwner]
 
+    @extend_schema(
+        summary="Get dashboard configuration",
+        responses=DashboardConfigurationSerializer,
+    )
     def get(self, request: Request) -> Response:
         configuration = DashboardConfigurationService.generate_dashboard_configuration(
             request.user, ip_address=get_client_ip(request)
