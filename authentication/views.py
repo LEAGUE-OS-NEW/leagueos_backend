@@ -16,8 +16,8 @@ from authentication.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     PasswordResetVerifySerializer,
-    ProfileSerializer,
     SessionSerializer,
+    UserProfileSerializer,
 )
 from authentication.services.authentication_service import AuthenticationService
 from authentication.services.login_history_service import LoginHistoryService
@@ -93,7 +93,7 @@ class LoginView(APIView):
             metadata={"session_id": str(session.id)},
         )
 
-        profile = ProfileSerializer(user).data
+        profile = UserProfileSerializer(user).data
         highest_role = RoleService.get_highest_priority_role(user)
         dashboard_url = highest_role.dashboard_url if highest_role else ""
 
@@ -231,11 +231,11 @@ class LogoutAllView(APIView):
 
 
 class ProfileView(APIView):
-    serializer_class = ProfileSerializer
+    serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        serializer = ProfileSerializer(request.user)
+        serializer = UserProfileSerializer(request.user)
         return Response(
             build_response(
                 success=True, message="Profile fetched.", data={"user": serializer.data}
@@ -245,11 +245,11 @@ class ProfileView(APIView):
 
 
 class MeView(APIView):
-    serializer_class = ProfileSerializer
+    serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        serializer = ProfileSerializer(request.user)
+        serializer = UserProfileSerializer(request.user)
         return Response(
             build_response(success=True, message="Current user.", data={"user": serializer.data}),
             status=status.HTTP_200_OK,

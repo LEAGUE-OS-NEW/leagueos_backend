@@ -45,6 +45,7 @@ LOCAL_APPS = [
     "accounts",
     "authentication",
     "markets",
+    "profiles",
     "sports",
     "system",
 ]
@@ -227,3 +228,54 @@ LOGIN_LOCK_MINUTES = 15
 # Password Reset Settings
 PASSWORD_RESET_OTP_EXPIRY_MINUTES = 15
 PASSWORD_RESET_MAX_ATTEMPTS = 5
+
+# =============================================================================
+# Profile & Avatar Settings
+# =============================================================================
+
+# Minimum age for new profiles (in years)
+PROFILE_MIN_AGE_YEARS = env.int("PROFILE_MIN_AGE_YEARS", default=13)
+
+# Maximum upload size for avatars (in bytes) - 5 MB
+AVATAR_MAX_UPLOAD_SIZE = env.int("AVATAR_MAX_UPLOAD_SIZE", default=5 * 1024 * 1024)
+
+# Default avatar URL served by frontend when no avatar is set
+DEFAULT_AVATAR_URL = env(
+    "DEFAULT_AVATAR_URL",
+    default="https://cdn.leagueos.com/avatars/default.png",
+)
+
+# Image dimension constraints
+AVATAR_MAX_DIMENSION = 4096
+AVATAR_MIN_DIMENSION = 256
+
+# Allowed MIME types and extensions for avatars
+AVATAR_ALLOWED_MIME_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+]
+AVATAR_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
+
+# Storage backend selection (local, s3, minio, r2)
+STORAGE_BACKEND = env("STORAGE_BACKEND", default="local")
+
+# Default file storage backend
+if STORAGE_BACKEND == "local":
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+elif STORAGE_BACKEND in ("s3", "minio", "r2"):
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+# S3 / MinIO / R2 connection settings
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="")
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="")
+AWS_S3_SIGNATURE_VERSION = env("AWS_S3_SIGNATURE_VERSION", default="s3v4")
+AWS_S3_FILE_OVERWRITE = False
+AWS_QUERYSTRING_AUTH = False
+AWS_DEFAULT_ACL = "private"
+AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="")
+AWS_MEDIA_LOCATION = "media"
+MEDIA_URL = env("MEDIA_URL", default="/media/")

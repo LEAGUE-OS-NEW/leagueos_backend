@@ -15,36 +15,24 @@ urlpatterns = [
     ),
     path(
         "api/v1/docs/",
-        SpectacularSwaggerView.as_view(
-            url_name="api-schema",
-        ),
+        SpectacularSwaggerView.as_view(url_name="api-schema"),
         name="api-docs",
     ),
     path(
         "api/v1/redoc/",
-        SpectacularRedocView.as_view(
-            url_name="api-schema",
-        ),
+        SpectacularRedocView.as_view(url_name="api-schema"),
         name="api-redoc",
     ),
+    path("api/v1/", include("accounts.urls")),
+    path("api/v1/auth/", include("authentication.urls")),
     path(
         "api/v1/",
         include("markets.urls"),
     ),
+    path("api/v1/", include("profiles.urls")),
     path(
         "api/v1/",
         include("sports.urls"),
     ),
-    path(
-        "api/v1/system/",
-        include("system.urls"),
-    ),
-    path(
-        "api/v1/",
-        include("accounts.urls"),
-    ),
-    path(
-        "api/v1/auth/",
-        include("authentication.urls"),
-    ),
+    path("api/v1/system/", include("system.urls")),
 ]

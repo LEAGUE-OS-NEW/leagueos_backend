@@ -132,6 +132,13 @@ class AuditLog(models.Model):
         ("PASSWORD_RESET_EXPIRED", "Password reset token expired"),
         ("PASSWORD_RESET_TOKEN_REUSED", "Password reset token reused"),
         ("ALL_SESSIONS_TERMINATED", "All sessions terminated"),
+        ("PROFILE_VIEWED", "Profile viewed"),
+        ("PROFILE_UPDATED", "Profile updated"),
+        ("FAVOURITE_CLUB_UPDATED", "Favourite club updated"),
+        ("AVATAR_UPLOADED", "Avatar uploaded"),
+        ("AVATAR_UPDATED", "Avatar updated"),
+        ("AVATAR_DELETED", "Avatar deleted"),
+        ("UPLOAD_FAILED", "Upload failed"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

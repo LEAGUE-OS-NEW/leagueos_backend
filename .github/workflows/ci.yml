@@ -92,5 +92,6 @@ jobs:
           --cov=markets
           --cov=sports
           --cov=system
+          --cov=profiles
           --cov-report=term-missing
           --cov-report=xml

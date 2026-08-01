@@ -21,7 +21,7 @@ class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField()
 
 
-class ProfileSerializer(serializers.ModelSerializer):
+class UserProfileSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
 

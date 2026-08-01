@@ -28,16 +28,3 @@ Support: {{ support_email }}
 Website: {{ website }}
 
 © {{ current_year }} League OS. All rights reserved.
-</arg_value>
-<task_progress>
-- [x] Update verification email templates (HTML + plain text) with professional design
-- [ ] Extend AuditLog ACTION_CHOICES with EMAIL_VERIFICATION_* actions
-- [ ] Generate migration for AuditLog changes
-- [ ] Add /api/v1/auth/resend-verification/ URL
-- [ ] Update registration response message format
-- [ ] Update tests for new audit actions
-- [ ] Run quality checks (black, ruff)
-- [ ] Run full test suite with coverage
-- [ ] Commit and push
-</task_progress>
-</write_to_file></tool_call>
