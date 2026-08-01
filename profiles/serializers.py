@@ -90,6 +90,12 @@ class ProfileSerializer(serializers.ModelSerializer):
     and avatar information.
     """
 
+    user = _UserSerializer(read_only=True)
+    gender = GenderSerializer(read_only=True)
+    country = CountrySerializer(read_only=True)
+    preferred_language = LanguageSerializer(read_only=True)
+    timezone = TimezoneSerializer(read_only=True)
+    favourite_club = ClubSerializer(read_only=True)
     first_name = serializers.SerializerMethodField()
     last_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
@@ -121,7 +127,6 @@ class ProfileSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = fields
-        depth = 1
 
     def get_first_name(self, obj: Profile) -> str | None:
         return obj.user.first_name
