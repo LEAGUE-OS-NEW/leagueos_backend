@@ -10,7 +10,6 @@ from datetime import date
 from typing import Any
 
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from rest_framework import serializers
 
 from profiles.models import Club, Country, Gender, Language, Profile, Timezone

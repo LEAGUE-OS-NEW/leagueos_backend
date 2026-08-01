@@ -1,4 +1,4 @@
- ."""Tests for profiles models."""
+"""Tests for profiles models."""
 
 from __future__ import annotations
 

@@ -7,11 +7,8 @@ and avatar upload/delete/retrieve endpoints.
 
 from __future__ import annotations
 
-from typing import Any
-
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, status
-from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -31,7 +28,6 @@ from profiles.serializers import (
 )
 from profiles.services.avatar_service import AvatarService
 from profiles.services.image_validation_service import ValidationError as ImageValidationError
-from profiles.services.lookup_service import LookupService
 from profiles.services.profile_service import ProfileService
 
 # =============================================================================
@@ -206,7 +202,7 @@ class AvatarView(APIView):
     )
     def post(self, request: Request) -> Response:
         """Upload or replace the user's profile avatar."""
-        profile = self.get_object()
+        self.get_object()
 
         if "avatar" not in request.data:
             return Response(

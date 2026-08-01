@@ -67,8 +67,10 @@ class Command(BaseCommand):
 
                 total_countries = len(countries)
                 self.stdout.write(
-                    self.style.SUCCESS(f"Countries: {created_countries} created, "
-                                      f"{total_countries - created_countries} existed.")
+                    self.style.SUCCESS(
+                        f"Countries: {created_countries} created, "
+                        f"{total_countries - created_countries} existed."
+                    )
                 )
 
                 languages = [
@@ -100,8 +102,10 @@ class Command(BaseCommand):
 
                 total_languages = len(languages)
                 self.stdout.write(
-                    self.style.SUCCESS(f"Languages: {created_languages} created, "
-                                      f"{total_languages - created_languages} existed.")
+                    self.style.SUCCESS(
+                        f"Languages: {created_languages} created, "
+                        f"{total_languages - created_languages} existed."
+                    )
                 )
 
                 timezones = [
@@ -133,8 +137,10 @@ class Command(BaseCommand):
 
                 total_timezones = len(timezones)
                 self.stdout.write(
-                    self.style.SUCCESS(f"Timezones: {created_timezones} created, "
-                                      f"{total_timezones - created_timezones} existed.")
+                    self.style.SUCCESS(
+                        f"Timezones: {created_timezones} created, "
+                        f"{total_timezones - created_timezones} existed."
+                    )
                 )
 
                 genders = [
@@ -155,8 +161,10 @@ class Command(BaseCommand):
 
                 total_genders = len(genders)
                 self.stdout.write(
-                    self.style.SUCCESS(f"Genders: {created_genders} created, "
-                                      f"{total_genders - created_genders} existed.")
+                    self.style.SUCCESS(
+                        f"Genders: {created_genders} created, "
+                        f"{total_genders - created_genders} existed."
+                    )
                 )
 
         except Exception as e:

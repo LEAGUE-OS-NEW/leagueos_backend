@@ -67,9 +67,9 @@ class TestProfileService:
             ProfileService.validate_date_of_birth(future)
 
     def test_validate_date_of_birth_too_young(self):
-        from django.conf import settings
-
         from datetime import date
+
+        from django.conf import settings
 
         min_age = getattr(settings, "PROFILE_MIN_AGE_YEARS", 13)
         young = date(

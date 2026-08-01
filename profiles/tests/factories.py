@@ -1,4 +1,3 @@
-
 "Factory Boy factories for profiles app models."
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ class UserFactory(DjangoModelFactory):
         model = "accounts.User"
         django_get_or_create = ("email",)
 
-    id = uuid.uuid4()
+    id = factory.LazyFunction(uuid.uuid4)
     email = factory.Sequence(lambda n: f"user{n}@leagueos.com")
     username = factory.Sequence(lambda n: f"user{n}")
     first_name = "Test"
@@ -30,7 +29,7 @@ class CountryFactory(DjangoModelFactory):
         model = Country
         django_get_or_create = ("name",)
 
-    id = uuid.uuid4()
+    id = factory.LazyFunction(uuid.uuid4)
     name = factory.Sequence(lambda n: f"Country {n}")
     iso_code = factory.Sequence(lambda n: f"C{n:02d}")
     is_active = True
@@ -41,7 +40,7 @@ class LanguageFactory(DjangoModelFactory):
         model = Language
         django_get_or_create = ("name",)
 
-    id = uuid.uuid4()
+    id = factory.LazyFunction(uuid.uuid4)
     name = factory.Sequence(lambda n: f"Language {n}")
     code = factory.Sequence(lambda n: f"lang-{n}")
     is_active = True
@@ -52,7 +51,7 @@ class TimezoneFactory(DjangoModelFactory):
         model = Timezone
         django_get_or_create = ("timezone_name",)
 
-    id = uuid.uuid4()
+    id = factory.LazyFunction(uuid.uuid4)
     timezone_name = factory.Sequence(lambda n: f"Zone/{n}")
     utc_offset = "+00:00"
     is_active = True
@@ -63,7 +62,7 @@ class GenderFactory(DjangoModelFactory):
         model = Gender
         django_get_or_create = ("name",)
 
-    id = uuid.uuid4()
+    id = factory.LazyFunction(uuid.uuid4)
     name = factory.Sequence(lambda n: f"Gender {n}")
     code = factory.Sequence(lambda n: f"g-{n}")
     is_active = True
@@ -74,7 +73,7 @@ class ClubFactory(DjangoModelFactory):
         model = Club
         django_get_or_create = ("name",)
 
-    id = uuid.uuid4()
+    id = factory.LazyFunction(uuid.uuid4)
     name = factory.Sequence(lambda n: f"Club {n}")
     slug = factory.Sequence(lambda n: f"club-{n}")
     is_active = True
@@ -84,7 +83,7 @@ class ProfileFactory(DjangoModelFactory):
     class Meta:
         model = Profile
 
-    id = uuid.uuid4()
+    id = factory.LazyFunction(uuid.uuid4)
     user = factory.SubFactory(UserFactory)
     display_name = ""
     city = ""
