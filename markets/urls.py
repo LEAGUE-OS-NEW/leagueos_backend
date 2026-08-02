@@ -13,6 +13,7 @@ from markets.lifecycle_views import (
     MarketSubmitView,
     MarketSuspendView,
 )
+from markets.order_book_views import MarketOrderBookView
 from markets.participation_views import (
     MarketFillDetailView,
     MarketFillListView,
@@ -135,6 +136,11 @@ urlpatterns = [
         "markets/<uuid:market_id>/",
         MarketDetailView.as_view(),
         name="market-detail",
+    ),
+    path(
+        "markets/<uuid:market_id>/outcomes/<uuid:outcome_id>/order-book/",
+        MarketOrderBookView.as_view(),
+        name="market-order-book",
     ),
     path(
         "market-fills/",
