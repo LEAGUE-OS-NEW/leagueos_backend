@@ -1,8 +1,10 @@
 import uuid
 from decimal import Decimal
+from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
 from django.db.models import Q
 from django.utils.text import slugify
@@ -974,3 +976,202 @@ class MarketStatusTransition(TimeStampedUUIDModel):
 
         if errors:
             raise ValidationError(errors)
+
+
+class MarketFill(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False,
+    )
+    execution_reference = models.UUIDField(
+        unique=True,
+        editable=False,
+    )
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="fills",
+    )
+    outcome = models.ForeignKey(
+        MarketOutcome,
+        on_delete=models.PROTECT,
+        related_name="fills",
+    )
+    buy_order = models.ForeignKey(
+        MarketOrder,
+        on_delete=models.PROTECT,
+        related_name="buy_fills",
+    )
+    sell_order = models.ForeignKey(
+        MarketOrder,
+        on_delete=models.PROTECT,
+        related_name="sell_fills",
+    )
+    maker_order = models.ForeignKey(
+        MarketOrder,
+        on_delete=models.PROTECT,
+        related_name="maker_fills",
+    )
+    taker_order = models.ForeignKey(
+        MarketOrder,
+        on_delete=models.PROTECT,
+        related_name="taker_fills",
+    )
+    quantity = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+    )
+    price = models.DecimalField(
+        max_digits=6,
+        decimal_places=5,
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+
+    class Meta:
+        ordering = [
+            "-created_at",
+            "-id",
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "market",
+                    "created_at",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "outcome",
+                    "created_at",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "buy_order",
+                    "created_at",
+                ],
+            ),
+            models.Index(
+                fields=[
+                    "sell_order",
+                    "created_at",
+                ],
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(
+                    quantity__gt=0,
+                ),
+                name=("market_fill_quantity_positive"),
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    price__gt=0,
+                ),
+                name=("market_fill_price_positive"),
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    price__lt=1,
+                ),
+                name=("market_fill_price_below_one"),
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.execution_reference}: " f"{self.quantity} @ {self.price}"
+
+    def save(self, *args, **kwargs):
+        if (
+            self.pk
+            and type(self)
+            .objects.filter(
+                pk=self.pk,
+            )
+            .exists()
+        ):
+            raise DjangoValidationError("Market fills are immutable and " "cannot be updated.")
+
+        return super().save(
+            *args,
+            **kwargs,
+        )
+
+    def delete(self, *args, **kwargs):
+        raise DjangoValidationError("Market fills are immutable and " "cannot be deleted.")
+
+    def clean(self):
+        super().clean()
+
+        errors = {}
+
+        buy_order = self.buy_order if self.buy_order_id else None
+        sell_order = self.sell_order if self.sell_order_id else None
+        maker_order = self.maker_order if self.maker_order_id else None
+        taker_order = self.taker_order if self.taker_order_id else None
+        outcome = self.outcome if self.outcome_id else None
+
+        if buy_order and buy_order.side != MarketOrder.Side.BUY:
+            errors["buy_order"] = "The buy order must have BUY side."
+
+        if sell_order and sell_order.side != MarketOrder.Side.SELL:
+            errors["sell_order"] = "The sell order must have " "SELL side."
+
+        fill_orders = [
+            order
+            for order in [
+                buy_order,
+                sell_order,
+                maker_order,
+                taker_order,
+            ]
+            if order is not None
+        ]
+
+        if any(order.market_id != self.market_id for order in fill_orders):
+            errors["market"] = "The fill market must match " "every fill order."
+
+        if any(order.outcome_id != self.outcome_id for order in fill_orders):
+            errors["outcome"] = "The fill outcome must match " "every fill order."
+
+        if outcome and outcome.market_id != self.market_id:
+            errors["outcome"] = "The fill outcome must belong " "to the fill market."
+
+        fill_order_ids = {
+            self.buy_order_id,
+            self.sell_order_id,
+        }
+
+        if self.maker_order_id and self.maker_order_id not in fill_order_ids:
+            errors["maker_order"] = "The maker must be one of the " "fill orders."
+
+        if self.taker_order_id and self.taker_order_id not in fill_order_ids:
+            errors["taker_order"] = "The taker must be one of the " "fill orders."
+
+        if (
+            self.maker_order_id
+            and self.taker_order_id
+            and self.maker_order_id == self.taker_order_id
+        ):
+            errors["taker_order"] = "Maker and taker must be " "different fill orders."
+
+        if buy_order and sell_order and buy_order.user_id == sell_order.user_id:
+            errors["sell_order"] = "Self-trading is not allowed."
+
+        if self.quantity is not None and self.quantity <= Decimal("0.0000"):
+            errors["quantity"] = "Fill quantity must be positive."
+
+        if self.price is not None and (
+            self.price <= Decimal("0.00000") or self.price >= Decimal("1.00000")
+        ):
+            errors["price"] = "Fill price must be greater " "than zero and less than one."
+
+        if errors:
+            raise DjangoValidationError(errors)
