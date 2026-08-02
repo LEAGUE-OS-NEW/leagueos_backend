@@ -12,6 +12,7 @@ from django.db import (
 from markets.models import (
     MarketFill,
     MarketOrder,
+    MarketPosition,
 )
 
 
@@ -21,6 +22,8 @@ class MarketFillService:
         MarketOrder.Status.PARTIALLY_FILLED,
     }
     PRICE_QUANTUM = Decimal("0.00001")
+    QUANTITY_QUANTUM = Decimal("0.0001")
+    MONEY_QUANTUM = Decimal("0.0001")
 
     @classmethod
     @transaction.atomic
@@ -57,9 +60,9 @@ class MarketFillService:
             sell_order_id=sell_order_id,
         )
 
-        # Check again after acquiring both row locks.
-        # A concurrent transaction may have completed
-        # this execution while this transaction waited.
+        # A concurrent transaction may have
+        # completed this execution while this
+        # transaction waited for the order locks.
         existing_fill = cls._get_existing_fill(execution_reference)
 
         if existing_fill is not None:
@@ -108,6 +111,15 @@ class MarketFillService:
             taker_order_id=taker_order_id,
         )
 
+        buyer_position, seller_position = cls._get_locked_positions(
+            buy_order=buy_order,
+            sell_order=sell_order,
+        )
+        cls._require_sufficient_seller_position(
+            seller_position=seller_position,
+            quantity=quantity,
+        )
+
         fill = MarketFill(
             execution_reference=(execution_reference),
             market=buy_order.market,
@@ -131,12 +143,30 @@ class MarketFillService:
             quantity=quantity,
             price=price,
         )
+        cls._apply_buy_to_position(
+            position=buyer_position,
+            quantity=quantity,
+            price=price,
+        )
+        cls._apply_sell_to_position(
+            position=seller_position,
+            quantity=quantity,
+            price=price,
+        )
 
         buy_order.full_clean()
         sell_order.full_clean()
+        buyer_position.full_clean()
+        seller_position.full_clean()
 
         cls._save_order(buy_order)
         cls._save_order(sell_order)
+
+        # Saving the seller first lets a failure
+        # during buyer creation prove that all prior
+        # mutations are rolled back atomically.
+        cls._save_position(seller_position)
+        cls._save_position(buyer_position)
 
         try:
             fill.save(force_insert=True)
@@ -360,6 +390,68 @@ class MarketFillService:
 
         return maker_order, taker_order
 
+    @staticmethod
+    def _get_locked_positions(
+        *,
+        buy_order: MarketOrder,
+        sell_order: MarketOrder,
+    ) -> tuple[
+        MarketPosition,
+        MarketPosition,
+    ]:
+        positions = list(
+            MarketPosition.objects.select_for_update(
+                of=("self",),
+            )
+            .filter(
+                user_id__in={
+                    buy_order.user_id,
+                    sell_order.user_id,
+                },
+                market_id=buy_order.market_id,
+                outcome_id=buy_order.outcome_id,
+            )
+            .order_by("user_id")
+        )
+
+        positions_by_user = {position.user_id: position for position in positions}
+
+        seller_position = positions_by_user.get(sell_order.user_id)
+
+        if seller_position is None:
+            raise ValidationError(
+                {"position": ("The seller does not have " "a position in this outcome.")}
+            )
+
+        buyer_position = positions_by_user.get(buy_order.user_id)
+
+        if buyer_position is None:
+            buyer_position = MarketPosition(
+                user_id=buy_order.user_id,
+                market_id=buy_order.market_id,
+                outcome_id=buy_order.outcome_id,
+                quantity=Decimal("0.0000"),
+                average_entry_price=Decimal("0.00000"),
+                total_cost=Decimal("0.0000"),
+                realized_pnl=Decimal("0.0000"),
+            )
+
+        return (
+            buyer_position,
+            seller_position,
+        )
+
+    @staticmethod
+    def _require_sufficient_seller_position(
+        *,
+        seller_position: MarketPosition,
+        quantity: Decimal,
+    ) -> None:
+        if seller_position.quantity < quantity:
+            raise ValidationError(
+                {"position": ("The seller's position " "cannot cover this fill.")}
+            )
+
     @classmethod
     def _apply_fill_to_order(
         cls,
@@ -387,6 +479,77 @@ class MarketFillService:
             else (MarketOrder.Status.PARTIALLY_FILLED)
         )
 
+    @classmethod
+    def _apply_buy_to_position(
+        cls,
+        *,
+        position: MarketPosition,
+        quantity: Decimal,
+        price: Decimal,
+    ) -> None:
+        fill_cost = cls._quantize_money(quantity * price)
+
+        position.quantity = (position.quantity + quantity).quantize(
+            cls.QUANTITY_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+        position.total_cost = (position.total_cost + fill_cost).quantize(
+            cls.MONEY_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+        position.average_entry_price = (position.total_cost / position.quantity).quantize(
+            cls.PRICE_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+
+    @classmethod
+    def _apply_sell_to_position(
+        cls,
+        *,
+        position: MarketPosition,
+        quantity: Decimal,
+        price: Decimal,
+    ) -> None:
+        previous_quantity = position.quantity
+        previous_cost = position.total_cost
+
+        released_cost = cls._quantize_money(previous_cost * quantity / previous_quantity)
+        proceeds = cls._quantize_money(quantity * price)
+        realized_change = cls._quantize_money(proceeds - released_cost)
+
+        remaining_quantity = (previous_quantity - quantity).quantize(
+            cls.QUANTITY_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+        remaining_cost = cls._quantize_money(previous_cost - released_cost)
+
+        position.quantity = remaining_quantity
+        position.realized_pnl = (position.realized_pnl + realized_change).quantize(
+            cls.MONEY_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+
+        if remaining_quantity == Decimal("0.0000"):
+            position.total_cost = Decimal("0.0000")
+            position.average_entry_price = Decimal("0.00000")
+            return
+
+        position.total_cost = remaining_cost
+        position.average_entry_price = (remaining_cost / remaining_quantity).quantize(
+            cls.PRICE_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+
+    @classmethod
+    def _quantize_money(
+        cls,
+        value: Decimal,
+    ) -> Decimal:
+        return value.quantize(
+            cls.MONEY_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
+
     @staticmethod
     def _save_order(
         order: MarketOrder,
@@ -396,6 +559,24 @@ class MarketFillService:
                 "filled_quantity",
                 "average_fill_price",
                 "status",
+                "updated_at",
+            ]
+        )
+
+    @staticmethod
+    def _save_position(
+        position: MarketPosition,
+    ) -> None:
+        if position._state.adding:
+            position.save(force_insert=True)
+            return
+
+        position.save(
+            update_fields=[
+                "quantity",
+                "average_entry_price",
+                "total_cost",
+                "realized_pnl",
                 "updated_at",
             ]
         )

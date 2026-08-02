@@ -159,6 +159,18 @@ class MarketFillServiceTests(TestCase):
             limit_price=Decimal("0.55000"),
         )
 
+        self.seller_position = MarketPosition(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.45000"),
+            total_cost=Decimal("4.5000"),
+            realized_pnl=Decimal("0.0000"),
+        )
+        self.seller_position.full_clean()
+        self.seller_position.save()
+
     @property
     def fill_model(self):
         return apps.get_model(
@@ -775,12 +787,27 @@ class MarketFillServiceTests(TestCase):
             0,
         )
 
-    def test_fill_does_not_create_positions(
+    def test_fill_updates_position_accounting(
         self,
     ):
         self.execute_fill()
 
+        buyer_position = MarketPosition.objects.get(
+            user=self.buyer,
+            market=self.market,
+            outcome=self.outcome,
+        )
+        self.seller_position.refresh_from_db()
+
         self.assertEqual(
             MarketPosition.objects.count(),
-            0,
+            2,
+        )
+        self.assertEqual(
+            buyer_position.quantity,
+            Decimal("4.0000"),
+        )
+        self.assertEqual(
+            self.seller_position.quantity,
+            Decimal("6.0000"),
         )
