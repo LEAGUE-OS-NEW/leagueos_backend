@@ -2,6 +2,7 @@ from decimal import (
     ROUND_CEILING,
     Decimal,
 )
+from uuid import uuid5
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -99,6 +100,21 @@ class MarketParticipationService:
         )
         cls._require_cancellable_order(order)
 
+        if order.side == MarketOrder.Side.BUY:
+            release_amount = cls._calculate_buy_cancellation_release(order)
+
+            WalletService.release(
+                user=user,
+                currency=cls.MARKET_CURRENCY,
+                amount=release_amount,
+                idempotency_reference=uuid5(
+                    order.id,
+                    "cancellation-release",
+                ),
+                market=order.market,
+                order=order,
+            )
+
         order.status = MarketOrder.Status.CANCELLED
         order.full_clean()
         order.save(
@@ -118,6 +134,19 @@ class MarketParticipationService:
         maximum_cost = order.quantity * order.limit_price
 
         return maximum_cost.quantize(
+            cls.WALLET_AMOUNT_QUANTUM,
+            rounding=ROUND_CEILING,
+        )
+
+    @classmethod
+    def _calculate_buy_cancellation_release(
+        cls,
+        order: MarketOrder,
+    ) -> Decimal:
+        remaining_quantity = order.quantity - order.filled_quantity
+        remaining_exposure = remaining_quantity * order.limit_price
+
+        return remaining_exposure.quantize(
             cls.WALLET_AMOUNT_QUANTUM,
             rounding=ROUND_CEILING,
         )

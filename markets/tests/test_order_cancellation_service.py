@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -36,6 +37,12 @@ from sports.models import (
     Competition,
     Sport,
     SportingEvent,
+)
+from wallets.models import (
+    LedgerEntry,
+)
+from wallets.services.wallet_service import (
+    WalletService,
 )
 
 
@@ -98,7 +105,7 @@ class MarketOrderCancellationServiceTests(TestCase):
             is_verified=True,
         )
 
-        fund_market_wallet(self.owner)
+        self.wallet = fund_market_wallet(self.owner)
 
         UserRoleFactory(
             user=self.operations_user,
@@ -183,14 +190,20 @@ class MarketOrderCancellationServiceTests(TestCase):
             notes="Trading opened.",
         )
 
-    def create_order(self):
+    def create_order(
+        self,
+        *,
+        side=MarketOrder.Side.BUY,
+        quantity=Decimal("10.0000"),
+        limit_price=Decimal("0.55000"),
+    ):
         return MarketParticipationService.place_order(
             user=self.owner,
             market_id=self.market.id,
             outcome_id=self.outcome.id,
-            side=MarketOrder.Side.BUY,
-            quantity=Decimal("10.0000"),
-            limit_price=Decimal("0.55000"),
+            side=side,
+            quantity=quantity,
+            limit_price=limit_price,
         )
 
     def cancel_order(
@@ -380,3 +393,193 @@ class MarketOrderCancellationServiceTests(TestCase):
         )
 
         self.assertFalse(self.owner.market_positions.exists())
+
+    def test_cancelling_open_buy_order_releases_full_reservation(
+        self,
+    ):
+        order = self.create_order()
+
+        self.cancel_order(
+            order=order,
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("1000000.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+
+    def test_cancellation_creates_order_linked_release_entry(
+        self,
+    ):
+        order = self.create_order()
+
+        reservation_entry = LedgerEntry.objects.get(
+            order=order,
+            entry_type=(LedgerEntry.EntryType.RESERVE),
+        )
+
+        self.cancel_order(
+            order=order,
+        )
+
+        release_entry = LedgerEntry.objects.get(
+            order=order,
+            entry_type=(LedgerEntry.EntryType.RELEASE),
+        )
+
+        self.assertEqual(
+            release_entry.wallet_id,
+            self.wallet.id,
+        )
+        self.assertEqual(
+            release_entry.market_id,
+            self.market.id,
+        )
+        self.assertEqual(
+            release_entry.amount,
+            Decimal("5.5000"),
+        )
+        self.assertEqual(
+            release_entry.available_balance_before,
+            Decimal("999994.5000"),
+        )
+        self.assertEqual(
+            release_entry.available_balance_after,
+            Decimal("1000000.0000"),
+        )
+        self.assertEqual(
+            release_entry.reserved_balance_before,
+            Decimal("5.5000"),
+        )
+        self.assertEqual(
+            release_entry.reserved_balance_after,
+            Decimal("0.0000"),
+        )
+        self.assertNotEqual(
+            release_entry.idempotency_reference,
+            reservation_entry.idempotency_reference,
+        )
+
+    def test_partially_filled_buy_releases_only_remaining_reservation(
+        self,
+    ):
+        order = self.create_order()
+        order.status = MarketOrder.Status.PARTIALLY_FILLED
+        order.filled_quantity = Decimal("4.0000")
+        order.average_fill_price = Decimal("0.54000")
+        order.save(
+            update_fields=[
+                "status",
+                "filled_quantity",
+                "average_fill_price",
+                "updated_at",
+            ]
+        )
+
+        self.cancel_order(
+            order=order,
+        )
+
+        release_entry = LedgerEntry.objects.get(
+            order=order,
+            entry_type=(LedgerEntry.EntryType.RELEASE),
+        )
+
+        self.assertEqual(
+            release_entry.amount,
+            Decimal("3.3000"),
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("999997.8000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("2.2000"),
+        )
+
+    def test_cancellation_release_rounds_up_to_wallet_precision(
+        self,
+    ):
+        order = self.create_order(
+            quantity=Decimal("3.0000"),
+            limit_price=Decimal("0.33333"),
+        )
+
+        self.cancel_order(
+            order=order,
+        )
+
+        release_entry = LedgerEntry.objects.get(
+            order=order,
+            entry_type=(LedgerEntry.EntryType.RELEASE),
+        )
+
+        self.assertEqual(
+            release_entry.amount,
+            Decimal("1.0000"),
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("1000000.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+
+    def test_release_failure_rolls_back_order_cancellation(
+        self,
+    ):
+        order = self.create_order()
+
+        with patch.object(
+            WalletService,
+            "release",
+            side_effect=RuntimeError("Wallet release failed."),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.cancel_order(
+                    order=order,
+                )
+
+        order.refresh_from_db()
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            order.status,
+            MarketOrder.Status.OPEN,
+        )
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("999994.5000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("5.5000"),
+        )
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                order=order,
+                entry_type=(LedgerEntry.EntryType.RESERVE),
+            ).count(),
+            1,
+        )
+        self.assertFalse(
+            LedgerEntry.objects.filter(
+                order=order,
+                entry_type=(LedgerEntry.EntryType.RELEASE),
+            ).exists()
+        )
