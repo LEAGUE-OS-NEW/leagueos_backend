@@ -40,6 +40,10 @@ from sports.models import (
     Sport,
     SportingEvent,
 )
+from wallets.models import LedgerEntry
+from wallets.services.wallet_service import (
+    WalletService,
+)
 
 
 class MarketFillServiceTests(TestCase):
@@ -97,8 +101,8 @@ class MarketFillServiceTests(TestCase):
             is_verified=True,
         )
 
-        fund_market_wallet(self.buyer)
-        fund_market_wallet(self.seller)
+        self.buyer_wallet = fund_market_wallet(self.buyer)
+        self.seller_wallet = fund_market_wallet(self.seller)
 
         UserRoleFactory(
             user=self.operations_user,
@@ -309,6 +313,59 @@ class MarketFillServiceTests(TestCase):
         self.assertEqual(
             order.status,
             MarketOrder.Status.OPEN,
+        )
+
+    def assert_fill_wallet_rollback(self):
+        self.assert_order_unchanged(self.buy_order)
+        self.assert_order_unchanged(self.sell_order)
+
+        self.buyer_wallet.refresh_from_db()
+        self.seller_wallet.refresh_from_db()
+        self.seller_position.refresh_from_db()
+
+        self.assertEqual(
+            self.buyer_wallet.available_balance,
+            Decimal("999994.0000"),
+        )
+        self.assertEqual(
+            self.buyer_wallet.reserved_balance,
+            Decimal("6.0000"),
+        )
+        self.assertEqual(
+            self.seller_wallet.available_balance,
+            Decimal("1000000.0000"),
+        )
+        self.assertEqual(
+            self.seller_wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+        self.assertEqual(
+            self.seller_position.quantity,
+            Decimal("10.0000"),
+        )
+        self.assertEqual(
+            self.seller_position.total_cost,
+            Decimal("4.5000"),
+        )
+        self.assertEqual(
+            self.seller_position.realized_pnl,
+            Decimal("0.0000"),
+        )
+        self.assertFalse(
+            MarketPosition.objects.filter(
+                user=self.buyer,
+                market=self.market,
+                outcome=self.outcome,
+            ).exists()
+        )
+        self.assertEqual(
+            self.fill_model.objects.count(),
+            0,
+        )
+        self.assertFalse(
+            LedgerEntry.objects.filter(
+                fill__isnull=False,
+            ).exists()
         )
 
     def test_execute_fill_creates_record_and_partially_fills_orders(
@@ -816,4 +873,360 @@ class MarketFillServiceTests(TestCase):
         self.assertEqual(
             self.seller_position.quantity,
             Decimal("6.0000"),
+        )
+
+    def test_partial_fill_settles_actual_cost_and_releases_price_improvement(
+        self,
+    ):
+        self.execute_fill(
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.55000"),
+        )
+
+        self.buyer_wallet.refresh_from_db()
+        self.seller_wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.buyer_wallet.available_balance,
+            Decimal("999994.2000"),
+        )
+        self.assertEqual(
+            self.buyer_wallet.reserved_balance,
+            Decimal("3.6000"),
+        )
+        self.assertEqual(
+            self.seller_wallet.available_balance,
+            Decimal("1000000.0000"),
+        )
+        self.assertEqual(
+            self.seller_wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+
+    def test_fill_wallet_entries_are_linked_to_fill_order_and_market(
+        self,
+    ):
+        fill = self.execute_fill(
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.55000"),
+        )
+
+        debit_entry = LedgerEntry.objects.get(
+            fill=fill,
+            order=self.buy_order,
+            entry_type=LedgerEntry.EntryType.DEBIT,
+        )
+        release_entry = LedgerEntry.objects.get(
+            fill=fill,
+            order=self.buy_order,
+            entry_type=LedgerEntry.EntryType.RELEASE,
+        )
+
+        self.assertEqual(
+            debit_entry.wallet_id,
+            self.buyer_wallet.id,
+        )
+        self.assertEqual(
+            debit_entry.market_id,
+            self.market.id,
+        )
+        self.assertEqual(
+            debit_entry.amount,
+            Decimal("2.2000"),
+        )
+        self.assertEqual(
+            debit_entry.available_balance_before,
+            Decimal("999994.0000"),
+        )
+        self.assertEqual(
+            debit_entry.available_balance_after,
+            Decimal("999994.0000"),
+        )
+        self.assertEqual(
+            debit_entry.reserved_balance_before,
+            Decimal("6.0000"),
+        )
+        self.assertEqual(
+            debit_entry.reserved_balance_after,
+            Decimal("3.8000"),
+        )
+
+        self.assertEqual(
+            release_entry.wallet_id,
+            self.buyer_wallet.id,
+        )
+        self.assertEqual(
+            release_entry.market_id,
+            self.market.id,
+        )
+        self.assertEqual(
+            release_entry.amount,
+            Decimal("0.2000"),
+        )
+        self.assertEqual(
+            release_entry.available_balance_before,
+            Decimal("999994.0000"),
+        )
+        self.assertEqual(
+            release_entry.available_balance_after,
+            Decimal("999994.2000"),
+        )
+        self.assertEqual(
+            release_entry.reserved_balance_before,
+            Decimal("3.8000"),
+        )
+        self.assertEqual(
+            release_entry.reserved_balance_after,
+            Decimal("3.6000"),
+        )
+        self.assertNotEqual(
+            debit_entry.idempotency_reference,
+            release_entry.idempotency_reference,
+        )
+
+    def test_full_fill_clears_buy_reservation_and_charges_actual_cost(
+        self,
+    ):
+        fill = self.execute_fill(
+            quantity=Decimal("10.0000"),
+            price=Decimal("0.55000"),
+        )
+
+        self.buyer_wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.buyer_wallet.available_balance,
+            Decimal("999994.5000"),
+        )
+        self.assertEqual(
+            self.buyer_wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+
+        debit_entry = LedgerEntry.objects.get(
+            fill=fill,
+            entry_type=LedgerEntry.EntryType.DEBIT,
+        )
+        release_entry = LedgerEntry.objects.get(
+            fill=fill,
+            entry_type=LedgerEntry.EntryType.RELEASE,
+        )
+
+        self.assertEqual(
+            debit_entry.amount,
+            Decimal("5.5000"),
+        )
+        self.assertEqual(
+            release_entry.amount,
+            Decimal("0.5000"),
+        )
+
+    def test_fill_at_buy_limit_price_creates_no_price_improvement_release(
+        self,
+    ):
+        fill = self.execute_fill(
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.60000"),
+        )
+
+        debit_entry = LedgerEntry.objects.get(
+            fill=fill,
+            entry_type=LedgerEntry.EntryType.DEBIT,
+        )
+
+        self.assertEqual(
+            debit_entry.amount,
+            Decimal("2.4000"),
+        )
+        self.assertFalse(
+            LedgerEntry.objects.filter(
+                fill=fill,
+                entry_type=(LedgerEntry.EntryType.RELEASE),
+            ).exists()
+        )
+
+        self.buyer_wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.buyer_wallet.available_balance,
+            Decimal("999994.0000"),
+        )
+        self.assertEqual(
+            self.buyer_wallet.reserved_balance,
+            Decimal("3.6000"),
+        )
+
+    def test_fill_wallet_rounding_preserves_remaining_reservation(
+        self,
+    ):
+        buy_order = self.create_order(
+            user=self.buyer,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.BUY,
+            quantity=Decimal("3.0000"),
+            limit_price=Decimal("0.33333"),
+        )
+        sell_order = self.create_order(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.SELL,
+            quantity=Decimal("3.0000"),
+            limit_price=Decimal("0.33333"),
+        )
+
+        fill = self.execute_fill(
+            buy_order=buy_order,
+            sell_order=sell_order,
+            quantity=Decimal("1.0000"),
+            price=Decimal("0.33333"),
+        )
+
+        debit_entry = LedgerEntry.objects.get(
+            fill=fill,
+            order=buy_order,
+            entry_type=LedgerEntry.EntryType.DEBIT,
+        )
+
+        self.assertEqual(
+            debit_entry.amount,
+            Decimal("0.3333"),
+        )
+
+        MarketParticipationService.cancel_order(
+            user=self.buyer,
+            order_id=buy_order.id,
+        )
+
+        self.buyer_wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.buyer_wallet.available_balance,
+            Decimal("999993.6667"),
+        )
+        self.assertEqual(
+            self.buyer_wallet.reserved_balance,
+            Decimal("6.0000"),
+        )
+
+    def test_execution_reference_replay_does_not_settle_wallet_twice(
+        self,
+    ):
+        execution_reference = uuid4()
+
+        first_fill = self.execute_fill(
+            execution_reference=execution_reference,
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.55000"),
+        )
+        second_fill = self.execute_fill(
+            execution_reference=execution_reference,
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.55000"),
+        )
+
+        self.assertEqual(
+            second_fill.id,
+            first_fill.id,
+        )
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                fill=first_fill,
+                entry_type=LedgerEntry.EntryType.DEBIT,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                fill=first_fill,
+                entry_type=LedgerEntry.EntryType.RELEASE,
+            ).count(),
+            1,
+        )
+
+        self.buyer_wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.buyer_wallet.available_balance,
+            Decimal("999994.2000"),
+        )
+        self.assertEqual(
+            self.buyer_wallet.reserved_balance,
+            Decimal("3.6000"),
+        )
+
+    def test_wallet_consumption_failure_rolls_back_complete_fill(
+        self,
+    ):
+        with patch.object(
+            WalletService,
+            "consume_reserved",
+            side_effect=RuntimeError("Reserved consumption failed."),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.execute_fill(
+                    quantity=Decimal("4.0000"),
+                    price=Decimal("0.55000"),
+                )
+
+        self.assert_fill_wallet_rollback()
+
+    def test_price_improvement_release_failure_rolls_back_complete_fill(
+        self,
+    ):
+        with patch.object(
+            WalletService,
+            "release",
+            side_effect=RuntimeError("Price improvement release failed."),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.execute_fill(
+                    quantity=Decimal("4.0000"),
+                    price=Decimal("0.55000"),
+                )
+
+        self.assert_fill_wallet_rollback()
+
+    def test_cancelling_actual_partial_fill_releases_all_remaining_reservation(
+        self,
+    ):
+        fill = self.execute_fill(
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.55000"),
+        )
+
+        MarketParticipationService.cancel_order(
+            user=self.buyer,
+            order_id=self.buy_order.id,
+        )
+
+        self.buy_order.refresh_from_db()
+        self.buyer_wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.buy_order.status,
+            MarketOrder.Status.CANCELLED,
+        )
+        self.assertEqual(
+            self.buyer_wallet.available_balance,
+            Decimal("999997.8000"),
+        )
+        self.assertEqual(
+            self.buyer_wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                fill=fill,
+                entry_type=LedgerEntry.EntryType.DEBIT,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                order=self.buy_order,
+                entry_type=LedgerEntry.EntryType.RELEASE,
+            ).count(),
+            2,
         )
