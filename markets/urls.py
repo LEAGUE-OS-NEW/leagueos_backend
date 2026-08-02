@@ -28,6 +28,7 @@ from markets.resolution_views import (
     MarketResolveView,
     MarketVoidView,
 )
+from markets.settlement_views import MarketSettlementView
 from markets.views import (
     MarketCategoryListView,
     MarketDetailView,
@@ -136,6 +137,11 @@ urlpatterns = [
         "markets/<uuid:market_id>/",
         MarketDetailView.as_view(),
         name="market-detail",
+    ),
+    path(
+        "markets/<uuid:market_id>/settle/",
+        MarketSettlementView.as_view(),
+        name="market-settle",
     ),
     path(
         "markets/<uuid:market_id>/outcomes/<uuid:outcome_id>/order-book/",

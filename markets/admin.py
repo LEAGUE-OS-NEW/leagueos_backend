@@ -4,6 +4,8 @@ from markets.models import (
     Market,
     MarketCategory,
     MarketOutcome,
+    MarketPositionSettlement,
+    MarketSettlement,
     MarketStatusTransition,
     MarketTemplate,
 )
@@ -167,3 +169,48 @@ class MarketStatusTransitionAdmin(admin.ModelAdmin):
         obj=None,
     ) -> bool:
         return False
+
+
+class ImmutableSettlementAdmin(admin.ModelAdmin):
+    def get_readonly_fields(self, request, obj=None):
+        return tuple(field.name for field in self.model._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(MarketSettlement)
+class MarketSettlementAdmin(ImmutableSettlementAdmin):
+    list_display = (
+        "market",
+        "winning_outcome",
+        "settlement_currency",
+        "total_position_count",
+        "total_payout_amount",
+        "executed_by",
+        "executed_at",
+    )
+    list_filter = ("settlement_currency", "executed_at")
+    search_fields = ("market__question",)
+
+
+@admin.register(MarketPositionSettlement)
+class MarketPositionSettlementAdmin(ImmutableSettlementAdmin):
+    list_display = (
+        "market_settlement",
+        "market_position",
+        "participant",
+        "outcome",
+        "was_winner",
+        "settled_quantity",
+        "payout_amount",
+        "realized_pnl_delta",
+    )
+    list_filter = ("was_winner", "created_at")
+    search_fields = ("market_settlement__market__question",)

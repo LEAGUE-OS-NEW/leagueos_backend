@@ -898,6 +898,117 @@ class MarketPosition(TimeStampedUUIDModel):
             raise ValidationError(errors)
 
 
+class MarketSettlement(TimeStampedUUIDModel):
+    market = models.OneToOneField(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="settlement",
+    )
+    winning_outcome = models.ForeignKey(
+        MarketOutcome,
+        on_delete=models.PROTECT,
+        related_name="market_settlements",
+    )
+    payout_per_unit = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+    )
+    settlement_currency = models.CharField(
+        max_length=3,
+    )
+    total_position_count = models.PositiveIntegerField(default=0)
+    winning_position_count = models.PositiveIntegerField(default=0)
+    losing_position_count = models.PositiveIntegerField(default=0)
+    total_winning_quantity = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        default=Decimal("0.0000"),
+    )
+    total_payout_amount = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        default=Decimal("0.0000"),
+    )
+    executed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="executed_market_settlements",
+    )
+    executed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-executed_at", "-id"]
+        indexes = [
+            models.Index(fields=["executed_at"]),
+            models.Index(fields=["winning_outcome", "executed_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.market_id}: {self.total_payout_amount} {self.settlement_currency}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Market settlements are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Market settlements cannot be deleted.")
+
+
+class MarketPositionSettlement(TimeStampedUUIDModel):
+    market_settlement = models.ForeignKey(
+        MarketSettlement,
+        on_delete=models.PROTECT,
+        related_name="position_settlements",
+    )
+    market_position = models.OneToOneField(
+        MarketPosition,
+        on_delete=models.PROTECT,
+        related_name="settlement_record",
+    )
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_position_settlements",
+    )
+    outcome = models.ForeignKey(
+        MarketOutcome,
+        on_delete=models.PROTECT,
+        related_name="position_settlements",
+    )
+    was_winner = models.BooleanField(db_index=True)
+    settled_quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    payout_per_unit = models.DecimalField(max_digits=20, decimal_places=4)
+    payout_amount = models.DecimalField(max_digits=20, decimal_places=4)
+    cost_basis = models.DecimalField(max_digits=20, decimal_places=4)
+    realized_pnl_delta = models.DecimalField(max_digits=20, decimal_places=4)
+    wallet_ledger_entry = models.OneToOneField(
+        "wallets.LedgerEntry",
+        on_delete=models.PROTECT,
+        related_name="market_position_settlement",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(fields=["market_settlement", "was_winner"]),
+            models.Index(fields=["participant", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.market_position_id}: {self.payout_amount}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Position settlements are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Position settlements cannot be deleted.")
+
+
 class MarketStatusTransition(TimeStampedUUIDModel):
     class Action(models.TextChoices):
         SUBMIT = "SUBMIT", "Submit for approval"
