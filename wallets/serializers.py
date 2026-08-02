@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from wallets.models import LedgerEntry, Wallet
@@ -21,6 +22,12 @@ class WalletReadSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    @extend_schema_field(
+        serializers.DecimalField(
+            max_digits=18,
+            decimal_places=4,
+        )
+    )
     def get_total_balance(self, wallet):
         total = wallet.available_balance + wallet.reserved_balance
         return f"{total.quantize(Decimal('0.0000')):.4f}"
