@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.urls import reverse
 from django.utils import timezone
@@ -17,6 +18,7 @@ from markets.models import (
     MarketCategory,
     MarketOrder,
     MarketOutcome,
+    MarketPosition,
     MarketScope,
 )
 from markets.services.catalog_service import (
@@ -441,6 +443,15 @@ class MarketParticipationAPITests(APITestCase):
 
     def test_sell_order_can_be_created(self):
         market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(side=MarketOutcome.Side.YES)
+        position = MarketPosition.objects.create(
+            user=self.participant,
+            market=market,
+            outcome=outcome,
+            quantity="10.0000",
+            average_entry_price="0.40000",
+            total_cost="4.0000",
+        )
         self.authenticate(self.participant)
 
         response = self.client.post(
@@ -461,6 +472,22 @@ class MarketParticipationAPITests(APITestCase):
             response.data["side"],
             MarketOrder.Side.SELL,
         )
+        position.refresh_from_db()
+        self.assertEqual(position.reserved_quantity, Decimal("10.0000"))
+
+    def test_sell_order_without_position_returns_position_error(self):
+        market = self.open_market(self.create_market())
+        self.authenticate(self.participant)
+
+        response = self.client.post(
+            self.order_url(market),
+            self.order_payload(market, side=MarketOrder.Side.SELL),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("position", response.data)
+        self.assertFalse(MarketOrder.objects.filter(market=market).exists())
 
     def test_order_does_not_create_position(self):
         market = self.open_market(self.create_market())

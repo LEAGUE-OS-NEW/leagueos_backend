@@ -18,6 +18,7 @@ from markets.models import (
     MarketCategory,
     MarketOrder,
     MarketOutcome,
+    MarketPosition,
     MarketScope,
 )
 from markets.services.catalog_service import (
@@ -250,6 +251,14 @@ class MarketOrderHistoryAPITests(APITestCase):
     ):
         first_order = self.create_order(
             quantity=Decimal("10.0000"),
+        )
+        MarketPosition.objects.create(
+            user=self.owner,
+            market=self.market,
+            outcome=self.outcome,
+            quantity=Decimal("4.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("1.6000"),
         )
         second_order = self.create_order(
             side=MarketOrder.Side.SELL,

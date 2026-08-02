@@ -19,6 +19,7 @@ from markets.models import (
     MarketCategory,
     MarketOrder,
     MarketOutcome,
+    MarketPosition,
     MarketScope,
 )
 from markets.services.catalog_service import (
@@ -205,6 +206,18 @@ class MarketOrderCancellationServiceTests(TestCase):
             quantity=quantity,
             limit_price=limit_price,
         )
+
+    def create_sell_order(self, *, quantity=Decimal("10.0000")):
+        position = MarketPosition.objects.create(
+            user=self.owner,
+            market=self.market,
+            outcome=self.outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("4.0000"),
+        )
+        order = self.create_order(side=MarketOrder.Side.SELL, quantity=quantity)
+        return order, position
 
     def cancel_order(
         self,
@@ -583,3 +596,47 @@ class MarketOrderCancellationServiceTests(TestCase):
                 entry_type=(LedgerEntry.EntryType.RELEASE),
             ).exists()
         )
+
+    def test_cancelling_open_sell_releases_full_reservation(self):
+        order, position = self.create_sell_order()
+
+        self.cancel_order(order=order)
+
+        position.refresh_from_db()
+        self.assertEqual(position.quantity, Decimal("10.0000"))
+        self.assertEqual(position.reserved_quantity, Decimal("0.0000"))
+
+    def test_cancelling_partially_filled_sell_releases_only_remainder(self):
+        order, position = self.create_sell_order()
+        order.status = MarketOrder.Status.PARTIALLY_FILLED
+        order.filled_quantity = Decimal("4.0000")
+        order.average_fill_price = Decimal("0.55000")
+        order.save(update_fields=["status", "filled_quantity", "average_fill_price", "updated_at"])
+        position.quantity = Decimal("6.0000")
+        position.reserved_quantity = Decimal("6.0000")
+        position.save(update_fields=["quantity", "reserved_quantity", "updated_at"])
+
+        self.cancel_order(order=order)
+
+        position.refresh_from_db()
+        self.assertEqual(position.quantity, Decimal("6.0000"))
+        self.assertEqual(position.reserved_quantity, Decimal("0.0000"))
+
+    def test_sell_reservation_release_failure_rolls_back_cancellation(self):
+        order, position = self.create_sell_order()
+        original_save = MarketPosition.save
+
+        def failing_save(instance, *args, **kwargs):
+            if "reserved_quantity" in kwargs.get("update_fields", []):
+                raise RuntimeError("Position release failed.")
+            return original_save(instance, *args, **kwargs)
+
+        with patch.object(MarketPosition, "save", new=failing_save):
+            with self.assertRaises(RuntimeError):
+                self.cancel_order(order=order)
+
+        order.refresh_from_db()
+        position.refresh_from_db()
+        self.assertEqual(order.status, MarketOrder.Status.OPEN)
+        self.assertEqual(position.quantity, Decimal("10.0000"))
+        self.assertEqual(position.reserved_quantity, Decimal("10.0000"))

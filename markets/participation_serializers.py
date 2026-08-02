@@ -88,6 +88,7 @@ class MarketPositionReadSerializer(serializers.ModelSerializer):
             "market",
             "outcome",
             "quantity",
+            "reserved_quantity",
             "average_entry_price",
             "total_cost",
             "realized_pnl",

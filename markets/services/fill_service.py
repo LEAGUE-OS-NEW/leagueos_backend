@@ -601,6 +601,10 @@ class MarketFillService:
             raise ValidationError(
                 {"position": ("The seller's position " "cannot cover this fill.")}
             )
+        if seller_position.reserved_quantity < quantity:
+            raise ValidationError(
+                {"position": ("The seller's reserved position " "cannot cover this fill.")}
+            )
 
     @classmethod
     def _apply_fill_to_order(
@@ -674,6 +678,10 @@ class MarketFillService:
         remaining_cost = cls._quantize_money(previous_cost - released_cost)
 
         position.quantity = remaining_quantity
+        position.reserved_quantity = (position.reserved_quantity - quantity).quantize(
+            cls.QUANTITY_QUANTUM,
+            rounding=ROUND_HALF_UP,
+        )
         position.realized_pnl = (position.realized_pnl + realized_change).quantize(
             cls.MONEY_QUANTUM,
             rounding=ROUND_HALF_UP,
@@ -724,6 +732,7 @@ class MarketFillService:
         position.save(
             update_fields=[
                 "quantity",
+                "reserved_quantity",
                 "average_entry_price",
                 "total_cost",
                 "realized_pnl",

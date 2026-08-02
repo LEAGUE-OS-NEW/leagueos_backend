@@ -155,12 +155,7 @@ class MarketPositionAccountingServiceTests(TestCase):
             quantity=Decimal("10.0000"),
             limit_price=Decimal("0.70000"),
         )
-        self.sell_order = self.create_order(
-            user=self.seller,
-            side=MarketOrder.Side.SELL,
-            quantity=Decimal("10.0000"),
-            limit_price=Decimal("0.40000"),
-        )
+        self.sell_order = None
 
     def create_market(self):
         return MarketCatalogService.create_market(
@@ -249,6 +244,31 @@ class MarketPositionAccountingServiceTests(TestCase):
     ):
         buy_order = buy_order or self.buy_order
         sell_order = sell_order or self.sell_order
+        if sell_order is None:
+            seller_position = MarketPosition.objects.filter(
+                user=self.seller,
+                market=self.market,
+                outcome=self.outcome,
+            ).first()
+            if seller_position is None:
+                sell_order = MarketOrder.objects.create(
+                    user=self.seller,
+                    market=self.market,
+                    outcome=self.outcome,
+                    side=MarketOrder.Side.SELL,
+                    quantity=Decimal("10.0000"),
+                    limit_price=Decimal("0.40000"),
+                    filled_quantity=Decimal("0.0000"),
+                    status=MarketOrder.Status.OPEN,
+                )
+            else:
+                sell_order = self.create_order(
+                    user=self.seller,
+                    side=MarketOrder.Side.SELL,
+                    quantity=seller_position.quantity,
+                    limit_price=Decimal("0.40000"),
+                )
+            self.sell_order = sell_order
 
         return MarketFillService.execute_fill(
             execution_reference=(execution_reference or uuid4()),
@@ -533,6 +553,16 @@ class MarketPositionAccountingServiceTests(TestCase):
             average_entry_price=Decimal("0.40000"),
             total_cost=Decimal("1.2000"),
         )
+        self.sell_order = MarketOrder.objects.create(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.SELL,
+            quantity=Decimal("10.0000"),
+            limit_price=Decimal("0.40000"),
+            filled_quantity=Decimal("0.0000"),
+            status=MarketOrder.Status.OPEN,
+        )
 
         with self.assertRaises(ValidationError) as context:
             self.execute_fill(
@@ -630,14 +660,18 @@ class MarketPositionAccountingServiceTests(TestCase):
             total_cost=Decimal("4.0000"),
         )
 
-        first_sell_order = self.sell_order
         first_buy_order = self.buy_order
 
         self.execute_fill(
             buy_order=first_buy_order,
-            sell_order=first_sell_order,
             quantity=Decimal("2.0000"),
             price=Decimal("0.50000"),
+        )
+        first_sell_order = self.sell_order
+
+        MarketParticipationService.cancel_order(
+            user=self.seller,
+            order_id=first_sell_order.id,
         )
 
         second_buy_order = self.create_order(

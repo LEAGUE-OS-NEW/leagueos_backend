@@ -19,6 +19,7 @@ from markets.models import (
     MarketCategory,
     MarketOrder,
     MarketOutcome,
+    MarketPosition,
     MarketScope,
 )
 from markets.services.catalog_service import (
@@ -155,6 +156,22 @@ class MarketFillModelTests(TestCase):
             outcome=self.outcome,
             side=MarketOrder.Side.BUY,
             limit_price=Decimal("0.60000"),
+        )
+        MarketPosition.objects.create(
+            user=self.buyer,
+            market=self.market,
+            outcome=self.outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.50000"),
+            total_cost=Decimal("5.0000"),
+        )
+        MarketPosition.objects.create(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.45000"),
+            total_cost=Decimal("4.5000"),
         )
         self.sell_order = self.create_order(
             user=self.seller,
