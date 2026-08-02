@@ -29,6 +29,7 @@ urlpatterns = [
         "api/v1/",
         include("markets.urls"),
     ),
+    path("api/v1/", include("wallets.urls")),
     path("api/v1/", include("profiles.urls")),
     path("api/v1/", include("onboarding.urls")),
     path("api/v1/", include("notifications.urls")),
