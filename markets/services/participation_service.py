@@ -18,6 +18,9 @@ from markets.models import (
     MarketOutcome,
     MarketPosition,
 )
+from markets.services.matching_service import (
+    MarketMatchingService,
+)
 from wallets.services.wallet_service import (
     WalletService,
 )
@@ -101,6 +104,9 @@ class MarketParticipationService:
                 market=market,
                 order=order,
             )
+
+        MarketMatchingService.match_order(order.id)
+        order.refresh_from_db()
         return order
 
     @classmethod

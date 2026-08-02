@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 from uuid import uuid4
 
 from django.test import TestCase
@@ -243,14 +244,18 @@ class MarketFillHistoryAPITests(TestCase):
         quantity,
         limit_price,
     ):
-        return MarketParticipationService.place_order(
-            user=user,
-            market_id=self.market.id,
-            outcome_id=self.outcome.id,
-            side=side,
-            quantity=quantity,
-            limit_price=limit_price,
-        )
+        with patch(
+            "markets.services.participation_service." "MarketMatchingService.match_order",
+            return_value=[],
+        ):
+            return MarketParticipationService.place_order(
+                user=user,
+                market_id=self.market.id,
+                outcome_id=self.outcome.id,
+                side=side,
+                quantity=quantity,
+                limit_price=limit_price,
+            )
 
     def execute_fill(
         self,

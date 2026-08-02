@@ -242,14 +242,18 @@ class MarketFillServiceTests(TestCase):
         quantity=Decimal("10.0000"),
         limit_price=Decimal("0.55000"),
     ):
-        return MarketParticipationService.place_order(
-            user=user,
-            market_id=market.id,
-            outcome_id=outcome.id,
-            side=side,
-            quantity=quantity,
-            limit_price=limit_price,
-        )
+        with patch(
+            "markets.services.participation_service." "MarketMatchingService.match_order",
+            return_value=[],
+        ):
+            return MarketParticipationService.place_order(
+                user=user,
+                market_id=market.id,
+                outcome_id=outcome.id,
+                side=side,
+                quantity=quantity,
+                limit_price=limit_price,
+            )
 
     def set_existing_fill_state(
         self,
