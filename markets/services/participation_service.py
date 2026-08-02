@@ -1,4 +1,7 @@
-from decimal import Decimal
+from decimal import (
+    ROUND_CEILING,
+    Decimal,
+)
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -13,10 +16,15 @@ from markets.models import (
     MarketOrder,
     MarketOutcome,
 )
+from wallets.services.wallet_service import (
+    WalletService,
+)
 
 
 class MarketParticipationService:
     PARTICIPATE_PERMISSION = "participate_market"
+    MARKET_CURRENCY = "UGX"
+    WALLET_AMOUNT_QUANTUM = Decimal("0.0001")
 
     @classmethod
     @transaction.atomic
@@ -58,6 +66,18 @@ class MarketParticipationService:
         order.full_clean()
         order.save(force_insert=True)
 
+        if order.side == MarketOrder.Side.BUY:
+            reservation_amount = cls._calculate_buy_reservation(order)
+
+            WalletService.reserve(
+                user=user,
+                currency=cls.MARKET_CURRENCY,
+                amount=reservation_amount,
+                idempotency_reference=order.id,
+                market=market,
+                order=order,
+            )
+
         return order
 
     @classmethod
@@ -89,6 +109,18 @@ class MarketParticipationService:
         )
 
         return order
+
+    @classmethod
+    def _calculate_buy_reservation(
+        cls,
+        order: MarketOrder,
+    ) -> Decimal:
+        maximum_cost = order.quantity * order.limit_price
+
+        return maximum_cost.quantize(
+            cls.WALLET_AMOUNT_QUANTUM,
+            rounding=ROUND_CEILING,
+        )
 
     @staticmethod
     def _get_locked_order(

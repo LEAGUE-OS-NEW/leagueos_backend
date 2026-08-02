@@ -49,6 +49,9 @@ class WalletService:
         currency,
         amount,
         idempotency_reference,
+        market=None,
+        order=None,
+        fill=None,
     ) -> LedgerEntry:
         return cls._execute(
             user=user,
@@ -56,6 +59,9 @@ class WalletService:
             amount=amount,
             idempotency_reference=(idempotency_reference),
             operation=cls.OPERATION_RESERVE,
+            market=market,
+            order=order,
+            fill=fill,
         )
 
     @classmethod
@@ -120,6 +126,9 @@ class WalletService:
         idempotency_reference,
         operation,
         create_wallet=False,
+        market=None,
+        order=None,
+        fill=None,
     ) -> LedgerEntry:
         normalized_currency = cls._normalize_currency(currency)
         normalized_amount = cls._normalize_amount(amount)
@@ -134,6 +143,9 @@ class WalletService:
                 currency=normalized_currency,
                 amount=normalized_amount,
                 operation=operation,
+                market=market,
+                order=order,
+                fill=fill,
             )
             return existing_entry
 
@@ -151,6 +163,9 @@ class WalletService:
                 currency=normalized_currency,
                 amount=normalized_amount,
                 operation=operation,
+                market=market,
+                order=order,
+                fill=fill,
             )
             return existing_entry
 
@@ -181,6 +196,9 @@ class WalletService:
                 currency=normalized_currency,
                 amount=normalized_amount,
                 operation=operation,
+                market=market,
+                order=order,
+                fill=fill,
             )
             return existing_entry
 
@@ -218,6 +236,9 @@ class WalletService:
             reserved_balance_before=(reserved_before),
             reserved_balance_after=(reserved_after),
             idempotency_reference=(normalized_reference),
+            market=market,
+            order=order,
+            fill=fill,
         )
         entry.full_clean(
             validate_unique=False,
@@ -417,6 +438,9 @@ class WalletService:
         currency,
         amount,
         operation,
+        market=None,
+        order=None,
+        fill=None,
     ) -> None:
         matches = all(
             [
@@ -426,6 +450,24 @@ class WalletService:
                 cls._entry_matches_operation(
                     entry=entry,
                     operation=operation,
+                ),
+                entry.market_id
+                == getattr(
+                    market,
+                    "pk",
+                    None,
+                ),
+                entry.order_id
+                == getattr(
+                    order,
+                    "pk",
+                    None,
+                ),
+                entry.fill_id
+                == getattr(
+                    fill,
+                    "pk",
+                    None,
                 ),
             ]
         )

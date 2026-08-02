@@ -29,6 +29,9 @@ from markets.services.lifecycle_service import (
 from markets.services.participation_service import (
     MarketParticipationService,
 )
+from markets.tests.wallet_test_support import (
+    fund_market_wallet,
+)
 from sports.models import (
     Competition,
     Sport,
@@ -96,6 +99,9 @@ class MarketOrderHistoryAPITests(APITestCase):
         self.empty_user = UserFactory(
             is_verified=True,
         )
+
+        fund_market_wallet(self.owner)
+        fund_market_wallet(self.other_participant)
 
         UserRoleFactory(
             user=self.operations_user,

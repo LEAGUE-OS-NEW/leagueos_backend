@@ -25,6 +25,9 @@ from markets.services.catalog_service import (
 from markets.services.lifecycle_service import (
     MarketLifecycleService,
 )
+from markets.tests.wallet_test_support import (
+    fund_market_wallet,
+)
 from sports.models import (
     Competition,
     Sport,
@@ -89,6 +92,8 @@ class MarketParticipationAPITests(APITestCase):
         self.outsider = UserFactory(
             is_verified=True,
         )
+
+        fund_market_wallet(self.participant)
 
         UserRoleFactory(
             user=self.operations_user,
