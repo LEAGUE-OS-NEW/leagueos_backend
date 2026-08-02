@@ -161,14 +161,6 @@ class MarketFillServiceTests(TestCase):
             side=MarketOrder.Side.BUY,
             limit_price=Decimal("0.60000"),
         )
-        self.sell_order = self.create_order(
-            user=self.seller,
-            market=self.market,
-            outcome=self.outcome,
-            side=MarketOrder.Side.SELL,
-            limit_price=Decimal("0.55000"),
-        )
-
         self.seller_position = MarketPosition(
             user=self.seller,
             market=self.market,
@@ -180,6 +172,13 @@ class MarketFillServiceTests(TestCase):
         )
         self.seller_position.full_clean()
         self.seller_position.save()
+        self.sell_order = self.create_order(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.SELL,
+            limit_price=Decimal("0.55000"),
+        )
 
     @property
     def fill_model(self):
@@ -344,6 +343,10 @@ class MarketFillServiceTests(TestCase):
             Decimal("10.0000"),
         )
         self.assertEqual(
+            self.seller_position.reserved_quantity,
+            Decimal("10.0000"),
+        )
+        self.assertEqual(
             self.seller_position.total_cost,
             Decimal("4.5000"),
         )
@@ -431,6 +434,10 @@ class MarketFillServiceTests(TestCase):
     def test_execute_fill_marks_fully_consumed_orders_filled(
         self,
     ):
+        MarketParticipationService.cancel_order(
+            user=self.seller,
+            order_id=self.sell_order.id,
+        )
         buy_order = self.create_order(
             user=self.buyer,
             market=self.market,
@@ -586,6 +593,9 @@ class MarketFillServiceTests(TestCase):
     def test_fill_requires_open_or_partially_filled_orders(
         self,
     ):
+        self.seller_position.quantity = Decimal("22.0000")
+        self.seller_position.total_cost = Decimal("9.9000")
+        self.seller_position.save(update_fields=["quantity", "total_cost", "updated_at"])
         invalid_statuses = [
             MarketOrder.Status.CANCELLED,
             MarketOrder.Status.REJECTED,
@@ -649,6 +659,14 @@ class MarketFillServiceTests(TestCase):
         other_outcome = other_market.outcomes.get(
             side=MarketOutcome.Side.YES,
         )
+        MarketPosition.objects.create(
+            user=self.seller,
+            market=other_market,
+            outcome=other_outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.45000"),
+            total_cost=Decimal("4.5000"),
+        )
         other_sell_order = self.create_order(
             user=self.seller,
             market=other_market,
@@ -677,6 +695,9 @@ class MarketFillServiceTests(TestCase):
     def test_execution_price_must_respect_both_order_limits(
         self,
     ):
+        self.seller_position.quantity = Decimal("30.0000")
+        self.seller_position.total_cost = Decimal("13.5000")
+        self.seller_position.save(update_fields=["quantity", "total_cost", "updated_at"])
         invalid_prices = [
             Decimal("0.54000"),
             Decimal("0.61000"),
@@ -733,6 +754,14 @@ class MarketFillServiceTests(TestCase):
     def test_self_trade_is_rejected_without_mutation(
         self,
     ):
+        MarketPosition.objects.create(
+            user=self.buyer,
+            market=self.market,
+            outcome=self.outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.60000"),
+            total_cost=Decimal("6.0000"),
+        )
         self_sell_order = self.create_order(
             user=self.buyer,
             market=self.market,
@@ -874,6 +903,49 @@ class MarketFillServiceTests(TestCase):
             self.seller_position.quantity,
             Decimal("6.0000"),
         )
+        self.assertEqual(
+            self.seller_position.reserved_quantity,
+            Decimal("6.0000"),
+        )
+
+    def test_full_sell_fill_consumes_full_reservation(self):
+        self.execute_fill(quantity=Decimal("10.0000"), price=Decimal("0.55000"))
+
+        self.seller_position.refresh_from_db()
+        self.assertEqual(self.seller_position.quantity, Decimal("0.0000"))
+        self.assertEqual(self.seller_position.reserved_quantity, Decimal("0.0000"))
+
+    def test_fill_rejects_under_reserved_sell_order(self):
+        self.seller_position.reserved_quantity = Decimal("3.9999")
+        self.seller_position.save(update_fields=["reserved_quantity", "updated_at"])
+
+        with self.assertRaises(ValidationError) as context:
+            self.execute_fill(quantity=Decimal("4.0000"))
+
+        self.assertIn("position", context.exception.message_dict)
+        self.seller_position.refresh_from_db()
+        self.assertEqual(self.seller_position.quantity, Decimal("10.0000"))
+        self.assertEqual(self.seller_position.reserved_quantity, Decimal("3.9999"))
+
+    def test_other_sell_order_reservation_remains_after_fill(self):
+        self.seller_position.quantity = Decimal("12.0000")
+        self.seller_position.total_cost = Decimal("5.4000")
+        self.seller_position.save(update_fields=["quantity", "total_cost", "updated_at"])
+        other_sell_order = self.create_order(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.SELL,
+            quantity=Decimal("2.0000"),
+            limit_price=Decimal("0.55000"),
+        )
+        self.execute_fill(quantity=Decimal("4.0000"))
+
+        self.seller_position.refresh_from_db()
+        other_sell_order.refresh_from_db()
+        self.assertEqual(self.seller_position.quantity, Decimal("8.0000"))
+        self.assertEqual(self.seller_position.reserved_quantity, Decimal("8.0000"))
+        self.assertEqual(other_sell_order.filled_quantity, Decimal("0.0000"))
 
     def test_partial_fill_settles_actual_cost_and_releases_price_improvement(
         self,
@@ -1059,6 +1131,10 @@ class MarketFillServiceTests(TestCase):
     def test_fill_wallet_rounding_preserves_remaining_reservation(
         self,
     ):
+        MarketParticipationService.cancel_order(
+            user=self.seller,
+            order_id=self.sell_order.id,
+        )
         buy_order = self.create_order(
             user=self.buyer,
             market=self.market,
@@ -1272,6 +1348,10 @@ class MarketFillServiceTests(TestCase):
         self.assertEqual(credit_entry.amount, Decimal("5.5000"))
 
     def test_seller_credit_uses_money_rounding_and_not_position_cost_basis(self):
+        MarketParticipationService.cancel_order(
+            user=self.seller,
+            order_id=self.sell_order.id,
+        )
         sell_order = self.create_order(
             user=self.seller,
             market=self.market,

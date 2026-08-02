@@ -793,6 +793,11 @@ class MarketPosition(TimeStampedUUIDModel):
         decimal_places=4,
         default=Decimal("0"),
     )
+    reserved_quantity = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        default=Decimal("0.0000"),
+    )
     average_entry_price = models.DecimalField(
         max_digits=6,
         decimal_places=5,
@@ -826,6 +831,14 @@ class MarketPosition(TimeStampedUUIDModel):
             models.CheckConstraint(
                 condition=Q(quantity__gte=0),
                 name=("market_position_quantity_" "non_negative"),
+            ),
+            models.CheckConstraint(
+                condition=Q(reserved_quantity__gte=0),
+                name=("market_position_reserved_quantity_" "non_negative"),
+            ),
+            models.CheckConstraint(
+                condition=Q(reserved_quantity__lte=models.F("quantity")),
+                name=("market_position_reserved_quantity_" "within_position"),
             ),
             models.CheckConstraint(
                 condition=Q(total_cost__gte=0),
@@ -862,6 +875,12 @@ class MarketPosition(TimeStampedUUIDModel):
 
         if self.quantity is None or self.quantity < 0:
             errors["quantity"] = "Position quantity cannot be " "negative."
+
+        if self.reserved_quantity is None or self.reserved_quantity < 0:
+            errors["reserved_quantity"] = "Reserved quantity cannot be negative."
+        elif self.quantity is not None and self.reserved_quantity > self.quantity:
+            errors["reserved_quantity"] = "Reserved quantity cannot exceed the position quantity."
+            errors["quantity"] = "Position quantity cannot be below reserved quantity."
 
         if (
             self.average_entry_price is None

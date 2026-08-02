@@ -104,6 +104,7 @@ class ParticipationModelTestCase(TestCase):
             "market": self.market,
             "outcome": self.outcome,
             "quantity": Decimal("10.0000"),
+            "reserved_quantity": Decimal("0.0000"),
             "average_entry_price": Decimal("0.55000"),
             "total_cost": Decimal("5.5000"),
             "realized_pnl": Decimal("0.0000"),
@@ -252,6 +253,70 @@ class MarketPositionModelTests(ParticipationModelTestCase):
             "quantity",
             context.exception.message_dict,
         )
+
+    def test_reserved_quantity_cannot_be_negative(self):
+        position = self.valid_position(
+            reserved_quantity=Decimal("-0.0001"),
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            position.full_clean()
+
+        self.assertIn("reserved_quantity", context.exception.message_dict)
+
+    def test_reserved_quantity_cannot_exceed_quantity(self):
+        position = self.valid_position(
+            quantity=Decimal("10.0000"),
+            reserved_quantity=Decimal("10.0001"),
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            position.full_clean()
+
+        self.assertIn("reserved_quantity", context.exception.message_dict)
+
+    def test_quantity_cannot_be_reduced_below_reserved_quantity(self):
+        position = self.valid_position(
+            quantity=Decimal("4.9999"),
+            reserved_quantity=Decimal("5.0000"),
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            position.full_clean()
+
+        self.assertIn("quantity", context.exception.message_dict)
+
+    def test_database_rejects_negative_reserved_quantity(self):
+        position = self.valid_position()
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                MarketPosition.objects.create(
+                    user=position.user,
+                    market=position.market,
+                    outcome=position.outcome,
+                    quantity=position.quantity,
+                    reserved_quantity=Decimal("-0.0001"),
+                    average_entry_price=position.average_entry_price,
+                    total_cost=position.total_cost,
+                    realized_pnl=position.realized_pnl,
+                )
+
+    def test_database_rejects_reserved_quantity_above_quantity(self):
+        position = self.valid_position()
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                MarketPosition.objects.create(
+                    user=position.user,
+                    market=position.market,
+                    outcome=position.outcome,
+                    quantity=position.quantity,
+                    reserved_quantity=Decimal("10.0001"),
+                    average_entry_price=position.average_entry_price,
+                    total_cost=position.total_cost,
+                    realized_pnl=position.realized_pnl,
+                )
 
     def test_position_outcome_must_belong_to_market(
         self,

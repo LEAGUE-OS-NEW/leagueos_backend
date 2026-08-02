@@ -19,6 +19,7 @@ from markets.models import (
     MarketCategory,
     MarketOrder,
     MarketOutcome,
+    MarketPosition,
     MarketScope,
 )
 from markets.services.catalog_service import (
@@ -388,7 +389,19 @@ class MarketParticipationServiceTests(TestCase):
         )
 
     def test_sell_order_can_be_accepted(self):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(side=MarketOutcome.Side.YES)
+        position = MarketPosition.objects.create(
+            user=self.participant,
+            market=market,
+            outcome=outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("4.0000"),
+        )
         order = self.place_order(
+            market=market,
+            outcome=outcome,
             side=MarketOrder.Side.SELL,
         )
 
@@ -396,10 +409,128 @@ class MarketParticipationServiceTests(TestCase):
             order.side,
             MarketOrder.Side.SELL,
         )
-        self.assertEqual(
-            order.status,
-            MarketOrder.Status.OPEN,
+        position.refresh_from_db()
+        self.assertEqual(position.reserved_quantity, Decimal("10.0000"))
+
+    def test_sell_order_leaves_wallet_balances_unchanged(self):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(side=MarketOutcome.Side.YES)
+        MarketPosition.objects.create(
+            user=self.participant,
+            market=market,
+            outcome=outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("4.0000"),
         )
+
+        self.place_order(market=market, outcome=outcome, side=MarketOrder.Side.SELL)
+
+        self.wallet.refresh_from_db()
+        self.assertEqual(self.wallet.available_balance, Decimal("100.0000"))
+        self.assertEqual(self.wallet.reserved_balance, Decimal("0.0000"))
+        self.assertFalse(LedgerEntry.objects.filter(wallet=self.wallet).exists())
+
+    def test_sell_order_without_position_is_rejected(self):
+        market = self.open_market(self.create_market())
+
+        with self.assertRaises(ValidationError) as context:
+            self.place_order(market=market, side=MarketOrder.Side.SELL)
+
+        self.assertIn("position", context.exception.message_dict)
+        self.assertFalse(MarketOrder.objects.filter(market=market).exists())
+
+    def test_sell_order_cannot_exceed_available_quantity(self):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(side=MarketOutcome.Side.YES)
+        position = MarketPosition.objects.create(
+            user=self.participant,
+            market=market,
+            outcome=outcome,
+            quantity=Decimal("10.0000"),
+            reserved_quantity=Decimal("4.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("4.0000"),
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            self.place_order(
+                market=market,
+                outcome=outcome,
+                side=MarketOrder.Side.SELL,
+                quantity=Decimal("6.0001"),
+            )
+
+        self.assertIn("quantity", context.exception.message_dict)
+        position.refresh_from_db()
+        self.assertEqual(position.reserved_quantity, Decimal("4.0000"))
+
+    def test_sell_order_exactly_equal_to_available_quantity_succeeds(self):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(side=MarketOutcome.Side.YES)
+        position = MarketPosition.objects.create(
+            user=self.participant,
+            market=market,
+            outcome=outcome,
+            quantity=Decimal("10.0000"),
+            reserved_quantity=Decimal("4.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("4.0000"),
+        )
+
+        self.place_order(
+            market=market, outcome=outcome, side=MarketOrder.Side.SELL, quantity=Decimal("6.0000")
+        )
+
+        position.refresh_from_db()
+        self.assertEqual(position.reserved_quantity, Decimal("10.0000"))
+
+    def test_multiple_sell_orders_cannot_over_reserve_position(self):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(side=MarketOutcome.Side.YES)
+        position = MarketPosition.objects.create(
+            user=self.participant,
+            market=market,
+            outcome=outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("4.0000"),
+        )
+        self.place_order(
+            market=market, outcome=outcome, side=MarketOrder.Side.SELL, quantity=Decimal("6.0000")
+        )
+
+        with self.assertRaises(ValidationError):
+            self.place_order(
+                market=market,
+                outcome=outcome,
+                side=MarketOrder.Side.SELL,
+                quantity=Decimal("4.0001"),
+            )
+
+        position.refresh_from_db()
+        self.assertEqual(position.reserved_quantity, Decimal("6.0000"))
+        self.assertEqual(MarketOrder.objects.filter(market=market).count(), 1)
+
+    def test_sell_order_creation_failure_rolls_back_reservation(self):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(side=MarketOutcome.Side.YES)
+        position = MarketPosition.objects.create(
+            user=self.participant,
+            market=market,
+            outcome=outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("4.0000"),
+        )
+
+        with patch.object(MarketOrder, "save", side_effect=RuntimeError("Order failed.")):
+            with self.assertRaises(RuntimeError):
+                self.place_order(market=market, outcome=outcome, side=MarketOrder.Side.SELL)
+
+        position.refresh_from_db()
+        self.assertEqual(position.reserved_quantity, Decimal("0.0000"))
+        self.assertFalse(MarketOrder.objects.filter(market=market).exists())
 
     def test_order_does_not_create_position(self):
         self.place_order()

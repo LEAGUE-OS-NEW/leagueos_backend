@@ -183,6 +183,7 @@ class MarketPositionHistoryAPITests(APITestCase):
         user=None,
         outcome=None,
         quantity=Decimal("10.0000"),
+        reserved_quantity=Decimal("0.0000"),
         average_entry_price=Decimal("0.55000"),
         total_cost=Decimal("5.5000"),
         realized_pnl=Decimal("0.0000"),
@@ -192,6 +193,7 @@ class MarketPositionHistoryAPITests(APITestCase):
             market=self.market,
             outcome=outcome or self.yes_outcome,
             quantity=quantity,
+            reserved_quantity=reserved_quantity,
             average_entry_price=(average_entry_price),
             total_cost=total_cost,
             realized_pnl=realized_pnl,
@@ -343,6 +345,7 @@ class MarketPositionHistoryAPITests(APITestCase):
     ):
         position = self.create_position(
             realized_pnl=Decimal("1.2500"),
+            reserved_quantity=Decimal("3.0000"),
         )
         self.authenticate(self.owner)
 
@@ -374,6 +377,10 @@ class MarketPositionHistoryAPITests(APITestCase):
         self.assertEqual(
             response.data["quantity"],
             "10.0000",
+        )
+        self.assertEqual(
+            response.data["reserved_quantity"],
+            "3.0000",
         )
         self.assertEqual(
             response.data["average_entry_price"],

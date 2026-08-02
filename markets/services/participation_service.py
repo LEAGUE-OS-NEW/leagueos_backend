@@ -16,6 +16,7 @@ from markets.models import (
     Market,
     MarketOrder,
     MarketOutcome,
+    MarketPosition,
 )
 from wallets.services.wallet_service import (
     WalletService,
@@ -52,6 +53,18 @@ class MarketParticipationService:
             outcome_id=outcome_id,
         )
 
+        position = None
+        if side == MarketOrder.Side.SELL:
+            position = cls._get_locked_sell_position(
+                user=user,
+                market=market,
+                outcome=outcome,
+            )
+            cls._reserve_sell_quantity(
+                position=position,
+                quantity=quantity,
+            )
+
         order = MarketOrder(
             user=user,
             market=market,
@@ -65,6 +78,16 @@ class MarketParticipationService:
         )
 
         order.full_clean()
+
+        if position is not None:
+            position.full_clean()
+            position.save(
+                update_fields=[
+                    "reserved_quantity",
+                    "updated_at",
+                ]
+            )
+
         order.save(force_insert=True)
 
         if order.side == MarketOrder.Side.BUY:
@@ -78,7 +101,6 @@ class MarketParticipationService:
                 market=market,
                 order=order,
             )
-
         return order
 
     @classmethod
@@ -114,6 +136,21 @@ class MarketParticipationService:
                 market=order.market,
                 order=order,
             )
+        elif order.side == MarketOrder.Side.SELL:
+            position = cls._get_locked_sell_position(
+                user=user,
+                market=order.market,
+                outcome=order.outcome,
+            )
+            remaining_quantity = order.quantity - order.filled_quantity
+            position.reserved_quantity -= remaining_quantity
+            position.full_clean()
+            position.save(
+                update_fields=[
+                    "reserved_quantity",
+                    "updated_at",
+                ]
+            )
 
         order.status = MarketOrder.Status.CANCELLED
         order.full_clean()
@@ -137,6 +174,41 @@ class MarketParticipationService:
             cls.WALLET_AMOUNT_QUANTUM,
             rounding=ROUND_CEILING,
         )
+
+    @staticmethod
+    def _get_locked_sell_position(
+        *,
+        user,
+        market: Market,
+        outcome: MarketOutcome,
+    ) -> MarketPosition:
+        try:
+            return MarketPosition.objects.select_for_update(
+                of=("self",),
+            ).get(
+                user=user,
+                market=market,
+                outcome=outcome,
+            )
+        except MarketPosition.DoesNotExist as error:
+            raise ValidationError(
+                {"position": "A SELL order requires an owned position in this outcome."}
+            ) from error
+
+    @staticmethod
+    def _reserve_sell_quantity(
+        *,
+        position: MarketPosition,
+        quantity: Decimal,
+    ) -> None:
+        available_quantity = position.quantity - position.reserved_quantity
+
+        if quantity > available_quantity:
+            raise ValidationError(
+                {"quantity": "SELL quantity cannot exceed available position quantity."}
+            )
+
+        position.reserved_quantity += quantity
 
     @classmethod
     def _calculate_buy_cancellation_release(
