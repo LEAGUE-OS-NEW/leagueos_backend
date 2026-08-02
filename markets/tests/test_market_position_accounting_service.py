@@ -202,14 +202,18 @@ class MarketPositionAccountingServiceTests(TestCase):
         quantity=Decimal("10.0000"),
         limit_price=Decimal("0.50000"),
     ):
-        return MarketParticipationService.place_order(
-            user=user,
-            market_id=self.market.id,
-            outcome_id=self.outcome.id,
-            side=side,
-            quantity=quantity,
-            limit_price=limit_price,
-        )
+        with patch(
+            "markets.services.participation_service." "MarketMatchingService.match_order",
+            return_value=[],
+        ):
+            return MarketParticipationService.place_order(
+                user=user,
+                market_id=self.market.id,
+                outcome_id=self.outcome.id,
+                side=side,
+                quantity=quantity,
+                limit_price=limit_price,
+            )
 
     def create_position(
         self,
