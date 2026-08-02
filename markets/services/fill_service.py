@@ -1,7 +1,9 @@
 from decimal import (
+    ROUND_CEILING,
     ROUND_HALF_UP,
     Decimal,
 )
+from uuid import uuid5
 
 from django.core.exceptions import ValidationError
 from django.db import (
@@ -14,6 +16,9 @@ from markets.models import (
     MarketOrder,
     MarketPosition,
 )
+from wallets.services.wallet_service import (
+    WalletService,
+)
 
 
 class MarketFillService:
@@ -24,6 +29,7 @@ class MarketFillService:
     PRICE_QUANTUM = Decimal("0.00001")
     QUANTITY_QUANTUM = Decimal("0.0001")
     MONEY_QUANTUM = Decimal("0.0001")
+    MARKET_CURRENCY = "UGX"
 
     @classmethod
     @transaction.atomic
@@ -133,6 +139,16 @@ class MarketFillService:
         )
         fill.full_clean()
 
+        (
+            actual_cost,
+            price_improvement_release,
+            reservation_rounding_top_up,
+        ) = cls._calculate_buy_wallet_settlement(
+            buy_order=buy_order,
+            quantity=quantity,
+            price=price,
+        )
+
         cls._apply_fill_to_order(
             order=buy_order,
             quantity=quantity,
@@ -175,7 +191,115 @@ class MarketFillService:
                 {"execution_reference": ("This execution reference " "has already been used.")}
             ) from error
 
+        cls._settle_buy_wallet(
+            fill=fill,
+            buy_order=buy_order,
+            actual_cost=actual_cost,
+            price_improvement_release=(price_improvement_release),
+            reservation_rounding_top_up=(reservation_rounding_top_up),
+        )
+
         return fill
+
+    @classmethod
+    def _calculate_buy_wallet_settlement(
+        cls,
+        *,
+        buy_order: MarketOrder,
+        quantity: Decimal,
+        price: Decimal,
+    ) -> tuple[
+        Decimal,
+        Decimal,
+        Decimal,
+    ]:
+        remaining_before = buy_order.quantity - buy_order.filled_quantity
+        remaining_after = remaining_before - quantity
+
+        reservation_before = cls._quantize_reservation(remaining_before * buy_order.limit_price)
+        reservation_after = cls._quantize_reservation(remaining_after * buy_order.limit_price)
+
+        reservation_reduction = reservation_before - reservation_after
+        actual_cost = cls._quantize_money(quantity * price)
+
+        reconciliation = reservation_reduction - actual_cost
+
+        price_improvement_release = max(
+            reconciliation,
+            Decimal("0.0000"),
+        )
+        reservation_rounding_top_up = max(
+            -reconciliation,
+            Decimal("0.0000"),
+        )
+
+        return (
+            actual_cost,
+            price_improvement_release,
+            reservation_rounding_top_up,
+        )
+
+    @classmethod
+    def _settle_buy_wallet(
+        cls,
+        *,
+        fill: MarketFill,
+        buy_order: MarketOrder,
+        actual_cost: Decimal,
+        price_improvement_release: Decimal,
+        reservation_rounding_top_up: Decimal,
+    ) -> None:
+        if actual_cost > Decimal("0.0000"):
+            WalletService.consume_reserved(
+                user=buy_order.user,
+                currency=cls.MARKET_CURRENCY,
+                amount=actual_cost,
+                idempotency_reference=uuid5(
+                    fill.id,
+                    "buyer-reserved-consumption",
+                ),
+                market=fill.market,
+                order=buy_order,
+                fill=fill,
+            )
+
+        if price_improvement_release > Decimal("0.0000"):
+            WalletService.release(
+                user=buy_order.user,
+                currency=cls.MARKET_CURRENCY,
+                amount=(price_improvement_release),
+                idempotency_reference=uuid5(
+                    fill.id,
+                    ("buyer-price-" "improvement-release"),
+                ),
+                market=fill.market,
+                order=buy_order,
+                fill=fill,
+            )
+
+        if reservation_rounding_top_up > Decimal("0.0000"):
+            WalletService.reserve(
+                user=buy_order.user,
+                currency=cls.MARKET_CURRENCY,
+                amount=(reservation_rounding_top_up),
+                idempotency_reference=uuid5(
+                    fill.id,
+                    ("buyer-reservation-" "rounding-top-up"),
+                ),
+                market=fill.market,
+                order=buy_order,
+                fill=fill,
+            )
+
+    @classmethod
+    def _quantize_reservation(
+        cls,
+        value: Decimal,
+    ) -> Decimal:
+        return value.quantize(
+            cls.MONEY_QUANTUM,
+            rounding=ROUND_CEILING,
+        )
 
     @staticmethod
     def _get_existing_fill(

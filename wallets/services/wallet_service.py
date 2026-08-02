@@ -112,6 +112,9 @@ class WalletService:
         currency,
         amount,
         idempotency_reference,
+        market=None,
+        order=None,
+        fill=None,
     ) -> LedgerEntry:
         return cls._execute(
             user=user,
@@ -119,6 +122,9 @@ class WalletService:
             amount=amount,
             idempotency_reference=(idempotency_reference),
             operation=(cls.OPERATION_CONSUME_RESERVED),
+            market=market,
+            order=order,
+            fill=fill,
         )
 
     @classmethod
