@@ -31,6 +31,7 @@ urlpatterns = [
     ),
     path("api/v1/", include("profiles.urls")),
     path("api/v1/", include("onboarding.urls")),
+    path("api/v1/", include("notifications.urls")),
     path(
         "api/v1/",
         include("sports.urls"),

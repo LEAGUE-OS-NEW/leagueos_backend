@@ -45,6 +45,7 @@ LOCAL_APPS = [
     "accounts",
     "authentication",
     "markets",
+    "notifications",
     "onboarding",
     "profiles",
     "sports",
