@@ -2,7 +2,11 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from markets.models import MarketOrder, MarketPosition
+from markets.models import (
+    MarketFill,
+    MarketOrder,
+    MarketPosition,
+)
 
 
 class MarketOrderCreateSerializer(serializers.Serializer):
@@ -90,4 +94,22 @@ class MarketPositionReadSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        read_only_fields = fields
+
+
+class MarketFillReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MarketFill
+        fields = (
+            "id",
+            "market",
+            "outcome",
+            "buy_order",
+            "sell_order",
+            "maker_order",
+            "taker_order",
+            "quantity",
+            "price",
+            "created_at",
+        )
         read_only_fields = fields
