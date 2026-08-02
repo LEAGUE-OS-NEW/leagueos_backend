@@ -896,7 +896,7 @@ class MarketFillServiceTests(TestCase):
         )
         self.assertEqual(
             self.seller_wallet.available_balance,
-            Decimal("1000000.0000"),
+            Decimal("1000002.2000"),
         )
         self.assertEqual(
             self.seller_wallet.reserved_balance,
@@ -1230,3 +1230,119 @@ class MarketFillServiceTests(TestCase):
             ).count(),
             2,
         )
+
+    def test_partial_fill_credits_seller_with_linked_ledger_snapshots(self):
+        fill = self.execute_fill(
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.55000"),
+        )
+
+        self.seller_wallet.refresh_from_db()
+        credit_entry = LedgerEntry.objects.get(
+            fill=fill,
+            order=self.sell_order,
+            entry_type=LedgerEntry.EntryType.CREDIT,
+        )
+
+        self.assertEqual(self.seller_wallet.available_balance, Decimal("1000002.2000"))
+        self.assertEqual(self.seller_wallet.reserved_balance, Decimal("0.0000"))
+        self.assertEqual(credit_entry.wallet_id, self.seller_wallet.id)
+        self.assertEqual(credit_entry.market_id, self.market.id)
+        self.assertEqual(credit_entry.amount, Decimal("2.2000"))
+        self.assertEqual(credit_entry.available_balance_before, Decimal("1000000.0000"))
+        self.assertEqual(credit_entry.available_balance_after, Decimal("1000002.2000"))
+        self.assertEqual(credit_entry.reserved_balance_before, Decimal("0.0000"))
+        self.assertEqual(credit_entry.reserved_balance_after, Decimal("0.0000"))
+
+    def test_full_fill_credits_full_seller_proceeds(self):
+        fill = self.execute_fill(
+            quantity=Decimal("10.0000"),
+            price=Decimal("0.55000"),
+        )
+
+        self.seller_wallet.refresh_from_db()
+        credit_entry = LedgerEntry.objects.get(
+            fill=fill,
+            order=self.sell_order,
+            entry_type=LedgerEntry.EntryType.CREDIT,
+        )
+
+        self.assertEqual(self.seller_wallet.available_balance, Decimal("1000005.5000"))
+        self.assertEqual(self.seller_wallet.reserved_balance, Decimal("0.0000"))
+        self.assertEqual(credit_entry.amount, Decimal("5.5000"))
+
+    def test_seller_credit_uses_money_rounding_and_not_position_cost_basis(self):
+        sell_order = self.create_order(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.SELL,
+            quantity=Decimal("3.0000"),
+            limit_price=Decimal("0.33333"),
+        )
+        buy_order = self.create_order(
+            user=self.buyer,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.BUY,
+            quantity=Decimal("3.0000"),
+            limit_price=Decimal("0.33333"),
+        )
+
+        fill = self.execute_fill(
+            buy_order=buy_order,
+            sell_order=sell_order,
+            quantity=Decimal("1.0000"),
+            price=Decimal("0.33333"),
+        )
+
+        self.seller_wallet.refresh_from_db()
+        self.seller_position.refresh_from_db()
+        credit_entry = LedgerEntry.objects.get(
+            fill=fill,
+            entry_type=LedgerEntry.EntryType.CREDIT,
+        )
+
+        self.assertEqual(credit_entry.amount, Decimal("0.3333"))
+        self.assertEqual(self.seller_wallet.available_balance, Decimal("1000000.3333"))
+        self.assertEqual(self.seller_position.realized_pnl, Decimal("-0.1167"))
+
+    def test_seller_credit_execution_replay_does_not_credit_twice(self):
+        execution_reference = uuid4()
+
+        first_fill = self.execute_fill(
+            execution_reference=execution_reference,
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.55000"),
+        )
+        second_fill = self.execute_fill(
+            execution_reference=execution_reference,
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.55000"),
+        )
+
+        self.seller_wallet.refresh_from_db()
+        self.assertEqual(second_fill.id, first_fill.id)
+        self.assertEqual(self.seller_wallet.available_balance, Decimal("1000002.2000"))
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                fill=first_fill,
+                wallet=self.seller_wallet,
+                entry_type=LedgerEntry.EntryType.CREDIT,
+            ).count(),
+            1,
+        )
+
+    def test_seller_credit_failure_rolls_back_complete_fill(self):
+        with patch.object(
+            WalletService,
+            "credit",
+            side_effect=RuntimeError("Seller credit failed."),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.execute_fill(
+                    quantity=Decimal("4.0000"),
+                    price=Decimal("0.55000"),
+                )
+
+        self.assert_fill_wallet_rollback()

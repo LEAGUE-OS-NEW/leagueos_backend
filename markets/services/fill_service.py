@@ -198,6 +198,11 @@ class MarketFillService:
             price_improvement_release=(price_improvement_release),
             reservation_rounding_top_up=(reservation_rounding_top_up),
         )
+        cls._credit_seller_wallet(
+            fill=fill,
+            sell_order=sell_order,
+            proceeds=cls._quantize_money(quantity * price),
+        )
 
         return fill
 
@@ -299,6 +304,27 @@ class MarketFillService:
         return value.quantize(
             cls.MONEY_QUANTUM,
             rounding=ROUND_CEILING,
+        )
+
+    @classmethod
+    def _credit_seller_wallet(
+        cls,
+        *,
+        fill: MarketFill,
+        sell_order: MarketOrder,
+        proceeds: Decimal,
+    ) -> None:
+        WalletService.credit(
+            user=sell_order.user,
+            currency=cls.MARKET_CURRENCY,
+            amount=proceeds,
+            idempotency_reference=uuid5(
+                fill.id,
+                "seller-proceeds-credit",
+            ),
+            market=fill.market,
+            order=sell_order,
+            fill=fill,
         )
 
     @staticmethod
