@@ -1,6 +1,7 @@
 from django.core.exceptions import (
     ValidationError as DjangoValidationError,
 )
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -17,8 +18,14 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from markets.models import Market, MarketOrder, MarketPosition
+from markets.models import (
+    Market,
+    MarketFill,
+    MarketOrder,
+    MarketPosition,
+)
 from markets.participation_serializers import (
+    MarketFillReadSerializer,
     MarketOrderCreateSerializer,
     MarketOrderReadSerializer,
     MarketPositionReadSerializer,
@@ -272,4 +279,75 @@ class MarketPositionDetailView(RetrieveAPIView):
             request,
             *args,
             **kwargs,
+        )
+
+
+@extend_schema(tags=["Market Participation"])
+class MarketFillListView(ListAPIView):
+    serializer_class = MarketFillReadSerializer
+    permission_classes = [
+        IsAuthenticated,
+    ]
+    pagination_class = PublicCatalogPagination
+    queryset = MarketFill.objects.none()
+
+    def get_queryset(self):
+        user = self.request.user
+
+        return (
+            MarketFill.objects.filter(
+                Q(
+                    buy_order__user=user,
+                )
+                | Q(
+                    sell_order__user=user,
+                )
+            )
+            .select_related(
+                "market",
+                "outcome",
+                "buy_order",
+                "sell_order",
+                "maker_order",
+                "taker_order",
+            )
+            .distinct()
+            .order_by(
+                "-created_at",
+                "-id",
+            )
+        )
+
+
+@extend_schema(tags=["Market Participation"])
+class MarketFillDetailView(RetrieveAPIView):
+    serializer_class = MarketFillReadSerializer
+    permission_classes = [
+        IsAuthenticated,
+    ]
+    lookup_field = "id"
+    lookup_url_kwarg = "fill_id"
+    queryset = MarketFill.objects.none()
+
+    def get_queryset(self):
+        user = self.request.user
+
+        return (
+            MarketFill.objects.filter(
+                Q(
+                    buy_order__user=user,
+                )
+                | Q(
+                    sell_order__user=user,
+                )
+            )
+            .select_related(
+                "market",
+                "outcome",
+                "buy_order",
+                "sell_order",
+                "maker_order",
+                "taker_order",
+            )
+            .distinct()
         )
