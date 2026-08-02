@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -33,6 +34,13 @@ from sports.models import (
     Competition,
     Sport,
     SportingEvent,
+)
+from wallets.models import (
+    LedgerEntry,
+    Wallet,
+)
+from wallets.services.wallet_service import (
+    WalletService,
 )
 
 
@@ -109,6 +117,13 @@ class MarketParticipationServiceTests(TestCase):
         UserRoleFactory(
             user=self.unverified_participant,
             role=self.participant_role,
+        )
+
+        self.wallet = Wallet.objects.create(
+            user=self.participant,
+            currency="UGX",
+            available_balance=Decimal("100.0000"),
+            reserved_balance=Decimal("0.0000"),
         )
 
         self.sport = Sport.objects.create(
@@ -390,3 +405,245 @@ class MarketParticipationServiceTests(TestCase):
         self.place_order()
 
         self.assertFalse(self.participant.market_positions.exists())
+
+    def test_buy_order_reserves_maximum_limit_cost(
+        self,
+    ):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(
+            side=MarketOutcome.Side.YES,
+        )
+
+        self.place_order(
+            market=market,
+            outcome=outcome,
+            side=MarketOrder.Side.BUY,
+            quantity=Decimal("10.0000"),
+            limit_price=Decimal("0.55000"),
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("94.5000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("5.5000"),
+        )
+
+    def test_buy_reservation_creates_order_linked_ledger_entry(
+        self,
+    ):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(
+            side=MarketOutcome.Side.YES,
+        )
+
+        order = self.place_order(
+            market=market,
+            outcome=outcome,
+            side=MarketOrder.Side.BUY,
+            quantity=Decimal("10.0000"),
+            limit_price=Decimal("0.55000"),
+        )
+
+        entry = LedgerEntry.objects.get(
+            order=order,
+        )
+
+        self.assertEqual(
+            entry.wallet_id,
+            self.wallet.id,
+        )
+        self.assertEqual(
+            entry.market_id,
+            market.id,
+        )
+        self.assertEqual(
+            entry.entry_type,
+            LedgerEntry.EntryType.RESERVE,
+        )
+        self.assertEqual(
+            entry.amount,
+            Decimal("5.5000"),
+        )
+        self.assertEqual(
+            entry.available_balance_before,
+            Decimal("100.0000"),
+        )
+        self.assertEqual(
+            entry.available_balance_after,
+            Decimal("94.5000"),
+        )
+        self.assertEqual(
+            entry.reserved_balance_before,
+            Decimal("0.0000"),
+        )
+        self.assertEqual(
+            entry.reserved_balance_after,
+            Decimal("5.5000"),
+        )
+
+    def test_buy_order_rejects_insufficient_wallet_balance(
+        self,
+    ):
+        self.wallet.available_balance = Decimal("5.4999")
+        self.wallet.save(
+            update_fields=[
+                "available_balance",
+                "updated_at",
+            ]
+        )
+
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(
+            side=MarketOutcome.Side.YES,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            self.place_order(
+                market=market,
+                outcome=outcome,
+                side=MarketOrder.Side.BUY,
+                quantity=Decimal("10.0000"),
+                limit_price=Decimal("0.55000"),
+            )
+
+        self.assertIn(
+            "available_balance",
+            context.exception.message_dict,
+        )
+        self.assertFalse(
+            MarketOrder.objects.filter(
+                user=self.participant,
+                market=market,
+            ).exists()
+        )
+        self.assertFalse(
+            LedgerEntry.objects.filter(
+                wallet=self.wallet,
+            ).exists()
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("5.4999"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+
+    def test_buy_order_requires_wallet(
+        self,
+    ):
+        self.wallet.delete()
+
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(
+            side=MarketOutcome.Side.YES,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            self.place_order(
+                market=market,
+                outcome=outcome,
+                side=MarketOrder.Side.BUY,
+                quantity=Decimal("10.0000"),
+                limit_price=Decimal("0.55000"),
+            )
+
+        self.assertIn(
+            "wallet",
+            context.exception.message_dict,
+        )
+        self.assertFalse(
+            MarketOrder.objects.filter(
+                user=self.participant,
+                market=market,
+            ).exists()
+        )
+        self.assertEqual(
+            LedgerEntry.objects.count(),
+            0,
+        )
+
+    def test_buy_reservation_rounds_up_to_wallet_precision(
+        self,
+    ):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(
+            side=MarketOutcome.Side.YES,
+        )
+
+        order = self.place_order(
+            market=market,
+            outcome=outcome,
+            side=MarketOrder.Side.BUY,
+            quantity=Decimal("3.0000"),
+            limit_price=Decimal("0.33333"),
+        )
+
+        entry = LedgerEntry.objects.get(
+            order=order,
+        )
+
+        self.assertEqual(
+            entry.amount,
+            Decimal("1.0000"),
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("99.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("1.0000"),
+        )
+
+    def test_reservation_failure_rolls_back_order_creation(
+        self,
+    ):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(
+            side=MarketOutcome.Side.YES,
+        )
+
+        with patch.object(
+            WalletService,
+            "reserve",
+            side_effect=RuntimeError("Wallet reservation failed."),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.place_order(
+                    market=market,
+                    outcome=outcome,
+                    side=MarketOrder.Side.BUY,
+                    quantity=Decimal("10.0000"),
+                    limit_price=Decimal("0.55000"),
+                )
+
+        self.assertFalse(
+            MarketOrder.objects.filter(
+                user=self.participant,
+                market=market,
+            ).exists()
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("100.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("0.0000"),
+        )

@@ -35,6 +35,9 @@ from markets.services.lifecycle_service import (
 from markets.services.participation_service import (
     MarketParticipationService,
 )
+from markets.tests.wallet_test_support import (
+    fund_market_wallet,
+)
 from sports.models import (
     Competition,
     Sport,
@@ -96,6 +99,9 @@ class MarketPositionAccountingServiceTests(TestCase):
         self.seller = UserFactory(
             is_verified=True,
         )
+
+        fund_market_wallet(self.buyer)
+        fund_market_wallet(self.seller)
 
         UserRoleFactory(
             user=self.operations_user,

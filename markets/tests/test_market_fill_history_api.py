@@ -36,6 +36,9 @@ from markets.services.lifecycle_service import (
 from markets.services.participation_service import (
     MarketParticipationService,
 )
+from markets.tests.wallet_test_support import (
+    fund_market_wallet,
+)
 from sports.models import (
     Competition,
     Sport,
@@ -171,6 +174,7 @@ class MarketFillHistoryAPITests(TestCase):
             user=user,
             role=self.participant_role,
         )
+        fund_market_wallet(user)
         return user
 
     def create_market(self):
