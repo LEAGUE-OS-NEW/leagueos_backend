@@ -1060,6 +1060,91 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedComplianceReviewList'
           description: ''
+  /api/v1/market-admin/participants/{user_id}/responsible-participation/:
+    get:
+      operationId: market_admin_participants_responsible_participation_retrieve
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Responsible Participation Admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminResponsibleStatus'
+          description: ''
+    patch:
+      operationId: market_admin_participants_responsible_participation_partial_update
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Responsible Participation Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminResponsibleUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminResponsibleUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminResponsibleUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminResponsibleStatus'
+          description: ''
+  /api/v1/market-admin/participants/{user_id}/responsible-participation/events/:
+    get:
+      operationId: market_admin_participants_responsible_participation_events_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponsibleEventList'
+          description: ''
   /api/v1/market-fills/:
     get:
       operationId: market_fills_list
@@ -1365,7 +1450,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IneligibleOrderResponse'
+                $ref: '#/components/schemas/MarketOrderForbiddenResponse'
           description: ''
   /api/v1/markets/{market_id}/outcomes/{outcome_id}/order-book/:
     get:
@@ -1696,6 +1781,123 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MarketPortfolioSummary'
+          description: ''
+  /api/v1/markets/responsible-participation/:
+    get:
+      operationId: markets_responsible_participation_retrieve
+      tags:
+      - Market Responsible Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsibleStatus'
+          description: ''
+    patch:
+      operationId: markets_responsible_participation_partial_update
+      tags:
+      - Market Responsible Participation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedParticipantLimitsUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedParticipantLimitsUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedParticipantLimitsUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsibleStatus'
+          description: ''
+  /api/v1/markets/responsible-participation/cooling-off/:
+    post:
+      operationId: markets_responsible_participation_cooling_off_create
+      tags:
+      - Market Responsible Participation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Duration'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Duration'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Duration'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsibleStatus'
+          description: ''
+  /api/v1/markets/responsible-participation/events/:
+    get:
+      operationId: markets_responsible_participation_events_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedParticipantResponsibleEventList'
+          description: ''
+  /api/v1/markets/responsible-participation/self-exclusion/:
+    post:
+      operationId: markets_responsible_participation_self_exclusion_create
+      tags:
+      - Market Responsible Participation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelfExclusion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SelfExclusion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SelfExclusion'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponsibleStatus'
           description: ''
   /api/v1/modules/:
     get:
@@ -2686,6 +2888,89 @@ components:
       - requirements
       - reviewed_at
       - reviewed_by
+    AdminResponsibleStatus:
+      type: object
+      properties:
+        limits:
+          $ref: '#/components/schemas/Limits'
+        utilization:
+          type: object
+          additionalProperties: {}
+        cooling_off_until:
+          type: string
+          format: date-time
+          nullable: true
+        cooling_off_active:
+          type: boolean
+        self_exclusion_until:
+          type: string
+          format: date-time
+          nullable: true
+        self_exclusion_active:
+          type: boolean
+        self_excluded_indefinitely:
+          type: boolean
+        administrative_block_active:
+          type: boolean
+        buy_allowed:
+          type: boolean
+        sell_allowed:
+          type: boolean
+        participation_allowed:
+          type: boolean
+        buy_reason_codes:
+          type: array
+          items:
+            type: string
+        sell_reason_codes:
+          type: array
+          items:
+            type: string
+        next_actions:
+          type: array
+          items:
+            type: string
+        evaluated_at:
+          type: string
+          format: date-time
+        participant_id:
+          type: string
+          format: uuid
+        administrative_block_until:
+          type: string
+          format: date-time
+          nullable: true
+        administrative_block_reason:
+          type: string
+        reviewed_by:
+          type: string
+          format: uuid
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - administrative_block_active
+      - administrative_block_reason
+      - administrative_block_until
+      - buy_allowed
+      - buy_reason_codes
+      - cooling_off_active
+      - cooling_off_until
+      - evaluated_at
+      - limits
+      - next_actions
+      - participant_id
+      - participation_allowed
+      - reviewed_at
+      - reviewed_by
+      - self_excluded_indefinitely
+      - self_exclusion_active
+      - self_exclusion_until
+      - sell_allowed
+      - sell_reason_codes
+      - utilization
     Avatar:
       type: object
       description: Serializer for returning avatar metadata and URL.
@@ -3273,6 +3558,25 @@ components:
       - module_name
       - permission_required
       - title
+    Duration:
+      type: object
+      properties:
+        duration:
+          $ref: '#/components/schemas/DurationDurationEnum'
+      required:
+      - duration
+    DurationDurationEnum:
+      enum:
+      - ONE_HOUR
+      - ONE_DAY
+      - SEVEN_DAYS
+      - THIRTY_DAYS
+      type: string
+      description: |-
+        * `ONE_HOUR` - ONE_HOUR
+        * `ONE_DAY` - ONE_DAY
+        * `SEVEN_DAYS` - SEVEN_DAYS
+        * `THIRTY_DAYS` - THIRTY_DAYS
     EligibilityResponse:
       type: object
       properties:
@@ -3527,6 +3831,44 @@ components:
       - order_id
       - reserved_balance_after
       - reserved_balance_before
+    Limits:
+      type: object
+      properties:
+        max_order_notional:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        daily_buy_notional_limit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        weekly_buy_notional_limit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_open_buy_commitment:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_market_exposure:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_total_exposure:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_cumulative_realized_loss:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
     Login:
       type: object
       properties:
@@ -3962,6 +4304,10 @@ components:
       - outcome_id
       - quantity
       - side
+    MarketOrderForbiddenResponse:
+      oneOf:
+      - $ref: '#/components/schemas/IneligibleOrderResponse'
+      - $ref: '#/components/schemas/ResponsibleOrderBlockedResponse'
     MarketOrderRead:
       type: object
       properties:
@@ -5437,6 +5783,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ParticipantPublic'
+    PaginatedParticipantResponsibleEventList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantResponsibleEvent'
+    PaginatedResponsibleEventList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResponsibleEvent'
     PaginatedSportPublicList:
       type: object
       required:
@@ -5634,6 +6026,35 @@ components:
       - name
       - slug
       - sport
+    ParticipantResponsibleEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/ResponsibleParticipationEventTypeEnum'
+          readOnly: true
+        previous_state:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        new_state:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - event_type
+      - id
+      - new_state
+      - previous_state
     PasswordResetConfirm:
       type: object
       properties:
@@ -5676,6 +6097,63 @@ components:
       required:
       - email
       - otp
+    PatchedAdminResponsibleUpdate:
+      type: object
+      properties:
+        max_order_notional:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        daily_buy_notional_limit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        weekly_buy_notional_limit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_open_buy_commitment:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_market_exposure:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_total_exposure:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_cumulative_realized_loss:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        administrative_block_until:
+          type: string
+          format: date-time
+          nullable: true
+        cooling_off_until:
+          type: string
+          format: date-time
+          nullable: true
+        self_exclusion_until:
+          type: string
+          format: date-time
+          nullable: true
+        self_excluded_indefinitely:
+          type: boolean
+        administrative_block_reason:
+          type: string
+        reason:
+          type: string
+          writeOnly: true
     PatchedComplianceUpdate:
       type: object
       properties:
@@ -5759,6 +6237,44 @@ components:
           type: string
           default: 'No'
           maxLength: 120
+    PatchedParticipantLimitsUpdate:
+      type: object
+      properties:
+        max_order_notional:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        daily_buy_notional_limit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        weekly_buy_notional_limit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_open_buy_commitment:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_market_exposure:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_total_exposure:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        max_cumulative_realized_loss:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
     PatchedProfileUpdate:
       type: object
       description: |-
@@ -6121,6 +6637,157 @@ components:
           format: email
       required:
       - email
+    ResponsibleEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant:
+          type: string
+          format: uuid
+          readOnly: true
+        actor:
+          type: string
+          format: uuid
+          readOnly: true
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/ResponsibleParticipationEventTypeEnum'
+          readOnly: true
+        previous_state:
+          readOnly: true
+        new_state:
+          readOnly: true
+        reason:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - actor
+      - created_at
+      - event_type
+      - id
+      - new_state
+      - participant
+      - previous_state
+      - reason
+    ResponsibleOrderBlockedResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        code:
+          type: string
+        allowed:
+          type: boolean
+        reason_codes:
+          type: array
+          items:
+            type: string
+        next_actions:
+          type: array
+          items:
+            type: string
+        utilization:
+          type: object
+          additionalProperties: {}
+      required:
+      - allowed
+      - code
+      - detail
+      - next_actions
+      - reason_codes
+      - utilization
+    ResponsibleParticipationEventTypeEnum:
+      enum:
+      - LIMITS_SET
+      - LIMITS_TIGHTENED
+      - ADMIN_LIMITS_UPDATED
+      - ADMIN_CONTROLS_UPDATED
+      - COOLING_OFF_STARTED
+      - COOLING_OFF_EXTENDED
+      - SELF_EXCLUSION_STARTED
+      - SELF_EXCLUSION_EXTENDED
+      - ADMIN_BLOCK_STARTED
+      - ADMIN_BLOCK_EXTENDED
+      type: string
+      description: |-
+        * `LIMITS_SET` - Limits set
+        * `LIMITS_TIGHTENED` - Limits tightened
+        * `ADMIN_LIMITS_UPDATED` - Admin limits updated
+        * `ADMIN_CONTROLS_UPDATED` - Admin controls updated
+        * `COOLING_OFF_STARTED` - Cooling off started
+        * `COOLING_OFF_EXTENDED` - Cooling off extended
+        * `SELF_EXCLUSION_STARTED` - Self exclusion started
+        * `SELF_EXCLUSION_EXTENDED` - Self exclusion extended
+        * `ADMIN_BLOCK_STARTED` - Admin block started
+        * `ADMIN_BLOCK_EXTENDED` - Admin block extended
+    ResponsibleStatus:
+      type: object
+      properties:
+        limits:
+          $ref: '#/components/schemas/Limits'
+        utilization:
+          type: object
+          additionalProperties: {}
+        cooling_off_until:
+          type: string
+          format: date-time
+          nullable: true
+        cooling_off_active:
+          type: boolean
+        self_exclusion_until:
+          type: string
+          format: date-time
+          nullable: true
+        self_exclusion_active:
+          type: boolean
+        self_excluded_indefinitely:
+          type: boolean
+        administrative_block_active:
+          type: boolean
+        buy_allowed:
+          type: boolean
+        sell_allowed:
+          type: boolean
+        participation_allowed:
+          type: boolean
+        buy_reason_codes:
+          type: array
+          items:
+            type: string
+        sell_reason_codes:
+          type: array
+          items:
+            type: string
+        next_actions:
+          type: array
+          items:
+            type: string
+        evaluated_at:
+          type: string
+          format: date-time
+      required:
+      - administrative_block_active
+      - buy_allowed
+      - buy_reason_codes
+      - cooling_off_active
+      - cooling_off_until
+      - evaluated_at
+      - limits
+      - next_actions
+      - participation_allowed
+      - self_excluded_indefinitely
+      - self_exclusion_active
+      - self_exclusion_until
+      - sell_allowed
+      - sell_reason_codes
+      - utilization
     RestrictionStatusEnum:
       enum:
       - CLEAR
@@ -6145,6 +6812,27 @@ components:
         * `COMPETITOR` - Competitor
         * `SUBJECT` - Subject
         * `OTHER` - Other
+    SelfExclusion:
+      type: object
+      properties:
+        duration:
+          $ref: '#/components/schemas/SelfExclusionDurationEnum'
+      required:
+      - duration
+    SelfExclusionDurationEnum:
+      enum:
+      - ONE_DAY
+      - SEVEN_DAYS
+      - THIRTY_DAYS
+      - NINETY_DAYS
+      - INDEFINITE
+      type: string
+      description: |-
+        * `ONE_DAY` - ONE_DAY
+        * `SEVEN_DAYS` - SEVEN_DAYS
+        * `THIRTY_DAYS` - THIRTY_DAYS
+        * `NINETY_DAYS` - NINETY_DAYS
+        * `INDEFINITE` - INDEFINITE
     Session:
       type: object
       properties:

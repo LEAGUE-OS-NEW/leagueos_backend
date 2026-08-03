@@ -1,7 +1,9 @@
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -126,6 +128,42 @@ MARKET_ALLOWED_COUNTRY_CODES = env.list("MARKET_ALLOWED_COUNTRY_CODES", default=
 MARKET_BLOCKED_COUNTRY_CODES = env.list("MARKET_BLOCKED_COUNTRY_CODES", default=[])
 
 
+def optional_non_negative_decimal(name):
+    raw_value = env(name, default="").strip()
+    if not raw_value:
+        return None
+    try:
+        value = Decimal(raw_value)
+    except InvalidOperation as error:
+        raise ImproperlyConfigured(f"{name} must be a valid decimal number.") from error
+    if not value.is_finite() or value < 0:
+        raise ImproperlyConfigured(f"{name} must be a finite non-negative decimal number.")
+    return value
+
+
+MARKET_RESPONSIBLE_DEFAULT_MAX_ORDER_NOTIONAL = optional_non_negative_decimal(
+    "MARKET_RESPONSIBLE_DEFAULT_MAX_ORDER_NOTIONAL"
+)
+MARKET_RESPONSIBLE_DEFAULT_DAILY_BUY_NOTIONAL = optional_non_negative_decimal(
+    "MARKET_RESPONSIBLE_DEFAULT_DAILY_BUY_NOTIONAL"
+)
+MARKET_RESPONSIBLE_DEFAULT_WEEKLY_BUY_NOTIONAL = optional_non_negative_decimal(
+    "MARKET_RESPONSIBLE_DEFAULT_WEEKLY_BUY_NOTIONAL"
+)
+MARKET_RESPONSIBLE_DEFAULT_MAX_OPEN_BUY_COMMITMENT = optional_non_negative_decimal(
+    "MARKET_RESPONSIBLE_DEFAULT_MAX_OPEN_BUY_COMMITMENT"
+)
+MARKET_RESPONSIBLE_DEFAULT_MAX_MARKET_EXPOSURE = optional_non_negative_decimal(
+    "MARKET_RESPONSIBLE_DEFAULT_MAX_MARKET_EXPOSURE"
+)
+MARKET_RESPONSIBLE_DEFAULT_MAX_TOTAL_EXPOSURE = optional_non_negative_decimal(
+    "MARKET_RESPONSIBLE_DEFAULT_MAX_TOTAL_EXPOSURE"
+)
+MARKET_RESPONSIBLE_DEFAULT_MAX_CUMULATIVE_REALIZED_LOSS = optional_non_negative_decimal(
+    "MARKET_RESPONSIBLE_DEFAULT_MAX_CUMULATIVE_REALIZED_LOSS"
+)
+
+
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
@@ -171,6 +209,18 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
+        "ResponsibleParticipationEventTypeEnum": [
+            ("LIMITS_SET", "Limits set"),
+            ("LIMITS_TIGHTENED", "Limits tightened"),
+            ("ADMIN_LIMITS_UPDATED", "Admin limits updated"),
+            ("ADMIN_CONTROLS_UPDATED", "Admin controls updated"),
+            ("COOLING_OFF_STARTED", "Cooling off started"),
+            ("COOLING_OFF_EXTENDED", "Cooling off extended"),
+            ("SELF_EXCLUSION_STARTED", "Self exclusion started"),
+            ("SELF_EXCLUSION_EXTENDED", "Self exclusion extended"),
+            ("ADMIN_BLOCK_STARTED", "Admin block started"),
+            ("ADMIN_BLOCK_EXTENDED", "Admin block extended"),
+        ],
         "MarketScopeEnum": ("markets.models.MarketScope.choices"),
         "MarketStatusEnum": [
             ("DRAFT", "Draft"),
