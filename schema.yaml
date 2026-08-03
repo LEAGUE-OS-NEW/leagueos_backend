@@ -6,15 +6,13 @@ info:
 paths:
   /api/v1/:
     get:
-      operationId: api_v1_retrieve
+      operationId: root_retrieve
       description: |-
         Get dashboard data for the current user.
 
         Returns:
             Complete dashboard response with user summary, navigation,
             widgets, module data, and recommendations.
-      tags:
-      - api
       security:
       - jwtAuth: []
       responses:
@@ -26,7 +24,7 @@ paths:
           description: ''
   /api/v1/analytics/:
     post:
-      operationId: api_v1_analytics_create
+      operationId: analytics_create
       description: |-
         Record analytics event.
 
@@ -39,7 +37,7 @@ paths:
         Returns:
             Success response
       tags:
-      - api
+      - analytics
       requestBody:
         content:
           application/json:
@@ -63,9 +61,9 @@ paths:
           description: ''
   /api/v1/auth/login/:
     post:
-      operationId: api_v1_auth_login_create
+      operationId: auth_login_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -90,9 +88,9 @@ paths:
           description: ''
   /api/v1/auth/logout/:
     post:
-      operationId: api_v1_auth_logout_create
+      operationId: auth_logout_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -116,9 +114,9 @@ paths:
           description: ''
   /api/v1/auth/logout-all/:
     post:
-      operationId: api_v1_auth_logout_all_create
+      operationId: auth_logout_all_create
       tags:
-      - api
+      - auth
       security:
       - jwtAuth: []
       responses:
@@ -126,9 +124,9 @@ paths:
           description: No response body
   /api/v1/auth/me/:
     get:
-      operationId: api_v1_auth_me_retrieve
+      operationId: auth_me_retrieve
       tags:
-      - api
+      - auth
       security:
       - jwtAuth: []
       responses:
@@ -140,9 +138,9 @@ paths:
           description: ''
   /api/v1/auth/password-reset/confirm/:
     post:
-      operationId: api_v1_auth_password_reset_confirm_create
+      operationId: auth_password_reset_confirm_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -167,9 +165,9 @@ paths:
           description: ''
   /api/v1/auth/password-reset/request/:
     post:
-      operationId: api_v1_auth_password_reset_request_create
+      operationId: auth_password_reset_request_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -194,9 +192,9 @@ paths:
           description: ''
   /api/v1/auth/password-reset/verify/:
     post:
-      operationId: api_v1_auth_password_reset_verify_create
+      operationId: auth_password_reset_verify_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -221,9 +219,9 @@ paths:
           description: ''
   /api/v1/auth/profile/:
     get:
-      operationId: api_v1_auth_profile_retrieve
+      operationId: auth_profile_retrieve
       tags:
-      - api
+      - auth
       security:
       - jwtAuth: []
       responses:
@@ -235,9 +233,9 @@ paths:
           description: ''
   /api/v1/auth/register/:
     post:
-      operationId: api_v1_auth_register_create
+      operationId: auth_register_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -262,9 +260,9 @@ paths:
           description: ''
   /api/v1/auth/registration-status/:
     get:
-      operationId: api_v1_auth_registration_status_retrieve
+      operationId: auth_registration_status_retrieve
       tags:
-      - api
+      - auth
       security:
       - jwtAuth: []
       - {}
@@ -277,9 +275,9 @@ paths:
           description: ''
   /api/v1/auth/resend-otp/:
     post:
-      operationId: api_v1_auth_resend_otp_create
+      operationId: auth_resend_otp_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -304,9 +302,9 @@ paths:
           description: ''
   /api/v1/auth/resend-verification/:
     post:
-      operationId: api_v1_auth_resend_verification_create
+      operationId: auth_resend_verification_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -331,9 +329,9 @@ paths:
           description: ''
   /api/v1/auth/sessions/:
     get:
-      operationId: api_v1_auth_sessions_retrieve
+      operationId: auth_sessions_retrieve
       tags:
-      - api
+      - auth
       security:
       - jwtAuth: []
       responses:
@@ -345,9 +343,9 @@ paths:
           description: ''
   /api/v1/auth/token/refresh/:
     post:
-      operationId: api_v1_auth_token_refresh_create
+      operationId: auth_token_refresh_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -371,9 +369,9 @@ paths:
           description: ''
   /api/v1/auth/verify-otp/:
     post:
-      operationId: api_v1_auth_verify_otp_create
+      operationId: auth_verify_otp_create
       tags:
-      - api
+      - auth
       requestBody:
         content:
           application/json:
@@ -398,10 +396,10 @@ paths:
           description: ''
   /api/v1/clubs/:
     get:
-      operationId: api_v1_clubs_list
+      operationId: clubs_list
       description: List all active clubs for favourite club selection.
       tags:
-      - api
+      - clubs
       security:
       - jwtAuth: []
       responses:
@@ -415,7 +413,7 @@ paths:
           description: ''
   /api/v1/competitions/:
     get:
-      operationId: api_v1_competitions_list
+      operationId: competitions_list
       parameters:
       - name: page
         required: false
@@ -454,10 +452,10 @@ paths:
           description: ''
   /api/v1/lookups/countries/:
     get:
-      operationId: api_v1_lookups_countries_list
+      operationId: lookups_countries_list
       description: List all active countries for profile lookup.
       tags:
-      - api
+      - lookups
       security:
       - jwtAuth: []
       responses:
@@ -471,10 +469,10 @@ paths:
           description: ''
   /api/v1/lookups/genders/:
     get:
-      operationId: api_v1_lookups_genders_list
+      operationId: lookups_genders_list
       description: List all active genders for profile lookup.
       tags:
-      - api
+      - lookups
       security:
       - jwtAuth: []
       responses:
@@ -488,10 +486,10 @@ paths:
           description: ''
   /api/v1/lookups/languages/:
     get:
-      operationId: api_v1_lookups_languages_list
+      operationId: lookups_languages_list
       description: List all active languages for profile lookup.
       tags:
-      - api
+      - lookups
       security:
       - jwtAuth: []
       responses:
@@ -505,10 +503,10 @@ paths:
           description: ''
   /api/v1/lookups/timezones/:
     get:
-      operationId: api_v1_lookups_timezones_list
+      operationId: lookups_timezones_list
       description: List all active timezones for profile lookup.
       tags:
-      - api
+      - lookups
       security:
       - jwtAuth: []
       responses:
@@ -522,7 +520,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/:
     get:
-      operationId: api_v1_market_admin_markets_list
+      operationId: market_admin_markets_list
       parameters:
       - in: query
         name: category
@@ -604,7 +602,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedMarketAdminReadList'
           description: ''
     post:
-      operationId: api_v1_market_admin_markets_create
+      operationId: market_admin_markets_create
       tags:
       - Market Administration
       requestBody:
@@ -630,7 +628,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/:
     get:
-      operationId: api_v1_market_admin_markets_retrieve
+      operationId: market_admin_markets_retrieve
       parameters:
       - in: path
         name: market_id
@@ -650,7 +648,7 @@ paths:
                 $ref: '#/components/schemas/MarketAdminRead'
           description: ''
     patch:
-      operationId: api_v1_market_admin_markets_partial_update
+      operationId: market_admin_markets_partial_update
       parameters:
       - in: path
         name: market_id
@@ -682,7 +680,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/approve/:
     post:
-      operationId: api_v1_market_admin_markets_approve_create
+      operationId: market_admin_markets_approve_create
       parameters:
       - in: path
         name: market_id
@@ -715,7 +713,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/close/:
     post:
-      operationId: api_v1_market_admin_markets_close_create
+      operationId: market_admin_markets_close_create
       parameters:
       - in: path
         name: market_id
@@ -748,7 +746,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/open/:
     post:
-      operationId: api_v1_market_admin_markets_open_create
+      operationId: market_admin_markets_open_create
       parameters:
       - in: path
         name: market_id
@@ -781,7 +779,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/reject/:
     post:
-      operationId: api_v1_market_admin_markets_reject_create
+      operationId: market_admin_markets_reject_create
       parameters:
       - in: path
         name: market_id
@@ -814,7 +812,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/reopen/:
     post:
-      operationId: api_v1_market_admin_markets_reopen_create
+      operationId: market_admin_markets_reopen_create
       parameters:
       - in: path
         name: market_id
@@ -845,9 +843,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketAdminRead'
           description: ''
+  /api/v1/market-admin/markets/{market_id}/resolve/:
+    post:
+      operationId: market_admin_markets_resolve_create
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Administration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketResolve'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketResolve'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketResolve'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketAdminRead'
+          description: ''
   /api/v1/market-admin/markets/{market_id}/submit/:
     post:
-      operationId: api_v1_market_admin_markets_submit_create
+      operationId: market_admin_markets_submit_create
       parameters:
       - in: path
         name: market_id
@@ -880,7 +911,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/suspend/:
     post:
-      operationId: api_v1_market_admin_markets_suspend_create
+      operationId: market_admin_markets_suspend_create
       parameters:
       - in: path
         name: market_id
@@ -911,9 +942,207 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketAdminRead'
           description: ''
+  /api/v1/market-admin/markets/{market_id}/void/:
+    post:
+      operationId: market_admin_markets_void_create
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Administration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketVoid'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketVoid'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketVoid'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketAdminRead'
+          description: ''
+  /api/v1/market-fills/:
+    get:
+      operationId: market_fills_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketFillReadList'
+          description: ''
+  /api/v1/market-fills/{fill_id}/:
+    get:
+      operationId: market_fills_retrieve
+      parameters:
+      - in: path
+        name: fill_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketFillRead'
+          description: ''
+  /api/v1/market-orders/:
+    get:
+      operationId: market_orders_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketOrderReadList'
+          description: ''
+  /api/v1/market-orders/{order_id}/:
+    get:
+      operationId: market_orders_retrieve
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketOrderRead'
+          description: ''
+  /api/v1/market-orders/{order_id}/cancel/:
+    post:
+      operationId: market_orders_cancel_create
+      parameters:
+      - in: path
+        name: order_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketOrderRead'
+          description: ''
+  /api/v1/market-positions/:
+    get:
+      operationId: market_positions_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketPositionReadList'
+          description: ''
+  /api/v1/market-positions/{position_id}/:
+    get:
+      operationId: market_positions_retrieve
+      parameters:
+      - in: path
+        name: position_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketPositionRead'
+          description: ''
   /api/v1/markets/:
     get:
-      operationId: api_v1_markets_list
+      operationId: markets_list
       parameters:
       - in: query
         name: category
@@ -994,7 +1223,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/:
     get:
-      operationId: api_v1_markets_retrieve
+      operationId: markets_retrieve
       parameters:
       - in: path
         name: market_id
@@ -1014,9 +1243,126 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketPublic'
           description: ''
+  /api/v1/markets/{market_id}/orders/:
+    post:
+      operationId: markets_orders_create
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Participation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketOrderCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketOrderCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketOrderCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketOrderRead'
+          description: ''
+  /api/v1/markets/{market_id}/outcomes/{outcome_id}/order-book/:
+    get:
+      operationId: markets_outcomes_order_book_retrieve
+      parameters:
+      - in: query
+        name: levels
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: outcome_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: trades
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 0
+          default: 20
+      tags:
+      - Markets
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketOrderBook'
+          description: ''
+  /api/v1/markets/{market_id}/settle/:
+    post:
+      operationId: markets_settle_create
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Administration
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketSettlement'
+          description: ''
+  /api/v1/markets/{market_id}/void-refund/:
+    post:
+      operationId: markets_void_refund_create
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Administration
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketVoidRefund'
+          description: ''
   /api/v1/markets/categories/:
     get:
-      operationId: api_v1_markets_categories_list
+      operationId: markets_categories_list
       parameters:
       - name: page
         required: false
@@ -1042,16 +1388,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedMarketCategoryPublicList'
           description: ''
+  /api/v1/markets/orders/open/:
+    get:
+      operationId: markets_orders_open_list
+      description: Return the authenticated participant's active OPEN and PARTIALLY_FILLED
+        orders.
+      parameters:
+      - in: query
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: outcome_id
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: side
+        schema:
+          type: string
+          enum:
+          - BUY
+          - SELL
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - OPEN
+          - PARTIALLY_FILLED
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedParticipantOpenOrderList'
+          description: ''
   /api/v1/modules/:
     get:
-      operationId: api_v1_modules_retrieve
+      operationId: modules_retrieve
       description: |-
         Get available dashboard modules.
 
         Returns:
             List of active dashboard modules
       tags:
-      - api
+      - modules
       security:
       - jwtAuth: []
       responses:
@@ -1063,14 +1462,14 @@ paths:
           description: ''
   /api/v1/navigation/:
     get:
-      operationId: api_v1_navigation_retrieve
+      operationId: navigation_retrieve
       description: |-
         Get navigation menu for the current user.
 
         Returns:
             Hierarchical navigation structure
       tags:
-      - api
+      - navigation
       security:
       - jwtAuth: []
       responses:
@@ -1082,10 +1481,10 @@ paths:
           description: ''
   /api/v1/notification-categories/:
     get:
-      operationId: api_v1_notification_categories_retrieve
+      operationId: notification_categories_retrieve
       description: Get all active notification categories.
       tags:
-      - api
+      - notification-categories
       security:
       - jwtAuth: []
       responses:
@@ -1097,10 +1496,10 @@ paths:
           description: ''
   /api/v1/notification-channels/:
     get:
-      operationId: api_v1_notification_channels_retrieve
+      operationId: notification_channels_retrieve
       description: Get all active notification channels.
       tags:
-      - api
+      - notification-channels
       security:
       - jwtAuth: []
       responses:
@@ -1112,10 +1511,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/:
     get:
-      operationId: api_v1_notification_preferences_retrieve
+      operationId: notification_preferences_retrieve
       description: Get user notification preferences.
       tags:
-      - api
+      - notification-preferences
       security:
       - jwtAuth: []
       responses:
@@ -1126,10 +1525,10 @@ paths:
                 $ref: '#/components/schemas/UserNotificationPreference'
           description: ''
     patch:
-      operationId: api_v1_notification_preferences_partial_update
+      operationId: notification_preferences_partial_update
       description: Bulk update user notification preferences.
       tags:
-      - api
+      - notification-preferences
       requestBody:
         content:
           application/json:
@@ -1152,10 +1551,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/audit-log/:
     get:
-      operationId: api_v1_notification_preferences_audit_log_retrieve
+      operationId: notification_preferences_audit_log_retrieve
       description: Get user's notification audit logs.
       tags:
-      - api
+      - notification-preferences
       security:
       - jwtAuth: []
       responses:
@@ -1167,10 +1566,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/capabilities/:
     get:
-      operationId: api_v1_notification_preferences_capabilities_retrieve
+      operationId: notification_preferences_capabilities_retrieve
       description: Get channel capabilities for current user.
       tags:
-      - api
+      - notification-preferences
       security:
       - jwtAuth: []
       responses:
@@ -1182,10 +1581,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/consents/:
     get:
-      operationId: api_v1_notification_preferences_consents_retrieve
+      operationId: notification_preferences_consents_retrieve
       description: Get current consent status.
       tags:
-      - api
+      - notification-preferences
       security:
       - jwtAuth: []
       responses:
@@ -1196,10 +1595,10 @@ paths:
                 $ref: '#/components/schemas/CommunicationConsent'
           description: ''
     post:
-      operationId: api_v1_notification_preferences_consents_create
+      operationId: notification_preferences_consents_create
       description: Grant or withdraw consent.
       tags:
-      - api
+      - notification-preferences
       requestBody:
         content:
           application/json:
@@ -1222,10 +1621,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/quiet-hours/:
     post:
-      operationId: api_v1_notification_preferences_quiet_hours_create
+      operationId: notification_preferences_quiet_hours_create
       description: Set or update quiet hours.
       tags:
-      - api
+      - notification-preferences
       requestBody:
         content:
           application/json:
@@ -1248,10 +1647,10 @@ paths:
                 $ref: '#/components/schemas/QuietHours'
           description: ''
     delete:
-      operationId: api_v1_notification_preferences_quiet_hours_destroy
+      operationId: notification_preferences_quiet_hours_destroy
       description: Delete quiet hours configuration.
       tags:
-      - api
+      - notification-preferences
       security:
       - jwtAuth: []
       responses:
@@ -1259,10 +1658,10 @@ paths:
           description: No response body
   /api/v1/notification-preferences/reset/:
     post:
-      operationId: api_v1_notification_preferences_reset_create
+      operationId: notification_preferences_reset_create
       description: Reset user preferences to defaults.
       tags:
-      - api
+      - notification-preferences
       requestBody:
         content:
           application/json:
@@ -1285,11 +1684,11 @@ paths:
           description: ''
   /api/v1/onboarding/:
     get:
-      operationId: api_v1_onboarding_retrieve
+      operationId: onboarding_retrieve
       description: Return the current onboarding status and saved preferences.
       summary: Get onboarding status
       tags:
-      - api
+      - onboarding
       security:
       - jwtAuth: []
       responses:
@@ -1301,11 +1700,11 @@ paths:
           description: ''
   /api/v1/onboarding/clubs/:
     post:
-      operationId: api_v1_onboarding_clubs_create
+      operationId: onboarding_clubs_create
       description: Select the user's favourite clubs during onboarding.
       summary: Select favourite clubs
       tags:
-      - api
+      - onboarding
       requestBody:
         content:
           application/json:
@@ -1329,11 +1728,11 @@ paths:
           description: ''
   /api/v1/onboarding/competitions/:
     post:
-      operationId: api_v1_onboarding_competitions_create
+      operationId: onboarding_competitions_create
       description: Select the user's favourite competitions during onboarding.
       summary: Select favourite competitions
       tags:
-      - api
+      - onboarding
       requestBody:
         content:
           application/json:
@@ -1357,11 +1756,11 @@ paths:
           description: ''
   /api/v1/onboarding/complete/:
     post:
-      operationId: api_v1_onboarding_complete_create
+      operationId: onboarding_complete_create
       description: Complete the onboarding flow and return the dashboard configuration.
       summary: Complete onboarding
       tags:
-      - api
+      - onboarding
       requestBody:
         content:
           application/json:
@@ -1384,11 +1783,11 @@ paths:
           description: ''
   /api/v1/onboarding/country/:
     post:
-      operationId: api_v1_onboarding_country_create
+      operationId: onboarding_country_create
       description: Select the user's preferred country during onboarding.
       summary: Select preferred country
       tags:
-      - api
+      - onboarding
       requestBody:
         content:
           application/json:
@@ -1412,11 +1811,11 @@ paths:
           description: ''
   /api/v1/onboarding/dashboard/:
     get:
-      operationId: api_v1_onboarding_dashboard_retrieve
+      operationId: onboarding_dashboard_retrieve
       description: Return the personalized dashboard configuration.
       summary: Get dashboard configuration
       tags:
-      - api
+      - onboarding
       security:
       - jwtAuth: []
       responses:
@@ -1428,11 +1827,11 @@ paths:
           description: ''
   /api/v1/onboarding/skip/:
     post:
-      operationId: api_v1_onboarding_skip_create
+      operationId: onboarding_skip_create
       description: Skip an onboarding step.
       summary: Skip onboarding step
       tags:
-      - api
+      - onboarding
       requestBody:
         content:
           application/json:
@@ -1456,11 +1855,11 @@ paths:
           description: ''
   /api/v1/onboarding/sports/:
     post:
-      operationId: api_v1_onboarding_sports_create
+      operationId: onboarding_sports_create
       description: Select the user's favourite sports during onboarding.
       summary: Select favourite sports
       tags:
-      - api
+      - onboarding
       requestBody:
         content:
           application/json:
@@ -1484,7 +1883,7 @@ paths:
           description: ''
   /api/v1/participants/:
     get:
-      operationId: api_v1_participants_list
+      operationId: participants_list
       parameters:
       - in: query
         name: kind
@@ -1540,10 +1939,10 @@ paths:
           description: ''
   /api/v1/preferences/clubs/:
     get:
-      operationId: api_v1_preferences_clubs_list
+      operationId: preferences_clubs_list
       description: List active clubs, optionally filtered by competition.
       tags:
-      - api
+      - preferences
       security:
       - jwtAuth: []
       responses:
@@ -1557,10 +1956,10 @@ paths:
           description: ''
   /api/v1/preferences/competitions/:
     get:
-      operationId: api_v1_preferences_competitions_list
+      operationId: preferences_competitions_list
       description: List active competitions, optionally filtered by sport.
       tags:
-      - api
+      - preferences
       security:
       - jwtAuth: []
       responses:
@@ -1574,10 +1973,10 @@ paths:
           description: ''
   /api/v1/preferences/countries/:
     get:
-      operationId: api_v1_preferences_countries_list
+      operationId: preferences_countries_list
       description: List all active countries for the preference catalogue.
       tags:
-      - api
+      - preferences
       security:
       - jwtAuth: []
       responses:
@@ -1591,10 +1990,10 @@ paths:
           description: ''
   /api/v1/preferences/sports/:
     get:
-      operationId: api_v1_preferences_sports_list
+      operationId: preferences_sports_list
       description: List all active sports for the preference catalogue.
       tags:
-      - api
+      - preferences
       security:
       - jwtAuth: []
       responses:
@@ -1608,11 +2007,11 @@ paths:
           description: ''
   /api/v1/profile/:
     get:
-      operationId: api_v1_profile_retrieve
+      operationId: profile_retrieve
       description: Retrieve the authenticated user's profile information.
       summary: Get profile
       tags:
-      - api
+      - profile
       security:
       - jwtAuth: []
       responses:
@@ -1623,13 +2022,13 @@ paths:
                 $ref: '#/components/schemas/Profile'
           description: ''
     patch:
-      operationId: api_v1_profile_partial_update
+      operationId: profile_partial_update
       description: 'Update the authenticated user''s profile. Allowed fields: first_name,
         last_name, display_name, date_of_birth, gender, country, city, biography,
         favourite_club, preferred_language, timezone, communication_preferences, notification_preferences.'
       summary: Update profile
       tags:
-      - api
+      - profile
       requestBody:
         content:
           application/json:
@@ -1652,12 +2051,12 @@ paths:
           description: ''
   /api/v1/profile/avatar/:
     get:
-      operationId: api_v1_profile_avatar_retrieve
+      operationId: profile_avatar_retrieve
       description: Retrieve the authenticated user's avatar metadata and URL. Returns
         the avatar URL (or default avatar URL if none set).
       summary: Get avatar info
       tags:
-      - api
+      - profile
       security:
       - jwtAuth: []
       responses:
@@ -1668,13 +2067,13 @@ paths:
                 $ref: '#/components/schemas/Avatar'
           description: ''
     post:
-      operationId: api_v1_profile_avatar_create
+      operationId: profile_avatar_create
       description: 'Upload or replace the authenticated user''s profile picture. Accepts
         multipart/form-data with an ''avatar'' image file. Supported formats: JPG,
         PNG, WebP. Max size: 5MB.'
       summary: Upload or replace avatar
       tags:
-      - api
+      - profile
       requestBody:
         content:
           application/json:
@@ -1694,12 +2093,12 @@ paths:
         '400':
           description: Invalid image or validation error
     delete:
-      operationId: api_v1_profile_avatar_destroy
+      operationId: profile_avatar_destroy
       description: Delete the authenticated user's profile picture. After deletion,
         the platform default avatar will be served.
       summary: Delete avatar
       tags:
-      - api
+      - profile
       security:
       - jwtAuth: []
       responses:
@@ -1707,7 +2106,7 @@ paths:
           description: Avatar deleted successfully
   /api/v1/sporting-events/:
     get:
-      operationId: api_v1_sporting_events_list
+      operationId: sporting_events_list
       parameters:
       - in: query
         name: competition
@@ -1796,7 +2195,7 @@ paths:
           description: ''
   /api/v1/sports/:
     get:
-      operationId: api_v1_sports_list
+      operationId: sports_list
       parameters:
       - name: page
         required: false
@@ -1824,7 +2223,7 @@ paths:
           description: ''
   /api/v1/system/health/:
     get:
-      operationId: api_v1_system_health_retrieve
+      operationId: system_health_retrieve
       summary: Backend health check
       tags:
       - System
@@ -1838,16 +2237,138 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthCheck'
           description: ''
+  /api/v1/wallets/:
+    get:
+      operationId: wallets_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Wallets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedWalletReadList'
+          description: ''
+        '401':
+          description: Authentication credentials are required.
+  /api/v1/wallets/{currency}/:
+    get:
+      operationId: wallets_retrieve
+      parameters:
+      - in: path
+        name: currency
+        schema:
+          type: string
+        required: true
+      tags:
+      - Wallets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletRead'
+          description: ''
+        '400':
+          description: Invalid currency.
+        '401':
+          description: Authentication credentials are required.
+        '404':
+          description: Wallet not found.
+  /api/v1/wallets/{currency}/ledger/:
+    get:
+      operationId: wallets_ledger_list
+      parameters:
+      - in: query
+        name: created_from
+        schema:
+          type: string
+      - in: query
+        name: created_to
+        schema:
+          type: string
+      - in: path
+        name: currency
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: entry_type
+        schema:
+          type: string
+          enum:
+          - CREDIT
+          - DEBIT
+          - RELEASE
+          - RESERVE
+      - in: query
+        name: fill_id
+        schema:
+          type: string
+      - in: query
+        name: market_id
+        schema:
+          type: string
+      - in: query
+        name: order_id
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Wallets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLedgerEntryReadList'
+          description: ''
+        '400':
+          description: Invalid currency or filter value.
+        '401':
+          description: Authentication credentials are required.
+        '404':
+          description: Wallet not found.
   /api/v1/widgets/:
     get:
-      operationId: api_v1_widgets_retrieve
+      operationId: widgets_retrieve
       description: |-
         Get enabled widgets for the current user.
 
         Returns:
             List of enabled widgets
       tags:
-      - api
+      - widgets
       security:
       - jwtAuth: []
       responses:
@@ -1870,8 +2391,8 @@ components:
         avatar:
           type: string
           format: uri
-          readOnly: true
           nullable: true
+          readOnly: true
         avatar_url:
           type: string
           nullable: true
@@ -2080,9 +2601,12 @@ components:
           type: string
           maxLength: 180
         slug:
-          type: string
-          maxLength: 200
-          pattern: ^[-a-zA-Z0-9_]+$
+          oneOf:
+          - type: string
+            maxLength: 200
+            pattern: ^[-a-zA-Z0-9_]+$
+          - type: string
+            maxLength: 0
         country_code:
           type: string
           default: UG
@@ -2377,6 +2901,18 @@ components:
       - module_name
       - permission_required
       - title
+    EntryTypeEnum:
+      enum:
+      - CREDIT
+      - DEBIT
+      - RESERVE
+      - RELEASE
+      type: string
+      description: |-
+        * `CREDIT` - Credit
+        * `DEBIT` - Debit
+        * `RESERVE` - Reserve
+        * `RELEASE` - Release
     EventParticipantPublic:
       type: object
       properties:
@@ -2384,9 +2920,8 @@ components:
           $ref: '#/components/schemas/RoleEnum'
         position:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         participant:
           allOf:
           - $ref: '#/components/schemas/ParticipantPublic'
@@ -2492,6 +3027,78 @@ components:
       - id
       - is_active
       - name
+    LedgerEntryRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        entry_type:
+          allOf:
+          - $ref: '#/components/schemas/EntryTypeEnum'
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        available_balance_before:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        available_balance_after:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_balance_before:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_balance_after:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        idempotency_reference:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        order_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        fill_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - amount
+      - available_balance_after
+      - available_balance_before
+      - created_at
+      - entry_type
+      - fill_id
+      - id
+      - idempotency_reference
+      - market_id
+      - order_id
+      - reserved_balance_after
+      - reserved_balance_before
     Login:
       type: object
       properties:
@@ -2580,6 +3187,11 @@ components:
           items:
             $ref: '#/components/schemas/MarketOutcomePublic'
           readOnly: true
+        winning_outcome:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -2612,6 +3224,8 @@ components:
           nullable: true
         resolution_notes:
           type: string
+        resolution_evidence:
+          type: string
         status_transitions:
           type: array
           items:
@@ -2635,6 +3249,7 @@ components:
       - subject
       - template
       - updated_at
+      - winning_outcome
     MarketAdminUser:
       type: object
       properties:
@@ -2742,19 +3357,77 @@ components:
           type: string
           maxLength: 120
         slug:
-          type: string
-          maxLength: 140
-          pattern: ^[-a-zA-Z0-9_]+$
+          oneOf:
+          - type: string
+            maxLength: 140
+            pattern: ^[-a-zA-Z0-9_]+$
+          - type: string
+            maxLength: 0
         description:
           type: string
         display_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
       required:
       - id
       - name
+    MarketFillRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market:
+          type: string
+          format: uuid
+          readOnly: true
+        outcome:
+          type: string
+          format: uuid
+          readOnly: true
+        buy_order:
+          type: string
+          format: uuid
+          readOnly: true
+        sell_order:
+          type: string
+          format: uuid
+          readOnly: true
+        maker_order:
+          type: string
+          format: uuid
+          readOnly: true
+        taker_order:
+          type: string
+          format: uuid
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - buy_order
+      - created_at
+      - id
+      - maker_order
+      - market
+      - outcome
+      - price
+      - quantity
+      - sell_order
+      - taker_order
     MarketLifecycleAction:
       type: object
       properties:
@@ -2762,6 +3435,174 @@ components:
           type: string
       required:
       - notes
+    MarketOrderBook:
+      type: object
+      properties:
+        market_id:
+          type: string
+          format: uuid
+        outcome:
+          $ref: '#/components/schemas/OrderBookOutcome'
+        best_bid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          nullable: true
+        best_ask:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          nullable: true
+        spread:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          nullable: true
+        total_bid_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        total_ask_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        bids:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderBookLevel'
+        asks:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderBookLevel'
+        recent_trades:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentTrade'
+      required:
+      - asks
+      - best_ask
+      - best_bid
+      - bids
+      - market_id
+      - outcome
+      - recent_trades
+      - spread
+      - total_ask_quantity
+      - total_bid_quantity
+    MarketOrderCreate:
+      type: object
+      properties:
+        outcome_id:
+          type: string
+          format: uuid
+        side:
+          $ref: '#/components/schemas/MarketOrderSideEnum'
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        limit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+      required:
+      - limit_price
+      - outcome_id
+      - quantity
+      - side
+    MarketOrderRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+          readOnly: true
+        market:
+          type: string
+          format: uuid
+          readOnly: true
+        outcome:
+          type: string
+          format: uuid
+          readOnly: true
+        side:
+          allOf:
+          - $ref: '#/components/schemas/MarketOrderSideEnum'
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        limit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          readOnly: true
+        filled_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        average_fill_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          readOnly: true
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/MarketOrderReadStatusEnum'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - average_fill_price
+      - created_at
+      - filled_quantity
+      - id
+      - limit_price
+      - market
+      - outcome
+      - quantity
+      - side
+      - status
+      - updated_at
+      - user
+    MarketOrderReadStatusEnum:
+      enum:
+      - PENDING
+      - OPEN
+      - PARTIALLY_FILLED
+      - FILLED
+      - CANCELLED
+      - REJECTED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `OPEN` - Open
+        * `PARTIALLY_FILLED` - Partially filled
+        * `FILLED` - Filled
+        * `CANCELLED` - Cancelled
+        * `REJECTED` - Rejected
+    MarketOrderSideEnum:
+      enum:
+      - BUY
+      - SELL
+      type: string
+      description: |-
+        * `BUY` - Buy
+        * `SELL` - Sell
     MarketOutcomePublic:
       type: object
       properties:
@@ -2770,12 +3611,11 @@ components:
           format: uuid
           readOnly: true
         side:
-          $ref: '#/components/schemas/SideEnum'
+          $ref: '#/components/schemas/MarketOutcomeSideEnum'
         position:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         label:
           type: string
           maxLength: 120
@@ -2786,6 +3626,78 @@ components:
       - label
       - position
       - side
+    MarketOutcomeSideEnum:
+      enum:
+      - 'YES'
+      - 'NO'
+      type: string
+      description: |-
+        * `YES` - Yes
+        * `NO` - No
+    MarketPositionRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+          readOnly: true
+        market:
+          type: string
+          format: uuid
+          readOnly: true
+        outcome:
+          type: string
+          format: uuid
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        average_entry_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          readOnly: true
+        total_cost:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        realized_pnl:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - average_entry_price
+      - created_at
+      - id
+      - market
+      - outcome
+      - quantity
+      - realized_pnl
+      - reserved_quantity
+      - total_cost
+      - updated_at
+      - user
     MarketPublic:
       type: object
       properties:
@@ -2855,6 +3767,11 @@ components:
           items:
             $ref: '#/components/schemas/MarketOutcomePublic'
           readOnly: true
+        winning_outcome:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -2877,6 +3794,21 @@ components:
       - subject
       - template
       - updated_at
+      - winning_outcome
+    MarketResolve:
+      type: object
+      properties:
+        winning_outcome_id:
+          type: string
+          format: uuid
+        notes:
+          type: string
+        evidence:
+          type: string
+      required:
+      - evidence
+      - notes
+      - winning_outcome_id
     MarketScopeEnum:
       enum:
       - EVENT
@@ -2889,6 +3821,64 @@ components:
         * `COMPETITION` - Competition
         * `PARTICIPANT` - Participant
         * `CUSTOM` - Custom proposition
+    MarketSettlement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        winning_outcome_id:
+          type: string
+          format: uuid
+          readOnly: true
+        payout_per_unit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        total_position_count:
+          type: integer
+          readOnly: true
+        winning_position_count:
+          type: integer
+          readOnly: true
+        losing_position_count:
+          type: integer
+          readOnly: true
+        total_winning_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        total_payout_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        executed_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - currency
+      - executed_at
+      - id
+      - losing_position_count
+      - market_id
+      - payout_per_unit
+      - total_payout_amount
+      - total_position_count
+      - total_winning_quantity
+      - winning_outcome_id
+      - winning_position_count
     MarketStatusEnum:
       enum:
       - DRAFT
@@ -2934,6 +3924,7 @@ components:
           maxLength: 254
         notes:
           type: string
+        metadata: {}
         created_at:
           type: string
           format: date-time
@@ -2976,9 +3967,12 @@ components:
           type: string
           maxLength: 80
         slug:
-          type: string
-          maxLength: 180
-          pattern: ^[-a-zA-Z0-9_]+$
+          oneOf:
+          - type: string
+            maxLength: 180
+            pattern: ^[-a-zA-Z0-9_]+$
+          - type: string
+            maxLength: 0
         scope_type:
           $ref: '#/components/schemas/MarketScopeEnum'
       required:
@@ -2995,6 +3989,8 @@ components:
       - SUSPEND
       - REOPEN
       - CLOSE
+      - RESOLVE
+      - VOID
       type: string
       description: |-
         * `SUBMIT` - Submit for approval
@@ -3004,6 +4000,81 @@ components:
         * `SUSPEND` - Suspend
         * `REOPEN` - Reopen
         * `CLOSE` - Close
+        * `RESOLVE` - Resolve
+        * `VOID` - Void
+    MarketVoid:
+      type: object
+      properties:
+        notes:
+          type: string
+        evidence:
+          type: string
+      required:
+      - evidence
+      - notes
+    MarketVoidRefund:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        total_cancelled_order_count:
+          type: integer
+          readOnly: true
+        cancelled_buy_order_count:
+          type: integer
+          readOnly: true
+        cancelled_sell_order_count:
+          type: integer
+          readOnly: true
+        total_released_buy_reservation_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        total_released_sell_reservation_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        refunded_position_count:
+          type: integer
+          readOnly: true
+        total_refunded_position_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        total_position_refund_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        executed_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cancelled_buy_order_count
+      - cancelled_sell_order_count
+      - currency
+      - executed_at
+      - id
+      - market_id
+      - refunded_position_count
+      - total_cancelled_order_count
+      - total_position_refund_amount
+      - total_refunded_position_quantity
+      - total_released_buy_reservation_amount
+      - total_released_sell_reservation_quantity
     NavigationMenu:
       type: object
       description: Serializer for navigation menu items.
@@ -3274,6 +4345,37 @@ components:
       - preferred_country
       - skipped_steps
       - updated_at
+    OrderBookLevel:
+      type: object
+      properties:
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        order_count:
+          type: integer
+      required:
+      - order_count
+      - price
+      - quantity
+    OrderBookOutcome:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        side:
+          type: string
+        label:
+          type: string
+      required:
+      - id
+      - label
+      - side
     PaginatedCompetitionPublicList:
       type: object
       required:
@@ -3297,6 +4399,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CompetitionPublic'
+    PaginatedLedgerEntryReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerEntryRead'
     PaginatedMarketAdminReadList:
       type: object
       required:
@@ -3343,6 +4468,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketCategoryPublic'
+    PaginatedMarketFillReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketFillRead'
+    PaginatedMarketOrderReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketOrderRead'
+    PaginatedMarketPositionReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketPositionRead'
     PaginatedMarketPublicList:
       type: object
       required:
@@ -3366,6 +4560,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketPublic'
+    PaginatedParticipantOpenOrderList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantOpenOrder'
     PaginatedParticipantPublicList:
       type: object
       required:
@@ -3435,6 +4652,120 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SportingEventPublic'
+    PaginatedWalletReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/WalletRead'
+    ParticipantOpenOrder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        outcome_id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_question:
+          type: string
+          readOnly: true
+        outcome_label:
+          type: string
+          readOnly: true
+        side:
+          allOf:
+          - $ref: '#/components/schemas/MarketOrderSideEnum'
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        filled_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        remaining_quantity:
+          type: string
+          readOnly: true
+        fill_percentage:
+          type: string
+          readOnly: true
+        limit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          readOnly: true
+        average_fill_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          readOnly: true
+          nullable: true
+        reserved_wallet_amount:
+          type: string
+          readOnly: true
+        reserved_position_quantity:
+          type: string
+          readOnly: true
+        is_cancellable:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - average_fill_price
+      - created_at
+      - fill_percentage
+      - filled_quantity
+      - id
+      - is_cancellable
+      - limit_price
+      - market_id
+      - market_question
+      - outcome_id
+      - outcome_label
+      - quantity
+      - remaining_quantity
+      - reserved_position_quantity
+      - reserved_wallet_amount
+      - side
+      - status
+      - updated_at
     ParticipantPublic:
       type: object
       properties:
@@ -3449,9 +4780,12 @@ components:
           type: string
           maxLength: 80
         slug:
-          type: string
-          maxLength: 200
-          pattern: ^[-a-zA-Z0-9_]+$
+          oneOf:
+          - type: string
+            maxLength: 200
+            pattern: ^[-a-zA-Z0-9_]+$
+          - type: string
+            maxLength: 0
         kind:
           allOf:
           - $ref: '#/components/schemas/KindEnum'
@@ -3727,8 +5061,8 @@ components:
         avatar:
           type: string
           format: uri
-          readOnly: true
           nullable: true
+          readOnly: true
         avatar_url:
           type: string
           nullable: true
@@ -3805,6 +5139,28 @@ components:
       - id
       - start_time
       - updated_at
+    RecentTrade:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        executed_at:
+          type: string
+          format: date-time
+      required:
+      - executed_at
+      - id
+      - price
+      - quantity
     RegistrationStatusQuery:
       type: object
       properties:
@@ -3870,14 +5226,6 @@ components:
       - id
       - last_activity
       - login_time
-    SideEnum:
-      enum:
-      - 'YES'
-      - 'NO'
-      type: string
-      description: |-
-        * `YES` - Yes
-        * `NO` - No
     SkipStep:
       type: object
       description: Serializer for skipping an onboarding step.
@@ -3935,9 +5283,12 @@ components:
           type: string
           maxLength: 30
         slug:
-          type: string
-          maxLength: 120
-          pattern: ^[-a-zA-Z0-9_]+$
+          oneOf:
+          - type: string
+            maxLength: 120
+            pattern: ^[-a-zA-Z0-9_]+$
+          - type: string
+            maxLength: 0
       required:
       - code
       - id
@@ -4141,10 +5492,13 @@ components:
           format: email
           maxLength: 254
         phone_number:
-          type: string
           nullable: true
-          pattern: ^\+?1?\d{9,15}$
-          maxLength: 20
+          oneOf:
+          - type: string
+            pattern: ^\+?1?\d{9,15}$
+            maxLength: 20
+          - type: string
+            maxLength: 0
         password:
           type: string
           writeOnly: true
@@ -4171,6 +5525,47 @@ components:
       required:
       - email
       - otp
+    WalletRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        available_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        total_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - available_balance
+      - created_at
+      - currency
+      - id
+      - reserved_balance
+      - total_balance
+      - updated_at
     _User:
       type: object
       description: Minimal user serializer for nested profile representation.
