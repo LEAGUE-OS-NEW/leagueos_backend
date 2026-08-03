@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import BooleanField, Exists, OuterRef, Q, Value
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import (
     ListAPIView,
@@ -9,14 +9,48 @@ from rest_framework.permissions import AllowAny
 from markets.models import (
     Market,
     MarketCategory,
+    MarketWatchlistEntry,
 )
 from markets.serializers import (
-    PUBLIC_MARKET_STATUSES,
     MarketCategoryPublicSerializer,
     MarketListQuerySerializer,
     MarketPublicSerializer,
 )
+from markets.services.discovery_common import visible_market_query
 from system.pagination import PublicCatalogPagination
+
+
+def public_market_queryset(user=None):
+    queryset = (
+        Market.objects.filter(visible_market_query())
+        .select_related(
+            "sport",
+            "category",
+            "template",
+            "event_group",
+            "sporting_event",
+            "sporting_event__sport",
+            "sporting_event__competition",
+            "sporting_event__competition__sport",
+            "competition",
+            "competition__sport",
+            "participant",
+            "participant__sport",
+            "winning_outcome",
+        )
+        .prefetch_related(
+            "outcomes",
+            "sporting_event__event_participants__participant",
+            "sporting_event__event_participants__participant__sport",
+        )
+    )
+    if user is not None and user.is_authenticated:
+        return queryset.annotate(
+            is_watchlisted=Exists(
+                MarketWatchlistEntry.objects.filter(participant=user, market_id=OuterRef("pk"))
+            )
+        )
+    return queryset.annotate(is_watchlisted=Value(False, output_field=BooleanField()))
 
 
 class MarketCategoryListView(ListAPIView):
@@ -41,31 +75,7 @@ class MarketCategoryListView(ListAPIView):
 
 class PublicMarketQuerysetMixin:
     def get_public_queryset(self):
-        return (
-            Market.objects.filter(
-                status__in=(PUBLIC_MARKET_STATUSES),
-            )
-            .select_related(
-                "sport",
-                "category",
-                "template",
-                "event_group",
-                "sporting_event",
-                "sporting_event__sport",
-                "sporting_event__competition",
-                ("sporting_event__" "competition__sport"),
-                "competition",
-                "competition__sport",
-                "participant",
-                "participant__sport",
-                "winning_outcome",
-            )
-            .prefetch_related(
-                "outcomes",
-                ("sporting_event__" "event_participants__" "participant"),
-                ("sporting_event__" "event_participants__" "participant__sport"),
-            )
-        )
+        return public_market_queryset(self.request.user)
 
 
 class MarketListView(

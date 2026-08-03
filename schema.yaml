@@ -2012,6 +2012,82 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketOrderBook'
           description: ''
+  /api/v1/markets/{market_id}/outcomes/{outcome_id}/price-history/:
+    get:
+      operationId: markets_outcomes_price_history_retrieve
+      description: Read-only executed-price history from immutable fills. RAW limit
+        means executed fill points. HOUR and DAY limits mean complete OHLCV buckets.
+        HOUR requests are bounded to 31 days and DAY requests to 730 days. Buckets
+        use the configured Africa/Kampala timezone. Open-order quotes, current mutable
+        prices and unmatched bids are excluded.
+      parameters:
+      - in: query
+        name: end
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: interval
+        schema:
+          enum:
+          - RAW
+          - HOUR
+          - DAY
+          type: string
+          default: RAW
+          minLength: 1
+        description: |-
+          * `RAW` - RAW
+          * `HOUR` - HOUR
+          * `DAY` - DAY
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 1000
+          minimum: 1
+          default: 200
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: outcome_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: start
+        schema:
+          type: string
+          format: date-time
+      tags:
+      - Markets
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketPriceHistoryResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceHistoryError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceHistoryError'
+          description: ''
   /api/v1/markets/{market_id}/settle/:
     post:
       operationId: markets_settle_create
@@ -2081,6 +2157,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedMarketCategoryPublicList'
+          description: ''
+  /api/v1/markets/discovery/:
+    get:
+      operationId: markets_discovery_retrieve
+      parameters:
+      - in: query
+        name: section_limit
+        schema:
+          type: integer
+          maximum: 20
+          minimum: 1
+          default: 5
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDiscoveryResponse'
           description: ''
   /api/v1/markets/eligibility/:
     get:
@@ -2437,6 +2535,97 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketProposalParticipant'
           description: ''
+  /api/v1/markets/recently-viewed/:
+    get:
+      operationId: markets_recently_viewed_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketRecentViewList'
+          description: ''
+    delete:
+      operationId: markets_recently_viewed_item_destroy
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/markets/recently-viewed/{market_id}/:
+    put:
+      operationId: markets_recently_viewed_update
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketRecentView'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketRecentView'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketRecentView'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketRecentView'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketRecentView'
+          description: ''
+    delete:
+      operationId: markets_recently_viewed_destroy
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/markets/responsible-participation/:
     get:
       operationId: markets_responsible_participation_retrieve
@@ -2554,6 +2743,87 @@ paths:
               schema:
                 $ref: '#/components/schemas/ResponsibleStatus'
           description: ''
+  /api/v1/markets/watchlist/:
+    get:
+      operationId: markets_watchlist_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketWatchlistEntryList'
+          description: ''
+  /api/v1/markets/watchlist/{market_id}/:
+    put:
+      operationId: markets_watchlist_update
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketWatchlistEntry'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketWatchlistEntry'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketWatchlistEntry'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketWatchlistEntry'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketWatchlistEntry'
+          description: ''
+    delete:
+      operationId: markets_recently_viewed_clear
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/modules/:
     get:
       operationId: modules_retrieve
@@ -4354,6 +4624,16 @@ components:
         * `NAVIGATION_CLICKED` - Navigation clicked
         * `MODULE_OPENED` - Module opened
         * `WIDGET_REORDERED` - Widget reordered
+    IntervalEnum:
+      enum:
+      - RAW
+      - HOUR
+      - DAY
+      type: string
+      description: |-
+        * `RAW` - RAW
+        * `HOUR` - HOUR
+        * `DAY` - DAY
     JurisdictionOverrideEnum:
       enum:
       - NONE
@@ -4653,6 +4933,10 @@ components:
           type: string
           format: date-time
           readOnly: true
+        is_watchlisted:
+          type: boolean
+          readOnly: true
+          default: false
         created_by:
           allOf:
           - $ref: '#/components/schemas/MarketAdminUser'
@@ -4692,6 +4976,7 @@ components:
       - created_by
       - event_group
       - id
+      - is_watchlisted
       - outcomes
       - participant
       - question
@@ -4834,6 +5119,25 @@ components:
       required:
       - id
       - name
+    MarketDiscoveryResponse:
+      type: object
+      properties:
+        watchlist:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketWatchlistEntry'
+        recently_viewed:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketRecentView'
+        related_markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketPublic'
+      required:
+      - recently_viewed
+      - related_markets
+      - watchlist
     MarketEventError:
       type: object
       properties:
@@ -5586,6 +5890,14 @@ components:
       - total_cost
       - updated_at
       - user
+    MarketPriceHistoryResponse:
+      oneOf:
+      - $ref: '#/components/schemas/RawPriceHistoryResponse'
+      - $ref: '#/components/schemas/OHLCVPriceHistoryResponse'
+      discriminator:
+        propertyName: interval
+        mapping:
+          null: '#/components/schemas/OHLCVPriceHistoryResponse'
     MarketProposalAdmin:
       type: object
       properties:
@@ -5961,12 +6273,17 @@ components:
           type: string
           format: date-time
           readOnly: true
+        is_watchlisted:
+          type: boolean
+          readOnly: true
+          default: false
       required:
       - category
       - competition
       - created_at
       - event_group
       - id
+      - is_watchlisted
       - outcomes
       - participant
       - question
@@ -5977,6 +6294,31 @@ components:
       - template
       - updated_at
       - winning_outcome
+    MarketRecentView:
+      type: object
+      properties:
+        market:
+          allOf:
+          - $ref: '#/components/schemas/MarketPublic'
+          readOnly: true
+        first_viewed_at:
+          type: string
+          format: date-time
+        last_viewed_at:
+          type: string
+          format: date-time
+        view_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 1
+        is_watchlisted:
+          type: boolean
+          readOnly: true
+      required:
+      - first_viewed_at
+      - is_watchlisted
+      - last_viewed_at
+      - market
     MarketResolve:
       type: object
       properties:
@@ -6257,6 +6599,20 @@ components:
       - total_refunded_position_quantity
       - total_released_buy_reservation_amount
       - total_released_sell_reservation_quantity
+    MarketWatchlistEntry:
+      type: object
+      properties:
+        market:
+          allOf:
+          - $ref: '#/components/schemas/MarketPublic'
+          readOnly: true
+        followed_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - followed_at
+      - market
     NavigationMenu:
       type: object
       description: Serializer for navigation menu items.
@@ -6455,6 +6811,70 @@ components:
     NullEnum:
       enum:
       - null
+    OHLCVPriceBucket:
+      type: object
+      properties:
+        bucket_start:
+          type: string
+          format: date-time
+        open:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,4})?$
+        high:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,4})?$
+        low:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,4})?$
+        close:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,4})?$
+        volume:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,4})?$
+        trade_count:
+          type: integer
+      required:
+      - bucket_start
+      - close
+      - high
+      - low
+      - open
+      - trade_count
+      - volume
+    OHLCVPriceHistoryResponse:
+      type: object
+      properties:
+        market_id:
+          type: string
+          format: uuid
+        outcome_id:
+          type: string
+          format: uuid
+        interval:
+          $ref: '#/components/schemas/IntervalEnum'
+        start:
+          type: string
+          format: date-time
+          nullable: true
+        end:
+          type: string
+          format: date-time
+          nullable: true
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/OHLCVPriceBucket'
+      required:
+      - interval
+      - market_id
+      - outcome_id
+      - points
     Onboarding:
       type: object
       description: Serializer for the full onboarding status response.
@@ -6940,6 +7360,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketPublic'
+    PaginatedMarketRecentViewList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketRecentView'
+    PaginatedMarketWatchlistEntryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketWatchlistEntry'
     PaginatedParticipantOpenOrderList:
       type: object
       required:
@@ -7758,6 +8224,16 @@ components:
       - unpriced_cost_basis
       - unpriced_position_count
       - valuation_complete
+    PriceHistoryError:
+      type: object
+      properties:
+        code:
+          type: string
+        errors: {}
+        detail:
+          type: string
+      required:
+      - code
     Profile:
       type: object
       description: |-
@@ -7902,6 +8378,56 @@ components:
       - id
       - start_time
       - updated_at
+    RawPriceHistoryResponse:
+      type: object
+      properties:
+        market_id:
+          type: string
+          format: uuid
+        outcome_id:
+          type: string
+          format: uuid
+        interval:
+          $ref: '#/components/schemas/IntervalEnum'
+        start:
+          type: string
+          format: date-time
+          nullable: true
+        end:
+          type: string
+          format: date-time
+          nullable: true
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/RawPricePoint'
+      required:
+      - interval
+      - market_id
+      - outcome_id
+      - points
+    RawPricePoint:
+      type: object
+      properties:
+        fill_id:
+          type: string
+          format: uuid
+        executed_at:
+          type: string
+          format: date-time
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,4})?$
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+      required:
+      - executed_at
+      - fill_id
+      - price
+      - quantity
     RecentTrade:
       type: object
       properties:

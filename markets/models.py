@@ -1135,6 +1135,73 @@ class MarketOutcome(TimeStampedUUIDModel):
             raise ValidationError(errors)
 
 
+class MarketWatchlistEntry(TimeStampedUUIDModel):
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="market_watchlist_entries",
+    )
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.CASCADE,
+        related_name="watchlist_entries",
+    )
+    followed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-followed_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["participant", "market"], name="unique_market_watchlist_entry"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["participant", "-followed_at"]),
+            models.Index(fields=["market", "followed_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.participant_id}: {self.market_id}"
+
+
+class MarketRecentView(TimeStampedUUIDModel):
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="market_recent_views",
+    )
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.CASCADE,
+        related_name="recent_views",
+    )
+    first_viewed_at = models.DateTimeField()
+    last_viewed_at = models.DateTimeField()
+    view_count = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+
+    class Meta:
+        ordering = ["-last_viewed_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["participant", "market"], name="unique_market_recent_view"
+            ),
+            models.CheckConstraint(
+                condition=Q(view_count__gte=1), name="market_recent_view_count_positive"
+            ),
+            models.CheckConstraint(
+                condition=Q(first_viewed_at__lte=models.F("last_viewed_at")),
+                name="market_recent_view_timestamps_ordered",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["participant", "-last_viewed_at"]),
+            models.Index(fields=["market", "last_viewed_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.participant_id}: {self.market_id} ({self.view_count})"
+
+
 class MarketOrder(TimeStampedUUIDModel):
     class Side(models.TextChoices):
         BUY = "BUY", "Buy"
