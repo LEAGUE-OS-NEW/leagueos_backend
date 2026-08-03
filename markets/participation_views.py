@@ -18,6 +18,9 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import AuditLog
+from markets.compliance_serializers import IneligibleOrderResponseSerializer
+from markets.exceptions import MarketParticipationIneligible
 from markets.models import (
     Market,
     MarketFill,
@@ -45,6 +48,7 @@ class MarketOrderCreateView(APIView):
         request=MarketOrderCreateSerializer,
         responses={
             201: MarketOrderReadSerializer,
+            403: IneligibleOrderResponseSerializer,
         },
         tags=["Market Participation"],
     )
@@ -73,6 +77,29 @@ class MarketOrderCreateView(APIView):
                 side=(serializer.validated_data["side"]),
                 quantity=(serializer.validated_data["quantity"]),
                 limit_price=(serializer.validated_data["limit_price"]),
+            )
+        except MarketParticipationIneligible as error:
+            AuditLog.objects.create(
+                user=request.user,
+                action="MARKET_ORDER_BLOCKED",
+                metadata={
+                    "participant_id": str(request.user.id),
+                    "market_id": str(market_id),
+                    "outcome_id": str(serializer.validated_data["outcome_id"]),
+                    "side": serializer.validated_data["side"],
+                    "reason_codes": list(error.result.reason_codes),
+                    "evaluated_at": error.result.evaluated_at.isoformat(),
+                },
+            )
+            return Response(
+                {
+                    "detail": "Market participation is not available.",
+                    "code": "market_participation_ineligible",
+                    "eligible": False,
+                    "reason_codes": error.result.reason_codes,
+                    "next_actions": error.result.next_actions,
+                },
+                status=status.HTTP_403_FORBIDDEN,
             )
         except DjangoValidationError as error:
             self.raise_api_validation_error(error)

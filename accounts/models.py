@@ -149,6 +149,7 @@ class AuditLog(models.Model):
         ("ONBOARDING_COMPLETED", "Onboarding completed"),
         ("PREFERENCES_UPDATED", "Preferences updated"),
         ("DASHBOARD_CONFIGURATION_GENERATED", "Dashboard configuration generated"),
+        ("MARKET_ORDER_BLOCKED", "Market order blocked"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

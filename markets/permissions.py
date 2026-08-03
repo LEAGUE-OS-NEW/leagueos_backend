@@ -45,3 +45,10 @@ class HasApproveMarketPermission(BasePermission):
             request.user,
             "approve_market",
         )
+
+
+class HasManageCompliancePermission(BasePermission):
+    message = "You do not have the manage_compliance permission."
+
+    def has_permission(self, request, view) -> bool:
+        return PermissionService.has_permission(request.user, "manage_compliance")

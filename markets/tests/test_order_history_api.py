@@ -30,6 +30,7 @@ from markets.services.lifecycle_service import (
 from markets.services.participation_service import (
     MarketParticipationService,
 )
+from markets.tests.eligibility_test_support import make_market_eligible
 from markets.tests.wallet_test_support import (
     fund_market_wallet,
 )
@@ -100,6 +101,8 @@ class MarketOrderHistoryFixtureMixin:
         self.empty_user = UserFactory(
             is_verified=True,
         )
+        make_market_eligible(self.owner)
+        make_market_eligible(self.other_participant)
 
         fund_market_wallet(self.owner)
         fund_market_wallet(self.other_participant)
@@ -213,6 +216,7 @@ class MarketOrderHistoryFixtureMixin:
         quantity=Decimal("10.0000"),
         limit_price=Decimal("0.55000"),
     ):
+        make_market_eligible(user or self.owner)
         return MarketParticipationService.place_order(
             user=user or self.owner,
             market_id=self.market.id,

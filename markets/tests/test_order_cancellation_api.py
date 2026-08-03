@@ -29,6 +29,7 @@ from markets.services.lifecycle_service import (
 from markets.services.participation_service import (
     MarketParticipationService,
 )
+from markets.tests.eligibility_test_support import make_market_eligible
 from markets.tests.wallet_test_support import (
     fund_market_wallet,
 )
@@ -196,6 +197,7 @@ class MarketOrderCancellationAPITests(APITestCase):
         )
 
     def create_order(self, *, user=None):
+        make_market_eligible(user or self.owner)
         return MarketParticipationService.place_order(
             user=user or self.owner,
             market_id=self.market.id,

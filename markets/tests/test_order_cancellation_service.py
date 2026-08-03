@@ -31,6 +31,7 @@ from markets.services.lifecycle_service import (
 from markets.services.participation_service import (
     MarketParticipationService,
 )
+from markets.tests.eligibility_test_support import make_market_eligible
 from markets.tests.wallet_test_support import (
     fund_market_wallet,
 )
@@ -198,6 +199,7 @@ class MarketOrderCancellationServiceTests(TestCase):
         quantity=Decimal("10.0000"),
         limit_price=Decimal("0.55000"),
     ):
+        make_market_eligible(self.owner)
         return MarketParticipationService.place_order(
             user=self.owner,
             market_id=self.market.id,

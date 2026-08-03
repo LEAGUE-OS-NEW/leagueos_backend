@@ -30,6 +30,7 @@ from markets.services.catalog_service import MarketCatalogService
 from markets.services.lifecycle_service import MarketLifecycleService
 from markets.services.matching_service import MarketMatchingService
 from markets.services.participation_service import MarketParticipationService
+from markets.tests.eligibility_test_support import make_market_eligible
 from sports.models import Competition, Sport, SportingEvent
 from wallets.models import LedgerEntry, Wallet
 from wallets.services.wallet_service import WalletService
@@ -56,6 +57,8 @@ class MarketCloseCleanupFixtureMixin:
         self.creator = UserFactory()
         self.buyer = UserFactory(is_verified=True)
         self.seller = UserFactory(is_verified=True)
+        make_market_eligible(self.buyer)
+        make_market_eligible(self.seller)
         UserRoleFactory(user=self.actor, role=approval_role)
         UserRoleFactory(user=self.creator, role=operations_role)
         UserRoleFactory(user=self.buyer, role=participant_role)

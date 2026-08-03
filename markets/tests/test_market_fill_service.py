@@ -32,6 +32,7 @@ from markets.services.lifecycle_service import (
 from markets.services.participation_service import (
     MarketParticipationService,
 )
+from markets.tests.eligibility_test_support import make_market_eligible
 from markets.tests.wallet_test_support import (
     fund_market_wallet,
 )
@@ -242,6 +243,7 @@ class MarketFillServiceTests(TestCase):
         quantity=Decimal("10.0000"),
         limit_price=Decimal("0.55000"),
     ):
+        make_market_eligible(user)
         with patch(
             "markets.services.participation_service." "MarketMatchingService.match_order",
             return_value=[],
