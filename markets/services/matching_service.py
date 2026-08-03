@@ -3,8 +3,9 @@ from uuid import uuid5
 
 from django.db import transaction
 from django.db.models import F
+from django.utils import timezone
 
-from markets.models import MarketFill, MarketOrder
+from markets.models import Market, MarketFill, MarketOrder
 from markets.services.fill_service import MarketFillService
 
 
@@ -19,6 +20,12 @@ class MarketMatchingService:
     def match_order(cls, order_id) -> list[MarketFill]:
         taker = cls._get_locked_order(order_id)
         if not cls._is_fillable(taker):
+            return []
+        if (
+            taker.market.status != Market.Status.OPEN
+            or taker.market.closes_at is None
+            or timezone.now() >= taker.market.closes_at
+        ):
             return []
 
         candidate_ids = cls._candidate_ids(taker)
