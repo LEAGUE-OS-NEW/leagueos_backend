@@ -4,6 +4,63 @@ info:
   version: 1.0.0
   description: Sports, fantasy, ticketing and markets platform API
 paths:
+  /api/v1/:
+    get:
+      operationId: api_v1_retrieve
+      description: |-
+        Get dashboard data for the current user.
+
+        Returns:
+            Complete dashboard response with user summary, navigation,
+            widgets, module data, and recommendations.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+          description: ''
+  /api/v1/analytics/:
+    post:
+      operationId: api_v1_analytics_create
+      description: |-
+        Record analytics event.
+
+        Request body:
+            - module: Module code (required)
+            - widget: Widget code (optional)
+            - interaction_type: Type of interaction (required)
+            - metadata: Additional metadata (optional)
+
+        Returns:
+            Success response
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DashboardAnalyticsCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DashboardAnalyticsCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DashboardAnalyticsCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardAnalyticsCreate'
+          description: ''
   /api/v1/auth/login/:
     post:
       operationId: api_v1_auth_login_create
@@ -985,6 +1042,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedMarketCategoryPublicList'
           description: ''
+  /api/v1/modules/:
+    get:
+      operationId: api_v1_modules_retrieve
+      description: |-
+        Get available dashboard modules.
+
+        Returns:
+            List of active dashboard modules
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardModule'
+          description: ''
+  /api/v1/navigation/:
+    get:
+      operationId: api_v1_navigation_retrieve
+      description: |-
+        Get navigation menu for the current user.
+
+        Returns:
+            Hierarchical navigation structure
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NavigationMenu'
+          description: ''
   /api/v1/notification-categories/:
     get:
       operationId: api_v1_notification_categories_retrieve
@@ -1743,6 +1838,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthCheck'
           description: ''
+  /api/v1/widgets/:
+    get:
+      operationId: api_v1_widgets_retrieve
+      description: |-
+        Get enabled widgets for the current user.
+
+        Returns:
+            List of enabled widgets
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardWidget'
+          description: ''
 components:
   schemas:
     Avatar:
@@ -2080,6 +2194,57 @@ components:
         * `COMPETITIONS` - Select Favourite Competitions
         * `CLUBS` - Select Favourite Clubs
         * `COMPLETED` - Completed
+    Dashboard:
+      type: object
+      description: Serializer for the main dashboard response.
+      properties:
+        user_summary:
+          type: object
+          additionalProperties: {}
+        navigation:
+          type: array
+          items: {}
+        widgets:
+          type: array
+          items: {}
+        modules:
+          type: object
+          additionalProperties: {}
+        module_metadata:
+          type: object
+          additionalProperties: {}
+        preferences:
+          type: object
+          additionalProperties: {}
+        recommendations:
+          type: array
+          items: {}
+      required:
+      - module_metadata
+      - modules
+      - navigation
+      - preferences
+      - recommendations
+      - user_summary
+      - widgets
+    DashboardAnalyticsCreate:
+      type: object
+      description: Serializer for creating analytics events.
+      properties:
+        module:
+          type: string
+          maxLength: 100
+        widget:
+          type: string
+          maxLength: 100
+        interaction_type:
+          $ref: '#/components/schemas/InteractionTypeEnum'
+        metadata:
+          type: object
+          additionalProperties: {}
+      required:
+      - interaction_type
+      - module
     DashboardConfiguration:
       type: object
       description: Serializer for the personalized dashboard configuration.
@@ -2112,6 +2277,106 @@ components:
       - favourite_sports
       - onboarding_completed
       - preferred_country
+    DashboardModule:
+      type: object
+      description: Serializer for dashboard modules.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        display_order:
+          type: integer
+          readOnly: true
+        icon:
+          type: string
+          readOnly: true
+        route:
+          type: string
+          readOnly: true
+        enabled:
+          type: boolean
+          readOnly: true
+        cache_timeout:
+          type: integer
+          readOnly: true
+          description: Cache timeout in seconds
+        is_active:
+          type: boolean
+          readOnly: true
+      required:
+      - cache_timeout
+      - code
+      - description
+      - display_order
+      - enabled
+      - icon
+      - id
+      - is_active
+      - name
+      - route
+    DashboardWidget:
+      type: object
+      description: Serializer for dashboard widgets.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        module:
+          type: string
+          format: uuid
+          readOnly: true
+        module_code:
+          type: string
+          readOnly: true
+        module_name:
+          type: string
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        display_order:
+          type: integer
+          readOnly: true
+        permission_required:
+          type: string
+          readOnly: true
+          description: Optional permission required to view this widget
+        cache_timeout:
+          type: integer
+          readOnly: true
+          description: Widget-specific cache timeout in seconds
+        is_active:
+          type: boolean
+          readOnly: true
+      required:
+      - cache_timeout
+      - code
+      - description
+      - display_order
+      - id
+      - is_active
+      - module
+      - module_code
+      - module_name
+      - permission_required
+      - title
     EventParticipantPublic:
       type: object
       properties:
@@ -2177,6 +2442,20 @@ components:
       required:
       - service
       - status
+    InteractionTypeEnum:
+      enum:
+      - VIEWED
+      - WIDGET_CLICKED
+      - NAVIGATION_CLICKED
+      - MODULE_OPENED
+      - WIDGET_REORDERED
+      type: string
+      description: |-
+        * `VIEWED` - Dashboard viewed
+        * `WIDGET_CLICKED` - Widget clicked
+        * `NAVIGATION_CLICKED` - Navigation clicked
+        * `MODULE_OPENED` - Module opened
+        * `WIDGET_REORDERED` - Widget reordered
     KindEnum:
       enum:
       - TEAM
@@ -2725,6 +3004,55 @@ components:
         * `SUSPEND` - Suspend
         * `REOPEN` - Reopen
         * `CLOSE` - Close
+    NavigationMenu:
+      type: object
+      description: Serializer for navigation menu items.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        route:
+          type: string
+          readOnly: true
+        icon:
+          type: string
+          readOnly: true
+        parent:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        display_order:
+          type: integer
+          readOnly: true
+        permission_required:
+          type: string
+          readOnly: true
+          description: Optional permission required to view this menu item
+        is_active:
+          type: boolean
+          readOnly: true
+        children:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          description: Recursively serialize child menu items.
+          readOnly: true
+      required:
+      - children
+      - display_order
+      - icon
+      - id
+      - is_active
+      - name
+      - parent
+      - permission_required
+      - route
     NotificationCategory:
       type: object
       description: |-
