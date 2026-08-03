@@ -1009,6 +1009,138 @@ class MarketPositionSettlement(TimeStampedUUIDModel):
         raise ValidationError("Position settlements cannot be deleted.")
 
 
+class ImmutableVoidRefundModel(TimeStampedUUIDModel):
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Void refund audit records are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Void refund audit records cannot be deleted.")
+
+
+class MarketVoidRefund(ImmutableVoidRefundModel):
+    market = models.OneToOneField(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="void_refund",
+    )
+    refund_currency = models.CharField(max_length=3)
+    total_cancelled_order_count = models.PositiveIntegerField(default=0)
+    cancelled_buy_order_count = models.PositiveIntegerField(default=0)
+    cancelled_sell_order_count = models.PositiveIntegerField(default=0)
+    total_released_buy_reservation_amount = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    total_released_sell_reservation_quantity = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    refunded_position_count = models.PositiveIntegerField(default=0)
+    total_refunded_position_quantity = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    total_position_refund_amount = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    executed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="executed_market_void_refunds",
+    )
+    executed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-executed_at", "-id"]
+        indexes = [models.Index(fields=["executed_at"])]
+
+    def __str__(self):
+        return f"{self.market_id}: {self.total_position_refund_amount} {self.refund_currency}"
+
+
+class MarketVoidOrderCancellation(ImmutableVoidRefundModel):
+    market_void_refund = models.ForeignKey(
+        MarketVoidRefund,
+        on_delete=models.PROTECT,
+        related_name="order_cancellations",
+    )
+    market_order = models.OneToOneField(
+        MarketOrder,
+        on_delete=models.PROTECT,
+        related_name="void_cancellation_record",
+    )
+    order_side = models.CharField(max_length=10, choices=MarketOrder.Side.choices)
+    remaining_quantity_cancelled = models.DecimalField(max_digits=18, decimal_places=4)
+    released_wallet_reservation_amount = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    released_position_reservation_quantity = models.DecimalField(
+        max_digits=18, decimal_places=4, default=Decimal("0.0000")
+    )
+    wallet_release_ledger_entry = models.OneToOneField(
+        "wallets.LedgerEntry",
+        on_delete=models.PROTECT,
+        related_name="market_void_order_cancellation",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["market_void_refund", "order_side"])]
+
+    def __str__(self):
+        return f"{self.market_order_id}: {self.remaining_quantity_cancelled}"
+
+
+class MarketPositionVoidRefund(ImmutableVoidRefundModel):
+    market_void_refund = models.ForeignKey(
+        MarketVoidRefund,
+        on_delete=models.PROTECT,
+        related_name="position_refunds",
+    )
+    market_position = models.OneToOneField(
+        MarketPosition,
+        on_delete=models.PROTECT,
+        related_name="void_refund_record",
+    )
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_position_void_refunds",
+    )
+    outcome = models.ForeignKey(
+        MarketOutcome,
+        on_delete=models.PROTECT,
+        related_name="position_void_refunds",
+    )
+    refunded_quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    cost_basis = models.DecimalField(max_digits=20, decimal_places=4)
+    refund_amount = models.DecimalField(max_digits=20, decimal_places=4)
+    realized_pnl_delta = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    wallet_credit_ledger_entry = models.OneToOneField(
+        "wallets.LedgerEntry",
+        on_delete=models.PROTECT,
+        related_name="market_position_void_refund",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(fields=["market_void_refund", "outcome"]),
+            models.Index(fields=["participant", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.market_position_id}: {self.refund_amount}"
+
+
 class MarketStatusTransition(TimeStampedUUIDModel):
     class Action(models.TextChoices):
         SUBMIT = "SUBMIT", "Submit for approval"

@@ -5,9 +5,12 @@ from markets.models import (
     MarketCategory,
     MarketOutcome,
     MarketPositionSettlement,
+    MarketPositionVoidRefund,
     MarketSettlement,
     MarketStatusTransition,
     MarketTemplate,
+    MarketVoidOrderCancellation,
+    MarketVoidRefund,
 )
 
 
@@ -214,3 +217,46 @@ class MarketPositionSettlementAdmin(ImmutableSettlementAdmin):
     )
     list_filter = ("was_winner", "created_at")
     search_fields = ("market_settlement__market__question",)
+
+
+@admin.register(MarketVoidRefund)
+class MarketVoidRefundAdmin(ImmutableSettlementAdmin):
+    list_display = (
+        "market",
+        "refund_currency",
+        "total_cancelled_order_count",
+        "refunded_position_count",
+        "total_position_refund_amount",
+        "executed_by",
+        "executed_at",
+    )
+    list_filter = ("refund_currency", "executed_at")
+    search_fields = ("market__question",)
+
+
+@admin.register(MarketVoidOrderCancellation)
+class MarketVoidOrderCancellationAdmin(ImmutableSettlementAdmin):
+    list_display = (
+        "market_void_refund",
+        "market_order",
+        "order_side",
+        "remaining_quantity_cancelled",
+        "released_wallet_reservation_amount",
+        "released_position_reservation_quantity",
+    )
+    list_filter = ("order_side", "created_at")
+    search_fields = ("market_void_refund__market__question",)
+
+
+@admin.register(MarketPositionVoidRefund)
+class MarketPositionVoidRefundAdmin(ImmutableSettlementAdmin):
+    list_display = (
+        "market_void_refund",
+        "market_position",
+        "participant",
+        "outcome",
+        "refunded_quantity",
+        "refund_amount",
+    )
+    list_filter = ("created_at",)
+    search_fields = ("market_void_refund__market__question",)

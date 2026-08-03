@@ -128,11 +128,23 @@ class MarketParticipationService:
         )
         cls._require_cancellable_order(order)
 
+        cls.cancel_locked_order(order=order)
+        return order
+
+    @classmethod
+    def cancel_locked_order(cls, *, order: MarketOrder) -> dict:
+        """Cancel a locked order without applying actor ownership policy."""
+        cls._require_cancellable_order(order)
+        remaining_quantity = order.quantity - order.filled_quantity
+        wallet_entry = None
+        released_wallet_amount = Decimal("0.0000")
+        released_position_quantity = Decimal("0.0000")
+
         if order.side == MarketOrder.Side.BUY:
             release_amount = cls._calculate_buy_cancellation_release(order)
 
-            WalletService.release(
-                user=user,
+            wallet_entry = WalletService.release(
+                user=order.user,
                 currency=cls.MARKET_CURRENCY,
                 amount=release_amount,
                 idempotency_reference=uuid5(
@@ -142,13 +154,13 @@ class MarketParticipationService:
                 market=order.market,
                 order=order,
             )
+            released_wallet_amount = release_amount
         elif order.side == MarketOrder.Side.SELL:
             position = cls._get_locked_sell_position(
-                user=user,
+                user=order.user,
                 market=order.market,
                 outcome=order.outcome,
             )
-            remaining_quantity = order.quantity - order.filled_quantity
             position.reserved_quantity -= remaining_quantity
             position.full_clean()
             position.save(
@@ -157,6 +169,7 @@ class MarketParticipationService:
                     "updated_at",
                 ]
             )
+            released_position_quantity = remaining_quantity
 
         order.status = MarketOrder.Status.CANCELLED
         order.full_clean()
@@ -167,7 +180,13 @@ class MarketParticipationService:
             ]
         )
 
-        return order
+        return {
+            "order": order,
+            "remaining_quantity": remaining_quantity,
+            "released_wallet_amount": released_wallet_amount,
+            "released_position_quantity": released_position_quantity,
+            "wallet_entry": wallet_entry,
+        }
 
     @classmethod
     def _calculate_buy_reservation(

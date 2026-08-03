@@ -34,6 +34,7 @@ from markets.views import (
     MarketDetailView,
     MarketListView,
 )
+from markets.void_refund_views import MarketVoidRefundView
 
 app_name = "markets"
 
@@ -142,6 +143,11 @@ urlpatterns = [
         "markets/<uuid:market_id>/settle/",
         MarketSettlementView.as_view(),
         name="market-settle",
+    ),
+    path(
+        "markets/<uuid:market_id>/void-refund/",
+        MarketVoidRefundView.as_view(),
+        name="market-void-refund",
     ),
     path(
         "markets/<uuid:market_id>/outcomes/<uuid:outcome_id>/order-book/",

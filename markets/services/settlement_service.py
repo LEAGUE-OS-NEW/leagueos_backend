@@ -39,6 +39,11 @@ class MarketSettlementService:
         if existing is not None:
             return existing
 
+        if hasattr(market, "void_refund"):
+            raise ValidationError(
+                {"finalization": "A void-refunded market cannot be normally settled."}
+            )
+
         cls._require_settleable_market(market)
         cls._lock_and_require_no_outstanding_orders(market)
         positions = cls._lock_positions(market)
