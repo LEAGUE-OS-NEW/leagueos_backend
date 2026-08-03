@@ -29,7 +29,11 @@ class NotificationsAggregator(BaseAggregator):
         """
         try:
             # Get unread notification count
-            unread_count = user.notifications.filter(read=False).count() if hasattr(user, "notifications") else 0
+            unread_count = (
+                user.notifications.filter(read=False).count()
+                if hasattr(user, "notifications")
+                else 0
+            )
 
             # Get recent notifications (last 5)
             recent_notifications = []

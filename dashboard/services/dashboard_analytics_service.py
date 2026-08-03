@@ -8,7 +8,6 @@ from __future__ import annotations
 import logging
 
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 
 from accounts.models import AuditLog
 from dashboard.models import DashboardAnalytics
@@ -143,6 +142,4 @@ class DashboardAnalyticsService:
         Returns:
             List of DashboardAnalytics instances
         """
-        return list(
-            DashboardAnalytics.objects.filter(user=user).select_related("user")[:limit]
-        )
+        return list(DashboardAnalytics.objects.filter(user=user).select_related("user")[:limit])

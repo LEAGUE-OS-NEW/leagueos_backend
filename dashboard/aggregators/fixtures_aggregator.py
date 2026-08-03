@@ -31,7 +31,7 @@ class FixturesAggregator(BaseAggregator):
         try:
             # Check if sports app is available
             try:
-                from sports.models import SportingEvent, Participant
+                from sports.models import SportingEvent
             except ImportError:
                 return self._error_response("Sports module not available.")
 
@@ -44,11 +44,13 @@ class FixturesAggregator(BaseAggregator):
 
             # Get upcoming fixtures
             now = timezone.now()
-            upcoming_events = SportingEvent.objects.filter(
-                status__in=["SCHEDULED", "LIVE"],
-                starts_at__gte=now,
-            ).select_related("sport", "competition").prefetch_related(
-                "event_participants__participant"
+            upcoming_events = (
+                SportingEvent.objects.filter(
+                    status__in=["SCHEDULED", "LIVE"],
+                    starts_at__gte=now,
+                )
+                .select_related("sport", "competition")
+                .prefetch_related("event_participants__participant")
             )
 
             # Personalize based on favourite clubs

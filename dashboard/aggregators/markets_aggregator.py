@@ -35,10 +35,14 @@ class MarketsAggregator(BaseAggregator):
                 return self._error_response("Markets module not available.")
 
             # Get featured/open markets
-            markets = Market.objects.filter(
-                status__in=["OPEN", "APPROVED"],
-                is_featured=True,
-            ).select_related("sport", "category").order_by("-created_at")[:10]
+            markets = (
+                Market.objects.filter(
+                    status__in=["OPEN", "APPROVED"],
+                    is_featured=True,
+                )
+                .select_related("sport", "category")
+                .order_by("-created_at")[:10]
+            )
 
             markets_data = [
                 {

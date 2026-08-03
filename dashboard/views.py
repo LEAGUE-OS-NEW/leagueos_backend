@@ -12,7 +12,6 @@ from dashboard.models import DashboardAnalytics
 from dashboard.serializers import (
     DashboardAnalyticsCreateSerializer,
     DashboardModuleSerializer,
-    DashboardWidgetSerializer,
 )
 from dashboard.services.dashboard_analytics_service import DashboardAnalyticsService
 from dashboard.services.dashboard_service import DashboardService
@@ -52,7 +51,7 @@ class DashboardView(APIView):
 
             return Response(dashboard_data)
 
-        except Exception as e:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             logger.exception("Dashboard view failed")
             return Response(
                 {"error": "Failed to load dashboard. Please try again."},
@@ -92,7 +91,7 @@ class NavigationView(APIView):
 
             return Response({"navigation": navigation})
 
-        except Exception as e:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             logger.exception("Navigation view failed")
             return Response(
                 {"error": "Failed to load navigation. Please try again."},
@@ -125,7 +124,7 @@ class WidgetsView(APIView):
 
             return Response({"widgets": widgets})
 
-        except Exception as e:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             logger.exception("Widgets view failed")
             return Response(
                 {"error": "Failed to load widgets. Please try again."},
@@ -163,7 +162,7 @@ class ModulesView(APIView):
             serializer = DashboardModuleSerializer(modules, many=True)
             return Response({"modules": serializer.data})
 
-        except Exception as e:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             logger.exception("Modules view failed")
             return Response(
                 {"error": "Failed to load modules. Please try again."},

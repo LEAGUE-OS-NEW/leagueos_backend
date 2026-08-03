@@ -6,12 +6,12 @@ invalidation based on user preferences and module updates.
 
 from __future__ import annotations
 
-import logging
 import hashlib
 import json
+import logging
 
-from django.core.cache import cache
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 
 User = get_user_model()
 logger = logging.getLogger(__name__)

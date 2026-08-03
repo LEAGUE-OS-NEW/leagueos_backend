@@ -8,7 +8,6 @@ from __future__ import annotations
 import logging
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q
 
 from dashboard.models import NavigationMenu
 

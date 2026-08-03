@@ -1,14 +1,13 @@
 """Tests for dashboard aggregators."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from dashboard.aggregators.base_aggregator import BaseAggregator
-from dashboard.aggregators.profile_aggregator import ProfileAggregator
 from dashboard.aggregators.favourites_aggregator import FavouritesAggregator
-from dashboard.aggregators.notifications_aggregator import NotificationsAggregator
 from dashboard.aggregators.fixtures_aggregator import FixturesAggregator
 from dashboard.aggregators.markets_aggregator import MarketsAggregator
+from dashboard.aggregators.notifications_aggregator import NotificationsAggregator
+from dashboard.aggregators.profile_aggregator import ProfileAggregator
 from dashboard.aggregators.wallet_aggregator import WalletAggregator
 
 

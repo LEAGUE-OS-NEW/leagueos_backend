@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from django.contrib.auth import get_user_model
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from dashboard.services.dashboard_cache_service import DashboardCacheService
@@ -45,7 +45,11 @@ def invalidate_dashboard_on_preference_change(sender, instance, **kwargs):
     """Invalidate dashboard cache when user preferences change."""
     try:
         DashboardCacheService.invalidate_all(instance.user)
-        logger.debug("Dashboard cache invalidated for preference change: user=%s, preference=%s", instance.user_id, sender.__name__)
+        logger.debug(
+            "Dashboard cache invalidated for preference change: user=%s, preference=%s",
+            instance.user_id,
+            sender.__name__,
+        )
     except Exception:  # noqa: BLE001
         logger.exception("Failed to invalidate dashboard cache for preference change")
 
@@ -57,7 +61,11 @@ def invalidate_dashboard_on_preference_delete(sender, instance, **kwargs):
     """Invalidate dashboard cache when user preferences are deleted."""
     try:
         DashboardCacheService.invalidate_all(instance.user)
-        logger.debug("Dashboard cache invalidated for preference delete: user=%s, preference=%s", instance.user_id, sender.__name__)
+        logger.debug(
+            "Dashboard cache invalidated for preference delete: user=%s, preference=%s",
+            instance.user_id,
+            sender.__name__,
+        )
     except Exception:  # noqa: BLE001
         logger.exception("Failed to invalidate dashboard cache for preference delete")
 
@@ -75,7 +83,10 @@ def invalidate_dashboard_on_preference_delete(sender, instance, **kwargs):
 #     try:
 #         if hasattr(instance, "user"):
 #             DashboardCacheService.invalidate_dashboard(instance.user)
-#             logger.debug("Dashboard cache invalidated for notification: user=%s", instance.user_id)
+#             logger.debug(
+#                 "Dashboard cache invalidated for notification: user=%s",
+#                 instance.user_id,
+#             )
 #     except Exception:  # noqa: BLE001
 #         logger.exception("Failed to invalidate dashboard cache for notification")
 
@@ -105,6 +116,8 @@ def invalidate_dashboard_on_preference_update(sender, instance, **kwargs):
     """Invalidate dashboard cache when dashboard preferences change."""
     try:
         DashboardCacheService.invalidate_all(instance.user)
-        logger.debug("Dashboard cache invalidated for dashboard preference update: user=%s", instance.user_id)
+        logger.debug(
+            "Dashboard cache invalidated for dashboard preference update: user=%s", instance.user_id
+        )
     except Exception:  # noqa: BLE001
         logger.exception("Failed to invalidate dashboard cache for dashboard preference update")

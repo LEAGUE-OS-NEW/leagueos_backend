@@ -9,7 +9,6 @@ import logging
 
 from django.contrib.auth import get_user_model
 
-from dashboard.aggregators import FavouritesAggregator, ProfileAggregator
 from dashboard.services.dashboard_aggregation_service import DashboardAggregationService
 from dashboard.services.dashboard_analytics_service import DashboardAnalyticsService
 from dashboard.services.dashboard_cache_service import DashboardCacheService
@@ -131,11 +130,15 @@ class DashboardService:
         try:
             from dashboard.models import DashboardWidget
 
-            widgets = DashboardWidget.objects.filter(
-                is_active=True,
-                module__is_active=True,
-                module__enabled=True,
-            ).select_related("module").order_by("module__display_order", "display_order")
+            widgets = (
+                DashboardWidget.objects.filter(
+                    is_active=True,
+                    module__is_active=True,
+                    module__enabled=True,
+                )
+                .select_related("module")
+                .order_by("module__display_order", "display_order")
+            )
 
             # Filter by permissions
             enabled_widgets = []
@@ -144,15 +147,17 @@ class DashboardService:
                 if widget.permission_required and not user.has_perm(widget.permission_required):
                     continue
 
-                enabled_widgets.append({
-                    "id": str(widget.id),
-                    "code": widget.code,
-                    "title": widget.title,
-                    "description": widget.description,
-                    "module_code": widget.module.code,
-                    "module_name": widget.module.name,
-                    "display_order": widget.display_order,
-                })
+                enabled_widgets.append(
+                    {
+                        "id": str(widget.id),
+                        "code": widget.code,
+                        "title": widget.title,
+                        "description": widget.description,
+                        "module_code": widget.module.code,
+                        "module_name": widget.module.name,
+                        "display_order": widget.display_order,
+                    }
+                )
 
             return enabled_widgets
 
@@ -176,33 +181,45 @@ class DashboardService:
             # Recommendation 1: Complete onboarding
             onboarding = getattr(user, "onboarding", None)
             if not onboarding or not onboarding.completed:
-                recommendations.append({
-                    "type": "onboarding",
-                    "title": "Complete your profile",
-                    "description": "Add your favourite clubs and preferences to personalize your experience.",
-                    "action": "complete_onboarding",
-                    "priority": "high",
-                })
+                recommendations.append(
+                    {
+                        "type": "onboarding",
+                        "title": "Complete your profile",
+                        "description": (
+                            "Add your favourite clubs and preferences to "
+                            "personalize your experience."
+                        ),
+                        "action": "complete_onboarding",
+                        "priority": "high",
+                    }
+                )
 
             # Recommendation 2: Notification preferences
-            if not hasattr(user, "notification_preferences") or not user.notification_preferences.exists():
-                recommendations.append({
-                    "type": "notifications",
-                    "title": "Configure notifications",
-                    "description": "Set up your notification preferences to stay updated.",
-                    "action": "configure_notifications",
-                    "priority": "medium",
-                })
+            if (
+                not hasattr(user, "notification_preferences")
+                or not user.notification_preferences.exists()
+            ):
+                recommendations.append(
+                    {
+                        "type": "notifications",
+                        "title": "Configure notifications",
+                        "description": "Set up your notification preferences to stay updated.",
+                        "action": "configure_notifications",
+                        "priority": "medium",
+                    }
+                )
 
             # Recommendation 3: Upcoming fixtures based on favourites
             if hasattr(user, "club_preferences") and user.club_preferences.exists():
-                recommendations.append({
-                    "type": "fixtures",
-                    "title": "Check upcoming matches",
-                    "description": "Your favourite teams have upcoming matches.",
-                    "action": "view_fixtures",
-                    "priority": "medium",
-                })
+                recommendations.append(
+                    {
+                        "type": "fixtures",
+                        "title": "Check upcoming matches",
+                        "description": "Your favourite teams have upcoming matches.",
+                        "action": "view_fixtures",
+                        "priority": "medium",
+                    }
+                )
 
             return recommendations
 
@@ -232,7 +249,9 @@ class DashboardService:
                 "display_name": profile.display_name if profile else "",
                 "avatar_url": profile.get_avatar_url() if profile else None,
                 "is_verified": user.is_verified,
-                "onboarding_completed": bool(onboarding and onboarding.completed) if onboarding else False,
+                "onboarding_completed": bool(onboarding and onboarding.completed)
+                if onboarding
+                else False,
             }
 
         except Exception as e:  # noqa: BLE001

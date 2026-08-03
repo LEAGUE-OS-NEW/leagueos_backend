@@ -3,7 +3,7 @@
 from django.urls import reverse
 from rest_framework import status
 
-from dashboard.models import DashboardAnalytics, DashboardModule, DashboardWidget, NavigationMenu
+from dashboard.models import DashboardAnalytics
 
 
 def test_dashboard_view_requires_authentication(client):
@@ -14,7 +14,9 @@ def test_dashboard_view_requires_authentication(client):
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_dashboard_view_returns_data(authenticated_client, user, dashboard_module, dashboard_widget):
+def test_dashboard_view_returns_data(
+    authenticated_client, user, dashboard_module, dashboard_widget
+):
     """Test that dashboard view returns data for authenticated user."""
     url = reverse("dashboard:dashboard")
     response = authenticated_client.get(url)

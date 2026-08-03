@@ -36,9 +36,13 @@ class FavouritesAggregator(BaseAggregator):
                         "id": str(pref.club.id),
                         "name": pref.club.name,
                         "sport": str(pref.club.sport) if pref.club.sport else None,
-                        "competition": str(pref.club.competition) if pref.club.competition else None,
+                        "competition": str(pref.club.competition)
+                        if pref.club.competition
+                        else None,
                     }
-                    for pref in user.club_preferences.select_related("club__sport", "club__competition")[:10]
+                    for pref in user.club_preferences.select_related(
+                        "club__sport", "club__competition"
+                    )[:10]
                 ]
 
             # Get favourite sports
@@ -63,7 +67,9 @@ class FavouritesAggregator(BaseAggregator):
                         "sport": str(pref.competition.sport) if pref.competition.sport else None,
                         "country_code": pref.competition.country_code,
                     }
-                    for pref in user.competition_preferences.select_related("competition__sport")[:10]
+                    for pref in user.competition_preferences.select_related("competition__sport")[
+                        :10
+                    ]
                 ]
 
             data = {

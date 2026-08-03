@@ -138,7 +138,5 @@ class DashboardAnalyticsCreateSerializer(serializers.Serializer):
 
     module = serializers.CharField(max_length=100)
     widget = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    interaction_type = serializers.ChoiceField(
-        choices=DashboardAnalytics.InteractionType.choices
-    )
+    interaction_type = serializers.ChoiceField(choices=DashboardAnalytics.InteractionType.choices)
     metadata = serializers.DictField(required=False, default=dict)

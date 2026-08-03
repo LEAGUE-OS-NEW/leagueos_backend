@@ -38,8 +38,12 @@ class ProfileAggregator(BaseAggregator):
                 "country": str(profile.country) if profile.country else None,
                 "city": profile.city or "",
                 "biography": profile.biography or "",
-                "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else None,
-                "preferred_language": str(profile.preferred_language) if profile.preferred_language else None,
+                "date_of_birth": profile.date_of_birth.isoformat()
+                if profile.date_of_birth
+                else None,
+                "preferred_language": str(profile.preferred_language)
+                if profile.preferred_language
+                else None,
                 "timezone": str(profile.timezone) if profile.timezone else None,
                 "favourite_club": str(profile.favourite_club) if profile.favourite_club else None,
                 "notification_preferences": profile.notification_preferences or {},

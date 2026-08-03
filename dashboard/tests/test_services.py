@@ -1,13 +1,10 @@
 """Tests for dashboard services."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-
-from dashboard.services.dashboard_cache_service import DashboardCacheService
-from dashboard.services.dashboard_analytics_service import DashboardAnalyticsService
-from dashboard.services.navigation_service import NavigationService
-from dashboard.services.dashboard_service import DashboardService
 from dashboard.models import DashboardAnalytics, NavigationMenu
+from dashboard.services.dashboard_analytics_service import DashboardAnalyticsService
+from dashboard.services.dashboard_cache_service import DashboardCacheService
+from dashboard.services.dashboard_service import DashboardService
+from dashboard.services.navigation_service import NavigationService
 
 
 def test_dashboard_cache_service_generate_key():
@@ -78,6 +75,7 @@ def test_navigation_service_filters_by_permission(user, navigation_menu):
 
     # Give user permission
     from django.contrib.auth.models import Permission
+
     permission = Permission.objects.get(codename="add_user")
     user.user_permissions.add(permission)
 
