@@ -1441,6 +1441,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedParticipantOpenOrderList'
           description: ''
+  /api/v1/markets/portfolio/summary/:
+    get:
+      operationId: markets_portfolio_summary_retrieve
+      description: Return the authenticated participant's read-only UGX portfolio
+        summary. Money and quantities use four decimal places. total_pnl is null when
+        any positive position is unpriced; mark_sources reports valuation coverage.
+      parameters:
+      - in: query
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        description: Optionally restrict positions and order exposure to one market.
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketPortfolioSummary'
+          description: ''
   /api/v1/modules/:
     get:
       operationId: modules_retrieve
@@ -3118,6 +3142,30 @@ components:
           type: string
       required:
       - refresh
+    MarkSourceSummary:
+      type: object
+      properties:
+        resolution:
+          type: integer
+          readOnly: true
+        void_cost_basis:
+          type: integer
+          readOnly: true
+        best_bid:
+          type: integer
+          readOnly: true
+        last_trade:
+          type: integer
+          readOnly: true
+        unpriced:
+          type: integer
+          readOnly: true
+      required:
+      - best_bid
+      - last_trade
+      - resolution
+      - unpriced
+      - void_cost_basis
     MarketAdminRead:
       type: object
       properties:
@@ -3634,6 +3682,39 @@ components:
       description: |-
         * `YES` - Yes
         * `NO` - No
+    MarketPortfolioSummary:
+      type: object
+      properties:
+        currency:
+          type: string
+          readOnly: true
+        scope:
+          allOf:
+          - $ref: '#/components/schemas/PortfolioScope'
+          readOnly: true
+        wallet:
+          allOf:
+          - $ref: '#/components/schemas/WalletPortfolioSummary'
+          readOnly: true
+        positions:
+          allOf:
+          - $ref: '#/components/schemas/PositionPortfolioSummary'
+          readOnly: true
+        orders:
+          allOf:
+          - $ref: '#/components/schemas/OrderPortfolioSummary'
+          readOnly: true
+        as_of:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - as_of
+      - currency
+      - orders
+      - positions
+      - scope
+      - wallet
     MarketPositionRead:
       type: object
       properties:
@@ -4376,6 +4457,40 @@ components:
       - id
       - label
       - side
+    OrderPortfolioSummary:
+      type: object
+      properties:
+        open_order_count:
+          type: integer
+          readOnly: true
+        open_buy_order_count:
+          type: integer
+          readOnly: true
+        open_sell_order_count:
+          type: integer
+          readOnly: true
+        remaining_order_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_buy_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_sell_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+      required:
+      - open_buy_order_count
+      - open_order_count
+      - open_sell_order_count
+      - remaining_order_quantity
+      - reserved_buy_amount
+      - reserved_sell_quantity
     PaginatedCompetitionPublicList:
       type: object
       required:
@@ -4995,6 +5110,106 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PortfolioScope:
+      type: object
+      properties:
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+      required:
+      - market_id
+    PositionPortfolioSummary:
+      type: object
+      properties:
+        open_position_count:
+          type: integer
+          readOnly: true
+        market_count:
+          type: integer
+          readOnly: true
+        total_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        available_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        total_cost_basis:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        marked_position_count:
+          type: integer
+          readOnly: true
+        unpriced_position_count:
+          type: integer
+          readOnly: true
+        marked_cost_basis:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        unpriced_cost_basis:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        marked_market_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        realized_pnl:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        marked_unrealized_pnl:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        total_pnl:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+          nullable: true
+        valuation_complete:
+          type: boolean
+          readOnly: true
+        mark_sources:
+          allOf:
+          - $ref: '#/components/schemas/MarkSourceSummary'
+          readOnly: true
+      required:
+      - available_quantity
+      - mark_sources
+      - marked_cost_basis
+      - marked_market_value
+      - marked_position_count
+      - marked_unrealized_pnl
+      - market_count
+      - open_position_count
+      - realized_pnl
+      - reserved_quantity
+      - total_cost_basis
+      - total_pnl
+      - total_quantity
+      - unpriced_cost_basis
+      - unpriced_position_count
+      - valuation_complete
     Profile:
       type: object
       description: |-
@@ -5525,6 +5740,32 @@ components:
       required:
       - email
       - otp
+    WalletPortfolioSummary:
+      type: object
+      properties:
+        exists:
+          type: boolean
+          readOnly: true
+        available_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        total_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+      required:
+      - available_balance
+      - exists
+      - reserved_balance
+      - total_balance
     WalletRead:
       type: object
       properties:
