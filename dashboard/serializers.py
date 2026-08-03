@@ -99,6 +99,18 @@ class NavigationMenuSerializer(serializers.ModelSerializer):
 # =============================================================================
 
 
+class DashboardSerializer(serializers.Serializer):
+    """Serializer for the main dashboard response."""
+
+    user_summary = serializers.DictField()
+    navigation = serializers.ListField()
+    widgets = serializers.ListField()
+    modules = serializers.DictField()
+    module_metadata = serializers.DictField()
+    preferences = serializers.DictField()
+    recommendations = serializers.ListField()
+
+
 class DashboardUserPreferenceSerializer(serializers.ModelSerializer):
     """Serializer for user dashboard preferences."""
 

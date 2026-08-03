@@ -12,6 +12,9 @@ from dashboard.models import DashboardAnalytics
 from dashboard.serializers import (
     DashboardAnalyticsCreateSerializer,
     DashboardModuleSerializer,
+    DashboardSerializer,
+    DashboardWidgetSerializer,
+    NavigationMenuSerializer,
 )
 from dashboard.services.dashboard_analytics_service import DashboardAnalyticsService
 from dashboard.services.dashboard_service import DashboardService
@@ -32,6 +35,7 @@ class DashboardView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = DashboardSerializer
 
     def get(self, request):  # noqa: C901
         """Get dashboard data for the current user.
@@ -71,6 +75,7 @@ class NavigationView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = NavigationMenuSerializer
 
     def get(self, request):
         """Get navigation menu for the current user.
@@ -111,6 +116,7 @@ class WidgetsView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = DashboardWidgetSerializer
 
     def get(self, request):
         """Get enabled widgets for the current user.
@@ -144,6 +150,7 @@ class ModulesView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = DashboardModuleSerializer
 
     def get(self, request):
         """Get available dashboard modules.
@@ -182,6 +189,7 @@ class AnalyticsView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    serializer_class = DashboardAnalyticsCreateSerializer
 
     def post(self, request):
         """Record analytics event.
