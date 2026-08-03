@@ -37,6 +37,7 @@ from markets.services.participation_service import MarketParticipationService
 from markets.services.resolution_service import MarketResolutionService
 from markets.services.settlement_service import MarketSettlementService
 from markets.services.void_refund_service import MarketVoidRefundService
+from markets.tests.eligibility_test_support import make_market_eligible
 from sports.models import Competition, Sport, SportingEvent
 from wallets.models import LedgerEntry, Wallet
 from wallets.services.wallet_service import WalletService
@@ -62,6 +63,7 @@ class VoidRefundFixtureMixin:
         self.creator = UserFactory()
         self.outsider = UserFactory()
         self.trader = UserFactory(is_verified=True)
+        make_market_eligible(self.trader)
         for user in (self.actor, self.other_actor):
             UserRoleFactory(user=user, role=approval_role)
         UserRoleFactory(user=self.creator, role=operations_role)

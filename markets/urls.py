@@ -4,6 +4,11 @@ from markets.admin_views import (
     MarketAdminDetailView,
     MarketAdminListCreateView,
 )
+from markets.compliance_views import (
+    AdminParticipantComplianceDetailView,
+    AdminParticipantComplianceReviewListView,
+    MarketParticipantEligibilityView,
+)
 from markets.lifecycle_views import (
     MarketApproveView,
     MarketCloseView,
@@ -45,6 +50,21 @@ from markets.void_refund_views import MarketVoidRefundView
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "markets/eligibility/",
+        MarketParticipantEligibilityView.as_view(),
+        name="market-participant-eligibility",
+    ),
+    path(
+        "market-admin/participants/<uuid:user_id>/compliance/",
+        AdminParticipantComplianceDetailView.as_view(),
+        name="admin-participant-compliance-detail",
+    ),
+    path(
+        "market-admin/participants/<uuid:user_id>/compliance/reviews/",
+        AdminParticipantComplianceReviewListView.as_view(),
+        name="admin-participant-compliance-reviews",
+    ),
     path(
         "markets/portfolio/activity/",
         MarketPortfolioActivityListView.as_view(),

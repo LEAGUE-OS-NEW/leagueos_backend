@@ -975,6 +975,91 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketAdminRead'
           description: ''
+  /api/v1/market-admin/participants/{user_id}/compliance/:
+    get:
+      operationId: market_admin_participants_compliance_retrieve
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Compliance
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminComplianceDetail'
+          description: ''
+    patch:
+      operationId: market_admin_participants_compliance_partial_update
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Compliance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedComplianceUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedComplianceUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedComplianceUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminComplianceDetail'
+          description: ''
+  /api/v1/market-admin/participants/{user_id}/compliance/reviews/:
+    get:
+      operationId: market_admin_participants_compliance_reviews_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedComplianceReviewList'
+          description: ''
   /api/v1/market-fills/:
     get:
       operationId: market_fills_list
@@ -1276,6 +1361,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketOrderRead'
           description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IneligibleOrderResponse'
+          description: ''
   /api/v1/markets/{market_id}/outcomes/{outcome_id}/order-book/:
     get:
       operationId: markets_outcomes_order_book_retrieve
@@ -1387,6 +1478,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedMarketCategoryPublicList'
+          description: ''
+  /api/v1/markets/eligibility/:
+    get:
+      operationId: markets_eligibility_retrieve
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EligibilityResponse'
           description: ''
   /api/v1/markets/orders/open/:
     get:
@@ -2531,6 +2636,56 @@ paths:
           description: ''
 components:
   schemas:
+    AdminComplianceDetail:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        evaluated_at:
+          type: string
+          format: date-time
+        requirements:
+          type: object
+          additionalProperties: {}
+        reason_codes:
+          type: array
+          items:
+            type: string
+        next_actions:
+          type: array
+          items:
+            type: string
+        participant_id:
+          type: string
+          format: uuid
+        date_of_birth:
+          type: string
+          format: date
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        reviewed_by:
+          type: string
+          format: uuid
+          nullable: true
+        jurisdiction_override_reason:
+          type: string
+        internal_review_notes:
+          type: string
+      required:
+      - date_of_birth
+      - eligible
+      - evaluated_at
+      - internal_review_notes
+      - jurisdiction_override_reason
+      - next_actions
+      - participant_id
+      - reason_codes
+      - requirements
+      - reviewed_at
+      - reviewed_by
     Avatar:
       type: object
       description: Serializer for returning avatar metadata and URL.
@@ -2796,6 +2951,62 @@ components:
             format: uuid
       required:
       - competition_ids
+    ComplianceReview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant:
+          type: string
+          format: uuid
+          readOnly: true
+        actor:
+          type: string
+          format: uuid
+          readOnly: true
+        previous_kyc_status:
+          type: string
+          readOnly: true
+        new_kyc_status:
+          type: string
+          readOnly: true
+        previous_restriction_status:
+          type: string
+          readOnly: true
+        new_restriction_status:
+          type: string
+          readOnly: true
+        previous_jurisdiction_override:
+          type: string
+          readOnly: true
+        new_jurisdiction_override:
+          type: string
+          readOnly: true
+        reason:
+          type: string
+          readOnly: true
+        notes_snapshot:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - actor
+      - created_at
+      - id
+      - new_jurisdiction_override
+      - new_kyc_status
+      - new_restriction_status
+      - notes_snapshot
+      - participant
+      - previous_jurisdiction_override
+      - previous_kyc_status
+      - previous_restriction_status
+      - reason
     ConsentTypeEnum:
       enum:
       - MARKETING
@@ -3062,6 +3273,31 @@ components:
       - module_name
       - permission_required
       - title
+    EligibilityResponse:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        evaluated_at:
+          type: string
+          format: date-time
+        requirements:
+          type: object
+          additionalProperties: {}
+        reason_codes:
+          type: array
+          items:
+            type: string
+        next_actions:
+          type: array
+          items:
+            type: string
+      required:
+      - eligible
+      - evaluated_at
+      - next_actions
+      - reason_codes
+      - requirements
     EntryTypeEnum:
       enum:
       - CREDIT
@@ -3122,6 +3358,29 @@ components:
       required:
       - service
       - status
+    IneligibleOrderResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        code:
+          type: string
+        eligible:
+          type: boolean
+        reason_codes:
+          type: array
+          items:
+            type: string
+        next_actions:
+          type: array
+          items:
+            type: string
+      required:
+      - code
+      - detail
+      - eligible
+      - next_actions
+      - reason_codes
     InteractionTypeEnum:
       enum:
       - VIEWED
@@ -3136,6 +3395,16 @@ components:
         * `NAVIGATION_CLICKED` - Navigation clicked
         * `MODULE_OPENED` - Module opened
         * `WIDGET_REORDERED` - Widget reordered
+    JurisdictionOverrideEnum:
+      enum:
+      - NONE
+      - ALLOW
+      - BLOCK
+      type: string
+      description: |-
+        * `NONE` - None
+        * `ALLOW` - Allow
+        * `BLOCK` - Block
     KindEnum:
       enum:
       - TEAM
@@ -3150,6 +3419,20 @@ components:
         * `COUNTRY` - Country or national team
         * `PAIR` - Pair
         * `OTHER` - Other
+    KycStatusEnum:
+      enum:
+      - NOT_STARTED
+      - PENDING
+      - VERIFIED
+      - REJECTED
+      - EXPIRED
+      type: string
+      description: |-
+        * `NOT_STARTED` - Not started
+        * `PENDING` - Pending
+        * `VERIFIED` - Verified
+        * `REJECTED` - Rejected
+        * `EXPIRED` - Expired
     Language:
       type: object
       description: Serializer for the Language lookup table.
@@ -4878,6 +5161,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CompetitionPublic'
+    PaginatedComplianceReviewList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceReview'
     PaginatedLedgerEntryReadList:
       type: object
       required:
@@ -5370,6 +5676,19 @@ components:
       required:
       - email
       - otp
+    PatchedComplianceUpdate:
+      type: object
+      properties:
+        kyc_status:
+          $ref: '#/components/schemas/KycStatusEnum'
+        restriction_status:
+          $ref: '#/components/schemas/RestrictionStatusEnum'
+        jurisdiction_override:
+          $ref: '#/components/schemas/JurisdictionOverrideEnum'
+        jurisdiction_override_reason:
+          type: string
+        internal_review_notes:
+          type: string
     PatchedMarketAdminWrite:
       type: object
       properties:
@@ -5802,6 +6121,16 @@ components:
           format: email
       required:
       - email
+    RestrictionStatusEnum:
+      enum:
+      - CLEAR
+      - RESTRICTED
+      - SUSPENDED
+      type: string
+      description: |-
+        * `CLEAR` - Clear
+        * `RESTRICTED` - Restricted
+        * `SUSPENDED` - Suspended
     RoleEnum:
       enum:
       - HOME

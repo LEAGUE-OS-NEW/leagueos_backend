@@ -5,6 +5,7 @@ from decimal import (
 from typing import TypedDict
 from uuid import uuid5
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -13,15 +14,19 @@ from rest_framework.exceptions import PermissionDenied
 from authentication.services.permission_service import (
     PermissionService,
 )
+from markets.exceptions import MarketParticipationIneligible
 from markets.models import (
     Market,
     MarketOrder,
     MarketOutcome,
+    MarketParticipantCompliance,
     MarketPosition,
 )
+from markets.services.eligibility_service import MarketEligibilityService
 from markets.services.matching_service import (
     MarketMatchingService,
 )
+from profiles.models import Profile
 from wallets.models import LedgerEntry
 from wallets.services.wallet_service import (
     WalletService,
@@ -55,6 +60,17 @@ class MarketParticipationService:
     ) -> MarketOrder:
         cls._require_permission(user)
         cls._require_verified_user(user)
+
+        user = get_user_model().objects.select_for_update().get(pk=user.pk)
+        profile = Profile.objects.select_related("country").filter(user=user).first()
+        compliance = (
+            MarketParticipantCompliance.objects.select_for_update().filter(participant=user).first()
+        )
+        eligibility = MarketEligibilityService.evaluate(
+            participant=user, profile=profile, compliance=compliance
+        )
+        if not eligibility.eligible:
+            raise MarketParticipationIneligible(eligibility)
 
         market = cls._get_locked_market(market_id)
 

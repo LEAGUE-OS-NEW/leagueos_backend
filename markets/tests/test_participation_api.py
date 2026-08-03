@@ -1,11 +1,15 @@
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from accounts.models import AuditLog
 from authentication.tests.factories import (
     PermissionFactory,
     RoleFactory,
@@ -27,6 +31,7 @@ from markets.services.catalog_service import (
 from markets.services.lifecycle_service import (
     MarketLifecycleService,
 )
+from markets.tests.eligibility_test_support import make_market_eligible
 from markets.tests.wallet_test_support import (
     fund_market_wallet,
 )
@@ -35,9 +40,36 @@ from sports.models import (
     Sport,
     SportingEvent,
 )
+from wallets.models import LedgerEntry, Wallet
 
 
 class MarketParticipationAPITests(APITestCase):
+    def test_ineligible_order_returns_structured_403_without_financial_mutation(self):
+        market = self.open_market(self.create_market())
+        self.participant.profile.date_of_birth = None
+        self.participant.profile.save(update_fields=["date_of_birth", "updated_at"])
+        Wallet.objects.filter(user=self.participant).delete()
+        self.authenticate(self.participant)
+
+        response = self.client.post(
+            self.order_url(market), self.order_payload(market), format="json"
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["code"], "market_participation_ineligible")
+        self.assertIn("DATE_OF_BIRTH_REQUIRED", response.data["reason_codes"])
+        self.assertFalse(MarketOrder.objects.filter(user=self.participant).exists())
+        self.assertFalse(Wallet.objects.filter(user=self.participant).exists())
+        self.assertFalse(LedgerEntry.objects.filter(wallet__user=self.participant).exists())
+        audit = AuditLog.objects.get(action="MARKET_ORDER_BLOCKED")
+        self.assertEqual(audit.metadata["participant_id"], str(self.participant.id))
+        self.assertNotIn("email", audit.metadata)
+        self.assertEqual(AuditLog.objects.filter(action="MARKET_ORDER_BLOCKED").count(), 1)
+        self.assertEqual(
+            set(audit.metadata),
+            {"participant_id", "market_id", "outcome_id", "side", "reason_codes", "evaluated_at"},
+        )
+
     def setUp(self):
         self.now = timezone.now()
 
@@ -94,6 +126,8 @@ class MarketParticipationAPITests(APITestCase):
         self.outsider = UserFactory(
             is_verified=True,
         )
+
+        make_market_eligible(self.participant)
 
         fund_market_wallet(self.participant)
 
@@ -291,6 +325,39 @@ class MarketParticipationAPITests(APITestCase):
             order.user,
             self.participant,
         )
+        self.assertFalse(AuditLog.objects.filter(action="MARKET_ORDER_BLOCKED").exists())
+
+    def test_ineligible_order_has_bounded_queries(self):
+        market = self.open_market(self.create_market())
+        self.participant.profile.date_of_birth = None
+        self.participant.profile.save(update_fields=["date_of_birth", "updated_at"])
+        self.authenticate(self.participant)
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.post(
+                self.order_url(market), self.order_payload(market), format="json"
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertLessEqual(len(queries), 15)
+
+    def test_order_create_schema_documents_201_and_403(self):
+        schema = self.client.get(reverse("api-schema"), {"format": "json"}).json()
+        operation = schema["paths"]["/api/v1/markets/{market_id}/orders/"]["post"]
+        self.assertEqual(set(operation["responses"]), {"201", "403"})
+        forbidden = operation["responses"]["403"]["content"]["application/json"]["schema"]
+        self.assertTrue(forbidden["$ref"].endswith("/IneligibleOrderResponse"))
+
+    def test_api_is_the_only_production_place_order_entry_point_and_audits_it(self):
+        project_root = Path(__file__).resolve().parents[2]
+        callers = []
+        for path in project_root.rglob("*.py"):
+            if "tests" in path.parts:
+                continue
+            source = path.read_text(encoding="utf-8")
+            if "MarketParticipationService.place_order(" in source:
+                callers.append((path.relative_to(project_root).as_posix(), source))
+        self.assertEqual([path for path, _ in callers], ["markets/participation_views.py"])
+        self.assertIn("except MarketParticipationIneligible", callers[0][1])
+        self.assertIn('action="MARKET_ORDER_BLOCKED"', callers[0][1])
 
     def test_order_requires_permission(self):
         market = self.open_market(self.create_market())

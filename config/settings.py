@@ -121,6 +121,10 @@ TIME_ZONE = "Africa/Kampala"
 USE_I18N = True
 USE_TZ = True
 
+MARKET_MINIMUM_AGE = env.int("MARKET_MINIMUM_AGE", default=18)
+MARKET_ALLOWED_COUNTRY_CODES = env.list("MARKET_ALLOWED_COUNTRY_CODES", default=[])
+MARKET_BLOCKED_COUNTRY_CODES = env.list("MARKET_BLOCKED_COUNTRY_CODES", default=[])
+
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

@@ -29,6 +29,7 @@ from markets.services.fill_service import MarketFillService
 from markets.services.lifecycle_service import MarketLifecycleService
 from markets.services.matching_service import MarketMatchingService
 from markets.services.participation_service import MarketParticipationService
+from markets.tests.eligibility_test_support import make_market_eligible
 from markets.tests.wallet_test_support import fund_market_wallet
 from sports.models import Competition, Sport, SportingEvent
 from wallets.models import LedgerEntry, Wallet
@@ -134,6 +135,7 @@ class MarketMatchingServiceTests(APITestCase):
         market=None,
         outcome=None,
     ):
+        make_market_eligible(user)
         return MarketParticipationService.place_order(
             user=user,
             market_id=(market or self.market).id,
@@ -631,6 +633,7 @@ class MarketMatchingServiceTests(APITestCase):
 
     def test_api_returns_final_status_and_fill_values(self):
         self.resting_sell(self.users[0], "2.0000", "0.54000")
+        make_market_eligible(self.users[1])
         self.client.force_authenticate(user=self.users[1])
         response = self.client.post(
             reverse("markets:market-order-create", kwargs={"market_id": self.market.id}),

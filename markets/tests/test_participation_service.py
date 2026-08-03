@@ -25,12 +25,15 @@ from markets.models import (
 from markets.services.catalog_service import (
     MarketCatalogService,
 )
+from markets.services.eligibility_service import MarketEligibilityService
 from markets.services.lifecycle_service import (
     MarketLifecycleService,
 )
+from markets.services.matching_service import MarketMatchingService
 from markets.services.participation_service import (
     MarketParticipationService,
 )
+from markets.tests.eligibility_test_support import make_market_eligible
 from sports.models import (
     Competition,
     Sport,
@@ -102,6 +105,7 @@ class MarketParticipationServiceTests(TestCase):
         self.outsider = UserFactory(
             is_verified=True,
         )
+        make_market_eligible(self.participant)
 
         UserRoleFactory(
             user=self.operations_user,
@@ -245,25 +249,77 @@ class MarketParticipationServiceTests(TestCase):
             order.side,
             MarketOrder.Side.BUY,
         )
-        self.assertEqual(
-            order.quantity,
-            Decimal("10.0000"),
+        self.assertEqual(order.quantity, Decimal("10.0000"))
+        self.assertEqual(order.limit_price, Decimal("0.55000"))
+        self.assertEqual(order.status, MarketOrder.Status.OPEN)
+        self.assertEqual(order.filled_quantity, Decimal("0"))
+        self.assertIsNone(order.average_fill_price)
+
+    def test_eligibility_precedes_order_wallet_reservation_and_matching(self):
+        events = []
+        original_evaluate = MarketEligibilityService.evaluate
+        original_order_save = MarketOrder.save
+        original_reserve = WalletService.reserve
+        original_match = MarketMatchingService.match_order
+
+        def evaluate(**kwargs):
+            events.append("eligibility")
+            return original_evaluate(**kwargs)
+
+        def save(order, *args, **kwargs):
+            events.append("order")
+            return original_order_save(order, *args, **kwargs)
+
+        def reserve(**kwargs):
+            events.append("wallet")
+            return original_reserve(**kwargs)
+
+        def match(order_id):
+            events.append("matching")
+            return original_match(order_id)
+
+        with (
+            patch.object(MarketEligibilityService, "evaluate", side_effect=evaluate),
+            patch.object(MarketOrder, "save", new=save),
+            patch.object(WalletService, "reserve", side_effect=reserve),
+            patch.object(MarketMatchingService, "match_order", side_effect=match),
+        ):
+            self.place_order()
+
+        eligibility_index = events.index("eligibility")
+        for operation in ("order", "wallet", "matching"):
+            self.assertLess(eligibility_index, events.index(operation))
+
+    def test_eligibility_precedes_sell_position_reservation(self):
+        market = self.open_market(self.create_market())
+        outcome = market.outcomes.get(side=MarketOutcome.Side.YES)
+        MarketPosition.objects.create(
+            user=self.participant,
+            market=market,
+            outcome=outcome,
+            quantity=Decimal("10.0000"),
+            average_entry_price=Decimal("0.40000"),
+            total_cost=Decimal("4.0000"),
         )
-        self.assertEqual(
-            order.limit_price,
-            Decimal("0.55000"),
-        )
-        self.assertEqual(
-            order.status,
-            MarketOrder.Status.OPEN,
-        )
-        self.assertEqual(
-            order.filled_quantity,
-            Decimal("0"),
-        )
-        self.assertIsNone(
-            order.average_fill_price,
-        )
+        events = []
+        original_evaluate = MarketEligibilityService.evaluate
+        original_reserve = MarketParticipationService._reserve_sell_quantity
+
+        def evaluate(**kwargs):
+            events.append("eligibility")
+            return original_evaluate(**kwargs)
+
+        def reserve(**kwargs):
+            events.append("position")
+            return original_reserve(**kwargs)
+
+        with (
+            patch.object(MarketEligibilityService, "evaluate", side_effect=evaluate),
+            patch.object(MarketParticipationService, "_reserve_sell_quantity", side_effect=reserve),
+        ):
+            self.place_order(market=market, outcome=outcome, side=MarketOrder.Side.SELL)
+
+        self.assertLess(events.index("eligibility"), events.index("position"))
 
     def test_place_order_requires_permission(self):
         market = self.open_market(self.create_market())

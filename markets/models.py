@@ -41,6 +41,86 @@ class MarketScope(models.TextChoices):
     CUSTOM = "CUSTOM", "Custom proposition"
 
 
+class MarketParticipantCompliance(TimeStampedUUIDModel):
+    class KYCStatus(models.TextChoices):
+        NOT_STARTED = "NOT_STARTED", "Not started"
+        PENDING = "PENDING", "Pending"
+        VERIFIED = "VERIFIED", "Verified"
+        REJECTED = "REJECTED", "Rejected"
+        EXPIRED = "EXPIRED", "Expired"
+
+    class RestrictionStatus(models.TextChoices):
+        CLEAR = "CLEAR", "Clear"
+        RESTRICTED = "RESTRICTED", "Restricted"
+        SUSPENDED = "SUSPENDED", "Suspended"
+
+    class JurisdictionOverride(models.TextChoices):
+        NONE = "NONE", "None"
+        ALLOW = "ALLOW", "Allow"
+        BLOCK = "BLOCK", "Block"
+
+    participant = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="market_compliance"
+    )
+    kyc_status = models.CharField(
+        max_length=20, choices=KYCStatus.choices, default=KYCStatus.NOT_STARTED, db_index=True
+    )
+    restriction_status = models.CharField(
+        max_length=20,
+        choices=RestrictionStatus.choices,
+        default=RestrictionStatus.CLEAR,
+        db_index=True,
+    )
+    jurisdiction_override = models.CharField(
+        max_length=10, choices=JurisdictionOverride.choices, default=JurisdictionOverride.NONE
+    )
+    jurisdiction_override_reason = models.TextField(blank=True)
+    internal_review_notes = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="market_compliance_reviews_performed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Market compliance for {self.participant_id}"
+
+
+class MarketComplianceReview(TimeStampedUUIDModel):
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="market_compliance_reviews"
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="market_compliance_audits"
+    )
+    previous_kyc_status = models.CharField(max_length=20)
+    new_kyc_status = models.CharField(max_length=20)
+    previous_restriction_status = models.CharField(max_length=20)
+    new_restriction_status = models.CharField(max_length=20)
+    previous_jurisdiction_override = models.CharField(max_length=10)
+    new_jurisdiction_override = models.CharField(max_length=10)
+    reason = models.TextField(blank=True)
+    notes_snapshot = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["participant", "-created_at"])]
+
+    def __str__(self):
+        return f"Compliance review for {self.participant_id} at {self.created_at}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Compliance review records are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Compliance review records are immutable.")
+
+
 class MarketCategory(TimeStampedUUIDModel):
     name = models.CharField(
         max_length=120,
