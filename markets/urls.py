@@ -13,6 +13,7 @@ from markets.lifecycle_views import (
     MarketSubmitView,
     MarketSuspendView,
 )
+from markets.open_order_views import ParticipantOpenOrderListView
 from markets.order_book_views import MarketOrderBookView
 from markets.participation_views import (
     MarketFillDetailView,
@@ -39,6 +40,11 @@ from markets.void_refund_views import MarketVoidRefundView
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "markets/orders/open/",
+        ParticipantOpenOrderListView.as_view(),
+        name="participant-open-orders",
+    ),
     path(
         "market-positions/",
         MarketPositionListView.as_view(),

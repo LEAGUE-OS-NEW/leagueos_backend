@@ -258,6 +258,18 @@ class MarketParticipationService:
             rounding=ROUND_CEILING,
         )
 
+    @classmethod
+    def calculate_buy_cancellation_release(cls, order: MarketOrder) -> Decimal:
+        """Return the exact amount released if an active BUY order is cancelled."""
+        return cls._calculate_buy_cancellation_release(order)
+
+    @staticmethod
+    def is_order_cancellable(order: MarketOrder) -> bool:
+        return order.status in {
+            MarketOrder.Status.OPEN,
+            MarketOrder.Status.PARTIALLY_FILLED,
+        }
+
     @staticmethod
     def _get_locked_order(
         order_id,
@@ -287,12 +299,7 @@ class MarketParticipationService:
     def _require_cancellable_order(
         order: MarketOrder,
     ) -> None:
-        cancellable_statuses = {
-            MarketOrder.Status.OPEN,
-            MarketOrder.Status.PARTIALLY_FILLED,
-        }
-
-        if order.status not in cancellable_statuses:
+        if not MarketParticipationService.is_order_cancellable(order):
             raise ValidationError(
                 {"status": ("Only open or partially " "filled orders can be " "cancelled.")}
             )

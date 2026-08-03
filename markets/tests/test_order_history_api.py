@@ -40,7 +40,7 @@ from sports.models import (
 )
 
 
-class MarketOrderHistoryAPITests(APITestCase):
+class MarketOrderHistoryFixtureMixin:
     def setUp(self):
         self.now = timezone.now()
 
@@ -233,6 +233,12 @@ class MarketOrderHistoryAPITests(APITestCase):
             filled_quantity=Decimal("0.0000"),
             status=MarketOrder.Status.OPEN,
         )
+
+
+class MarketOrderHistoryAPITests(
+    MarketOrderHistoryFixtureMixin,
+    APITestCase,
+):
 
     def test_order_list_requires_authentication(
         self,
