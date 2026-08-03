@@ -518,6 +518,292 @@ paths:
                 items:
                   $ref: '#/components/schemas/Timezone'
           description: ''
+  /api/v1/market-admin/events/:
+    get:
+      operationId: market_admin_events_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketEventPublicList'
+          description: ''
+    post:
+      operationId: market_admin_events_create
+      tags:
+      - market-admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketEventWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketEventWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketEventWrite'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventWrite'
+          description: ''
+  /api/v1/market-admin/events/{event_id}/:
+    get:
+      operationId: market_admin_events_retrieve
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventWrite'
+          description: ''
+    patch:
+      operationId: market_admin_events_partial_update
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMarketEventWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMarketEventWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMarketEventWrite'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventWrite'
+          description: ''
+  /api/v1/market-admin/events/{event_id}/archive/:
+    post:
+      operationId: market_admin_events_archive_create
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketEventPublic'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketEventPublic'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketEventPublic'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventPublic'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+  /api/v1/market-admin/events/{event_id}/markets/:
+    post:
+      operationId: market_admin_events_markets_create
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketAttachment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketAttachment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketAttachment'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketAttachment'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+  /api/v1/market-admin/events/{event_id}/markets/{market_id}/:
+    delete:
+      operationId: market_admin_events_markets_destroy
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/market-admin/events/{event_id}/publish/:
+    post:
+      operationId: market_admin_events_publish_create
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketEventPublic'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketEventPublic'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketEventPublic'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventPublic'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventError'
+          description: ''
   /api/v1/market-admin/markets/:
     get:
       operationId: market_admin_markets_list
@@ -1145,6 +1431,228 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedResponsibleEventList'
           description: ''
+  /api/v1/market-admin/proposals/:
+    get:
+      operationId: market_admin_proposals_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketProposalAdminList'
+          description: ''
+  /api/v1/market-admin/proposals/{proposal_id}/:
+    get:
+      operationId: market_admin_proposals_retrieve
+      parameters:
+      - in: path
+        name: proposal_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalAdmin'
+          description: ''
+  /api/v1/market-admin/proposals/{proposal_id}/review/:
+    post:
+      operationId: market_admin_proposals_review_create
+      parameters:
+      - in: path
+        name: proposal_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketProposalReviewAction'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketProposalReviewAction'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketProposalReviewAction'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalAdmin'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalError'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalError'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalError'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalError'
+          description: ''
+  /api/v1/market-admin/proposals/{proposal_id}/reviews/:
+    get:
+      operationId: market_admin_proposals_reviews_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: path
+        name: proposal_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketProposalReviewList'
+          description: ''
+  /api/v1/market-events/:
+    get:
+      operationId: market_events_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - market-events
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketEventPublicList'
+          description: ''
+  /api/v1/market-events/{event_id}/:
+    get:
+      operationId: market_events_retrieve
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-events
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketEventPublic'
+          description: ''
+  /api/v1/market-events/{event_id}/markets/:
+    get:
+      operationId: market_events_markets_list
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - market-events
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketPublicList'
+          description: ''
   /api/v1/market-fills/:
     get:
       operationId: market_fills_list
@@ -1320,6 +1828,11 @@ paths:
           type: string
           format: uuid
       - in: query
+        name: event_group_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
         name: is_featured
         schema:
           type: boolean
@@ -1358,6 +1871,11 @@ paths:
           minLength: 1
       - in: query
         name: sport
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: sporting_event_id
         schema:
           type: string
           format: uuid
@@ -1781,6 +2299,143 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MarketPortfolioSummary'
+          description: ''
+  /api/v1/markets/proposals/:
+    get:
+      operationId: markets_proposals_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketProposalParticipantList'
+          description: ''
+    post:
+      operationId: markets_proposals_create
+      tags:
+      - markets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketProposalParticipant'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketProposalParticipant'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketProposalParticipant'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalParticipant'
+          description: ''
+  /api/v1/markets/proposals/{proposal_id}/:
+    get:
+      operationId: markets_proposals_retrieve
+      parameters:
+      - in: path
+        name: proposal_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalParticipant'
+          description: ''
+    patch:
+      operationId: markets_proposals_partial_update
+      parameters:
+      - in: path
+        name: proposal_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMarketProposalParticipant'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMarketProposalParticipant'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMarketProposalParticipant'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalParticipant'
+          description: ''
+  /api/v1/markets/proposals/{proposal_id}/withdraw/:
+    post:
+      operationId: markets_proposals_withdraw_create
+      parameters:
+      - in: path
+        name: proposal_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketProposalParticipant'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketProposalParticipant'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketProposalParticipant'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProposalParticipant'
           description: ''
   /api/v1/markets/responsible-participation/:
     get:
@@ -3957,6 +4612,10 @@ components:
           allOf:
           - $ref: '#/components/schemas/MarketTemplatePublic'
           readOnly: true
+        event_group:
+          allOf:
+          - $ref: '#/components/schemas/MarketEventSummary'
+          readOnly: true
         sporting_event:
           allOf:
           - $ref: '#/components/schemas/SportingEventPublic'
@@ -4031,6 +4690,7 @@ components:
       - competition
       - created_at
       - created_by
+      - event_group
       - id
       - outcomes
       - participant
@@ -4140,6 +4800,14 @@ components:
       - question
       - scope_type
       - sport_id
+    MarketAttachment:
+      type: object
+      properties:
+        market_id:
+          type: string
+          format: uuid
+      required:
+      - market_id
     MarketCategoryPublic:
       type: object
       properties:
@@ -4166,6 +4834,155 @@ components:
       required:
       - id
       - name
+    MarketEventError:
+      type: object
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+      required:
+      - code
+    MarketEventPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 280
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        event_type:
+          $ref: '#/components/schemas/MarketEventTypeEnum'
+        category:
+          allOf:
+          - $ref: '#/components/schemas/MarketCategoryPublic'
+          readOnly: true
+        sporting_event:
+          allOf:
+          - $ref: '#/components/schemas/SportingEventSummary'
+          readOnly: true
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        market_count:
+          type: integer
+          readOnly: true
+        open_market_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category
+      - created_at
+      - event_type
+      - id
+      - market_count
+      - open_market_count
+      - slug
+      - sporting_event
+      - title
+      - updated_at
+    MarketEventStatusEnum:
+      enum:
+      - DRAFT
+      - PUBLISHED
+      - ARCHIVED
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `PUBLISHED` - Published
+        * `ARCHIVED` - Archived
+    MarketEventSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 280
+          pattern: ^[-a-zA-Z0-9_]+$
+        event_type:
+          $ref: '#/components/schemas/MarketEventTypeEnum'
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - event_type
+      - id
+      - slug
+      - title
+    MarketEventTypeEnum:
+      enum:
+      - SPORTING_EVENT
+      - LEAGUE_EVENT
+      - GENERAL_EVENT
+      type: string
+      description: |-
+        * `SPORTING_EVENT` - Sporting event
+        * `LEAGUE_EVENT` - League event
+        * `GENERAL_EVENT` - General event
+    MarketEventWrite:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 280
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        event_type:
+          $ref: '#/components/schemas/MarketEventTypeEnum'
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        sporting_event_id:
+          type: string
+          format: uuid
+          nullable: true
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/MarketEventStatusEnum'
+          readOnly: true
+      required:
+      - event_type
+      - id
+      - slug
+      - status
+      - title
     MarketFillRead:
       type: object
       properties:
@@ -4769,6 +5586,295 @@ components:
       - total_cost
       - updated_at
       - user
+    MarketProposalAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        question:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+        category:
+          type: string
+          format: uuid
+        scope_type:
+          $ref: '#/components/schemas/MarketScopeEnum'
+        sporting_event:
+          type: string
+          format: uuid
+          nullable: true
+        proposed_event_group:
+          type: string
+          format: uuid
+          nullable: true
+        proposed_event_title:
+          type: string
+          maxLength: 255
+        proposed_closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        proposed_resolution_source:
+          type: string
+          maxLength: 255
+        status:
+          $ref: '#/components/schemas/MarketProposalStatusEnum'
+        duplicate_status:
+          $ref: '#/components/schemas/MarketProposalDuplicateStatusEnum'
+        duplicate_fingerprint:
+          type: string
+          readOnly: true
+        duplicate_of_market:
+          type: string
+          format: uuid
+          nullable: true
+        duplicate_of_proposal:
+          type: string
+          format: uuid
+          nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        withdrawn_at:
+          type: string
+          format: date-time
+          nullable: true
+        proposer_id:
+          type: string
+          format: uuid
+          readOnly: true
+        reviewed_by_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        approved_market_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+      required:
+      - approved_market_id
+      - category
+      - created_at
+      - duplicate_fingerprint
+      - id
+      - proposer_id
+      - question
+      - reviewed_by_id
+      - submitted_at
+      - updated_at
+    MarketProposalDuplicateStatusEnum:
+      enum:
+      - CLEAR
+      - POSSIBLE_DUPLICATE
+      - CONFIRMED_DUPLICATE
+      type: string
+      description: |-
+        * `CLEAR` - Clear
+        * `POSSIBLE_DUPLICATE` - Possible duplicate
+        * `CONFIRMED_DUPLICATE` - Confirmed duplicate
+    MarketProposalError:
+      type: object
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+      required:
+      - code
+    MarketProposalParticipant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        question:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        scope_type:
+          allOf:
+          - $ref: '#/components/schemas/MarketProposalParticipantScopeTypeEnum'
+          default: EVENT
+        sporting_event_id:
+          type: string
+          format: uuid
+          nullable: true
+        proposed_event_group_id:
+          type: string
+          format: uuid
+          nullable: true
+        proposed_event_title:
+          type: string
+          maxLength: 255
+        proposed_closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        proposed_resolution_source:
+          type: string
+          maxLength: 255
+        status:
+          allOf:
+          - $ref: '#/components/schemas/MarketProposalStatusEnum'
+          readOnly: true
+        duplicate_status:
+          allOf:
+          - $ref: '#/components/schemas/MarketProposalDuplicateStatusEnum'
+          readOnly: true
+        duplicate_candidates:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        withdrawn_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_id
+      - created_at
+      - duplicate_candidates
+      - duplicate_status
+      - id
+      - question
+      - status
+      - submitted_at
+      - updated_at
+      - withdrawn_at
+    MarketProposalParticipantScopeTypeEnum:
+      enum:
+      - EVENT
+      type: string
+      description: '* `EVENT` - EVENT'
+    MarketProposalReview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        action:
+          $ref: '#/components/schemas/MarketProposalReviewActionEnum'
+        previous_status:
+          $ref: '#/components/schemas/MarketProposalStatusEnum'
+        new_status:
+          $ref: '#/components/schemas/MarketProposalStatusEnum'
+        reason:
+          type: string
+        actor_id:
+          type: string
+          format: uuid
+          readOnly: true
+        duplicate_market_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        duplicate_proposal_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        approved_market_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - actor_id
+      - approved_market_id
+      - created_at
+      - duplicate_market_id
+      - duplicate_proposal_id
+      - id
+      - new_status
+      - previous_status
+    MarketProposalReviewAction:
+      type: object
+      properties:
+        action:
+          $ref: '#/components/schemas/MarketProposalReviewActionEnum'
+        reason:
+          type: string
+        duplicate_of_market:
+          type: string
+          format: uuid
+          nullable: true
+        duplicate_of_proposal:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - action
+    MarketProposalReviewActionEnum:
+      enum:
+      - START_REVIEW
+      - APPROVE
+      - REJECT
+      - MARK_DUPLICATE
+      type: string
+      description: |-
+        * `START_REVIEW` - Start review
+        * `APPROVE` - Approve
+        * `REJECT` - Reject
+        * `MARK_DUPLICATE` - Mark duplicate
+    MarketProposalStatusEnum:
+      enum:
+      - SUBMITTED
+      - UNDER_REVIEW
+      - APPROVED
+      - REJECTED
+      - DUPLICATE
+      - WITHDRAWN
+      type: string
+      description: |-
+        * `SUBMITTED` - Submitted
+        * `UNDER_REVIEW` - Under review
+        * `APPROVED` - Approved
+        * `REJECTED` - Rejected
+        * `DUPLICATE` - Duplicate
+        * `WITHDRAWN` - Withdrawn
     MarketPublic:
       type: object
       properties:
@@ -4814,6 +5920,10 @@ components:
           allOf:
           - $ref: '#/components/schemas/MarketTemplatePublic'
           readOnly: true
+        event_group:
+          allOf:
+          - $ref: '#/components/schemas/MarketEventSummary'
+          readOnly: true
         sporting_event:
           allOf:
           - $ref: '#/components/schemas/SportingEventPublic'
@@ -4855,6 +5965,7 @@ components:
       - category
       - competition
       - created_at
+      - event_group
       - id
       - outcomes
       - participant
@@ -5599,6 +6710,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketCategoryPublic'
+    PaginatedMarketEventPublicList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketEventPublic'
     PaginatedMarketFillReadList:
       type: object
       required:
@@ -5714,6 +6848,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketPositionRead'
+    PaginatedMarketProposalAdminList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketProposalAdmin'
+    PaginatedMarketProposalParticipantList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketProposalParticipant'
+    PaginatedMarketProposalReviewList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketProposalReview'
     PaginatedMarketPublicList:
       type: object
       required:
@@ -6237,6 +7440,106 @@ components:
           type: string
           default: 'No'
           maxLength: 120
+    PatchedMarketEventWrite:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 280
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        event_type:
+          $ref: '#/components/schemas/MarketEventTypeEnum'
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        sporting_event_id:
+          type: string
+          format: uuid
+          nullable: true
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/MarketEventStatusEnum'
+          readOnly: true
+    PatchedMarketProposalParticipant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        question:
+          type: string
+          maxLength: 500
+        description:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        scope_type:
+          allOf:
+          - $ref: '#/components/schemas/MarketProposalParticipantScopeTypeEnum'
+          default: EVENT
+        sporting_event_id:
+          type: string
+          format: uuid
+          nullable: true
+        proposed_event_group_id:
+          type: string
+          format: uuid
+          nullable: true
+        proposed_event_title:
+          type: string
+          maxLength: 255
+        proposed_closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        proposed_resolution_source:
+          type: string
+          maxLength: 255
+        status:
+          allOf:
+          - $ref: '#/components/schemas/MarketProposalStatusEnum'
+          readOnly: true
+        duplicate_status:
+          allOf:
+          - $ref: '#/components/schemas/MarketProposalDuplicateStatusEnum'
+          readOnly: true
+        duplicate_candidates:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        withdrawn_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedParticipantLimitsUpdate:
       type: object
       properties:
@@ -6957,9 +8260,9 @@ components:
           type: string
           maxLength: 255
         event_type:
-          $ref: '#/components/schemas/SportingEventPublicEventTypeEnum'
+          $ref: '#/components/schemas/SportingEventTypeEnum'
         status:
-          $ref: '#/components/schemas/SportingEventPublicStatusEnum'
+          $ref: '#/components/schemas/SportingEventStatusEnum'
         starts_at:
           type: string
           format: date-time
@@ -6993,23 +8296,7 @@ components:
       - participants
       - sport
       - starts_at
-    SportingEventPublicEventTypeEnum:
-      enum:
-      - MATCH
-      - RACE
-      - TOURNAMENT
-      - BOUT
-      - SERIES
-      - OTHER
-      type: string
-      description: |-
-        * `MATCH` - Match
-        * `RACE` - Race
-        * `TOURNAMENT` - Tournament
-        * `BOUT` - Bout
-        * `SERIES` - Series
-        * `OTHER` - Other
-    SportingEventPublicStatusEnum:
+    SportingEventStatusEnum:
       enum:
       - DRAFT
       - SCHEDULED
@@ -7027,6 +8314,41 @@ components:
         * `POSTPONED` - Postponed
         * `CANCELLED` - Cancelled
         * `ABANDONED` - Abandoned
+    SportingEventSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        starts_at:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/SportingEventStatusEnum'
+      required:
+      - id
+      - name
+      - starts_at
+    SportingEventTypeEnum:
+      enum:
+      - MATCH
+      - RACE
+      - TOURNAMENT
+      - BOUT
+      - SERIES
+      - OTHER
+      type: string
+      description: |-
+        * `MATCH` - Match
+        * `RACE` - Race
+        * `TOURNAMENT` - Tournament
+        * `BOUT` - Bout
+        * `SERIES` - Series
+        * `OTHER` - Other
     StepEnum:
       enum:
       - COUNTRY

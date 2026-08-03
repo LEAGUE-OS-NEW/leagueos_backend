@@ -4,6 +4,7 @@ from rest_framework import serializers
 from markets.models import (
     Market,
     MarketCategory,
+    MarketEventGroup,
     MarketOutcome,
     MarketScope,
     MarketTemplate,
@@ -70,7 +71,14 @@ class MarketSubjectSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
+class MarketEventSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MarketEventGroup
+        fields = ["id", "title", "slug", "event_type", "scheduled_at"]
+
+
 class MarketPublicSerializer(serializers.ModelSerializer):
+    event_group = MarketEventSummarySerializer(read_only=True)
     sport = SportPublicSerializer(
         read_only=True,
     )
@@ -117,6 +125,7 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "sport",
             "category",
             "template",
+            "event_group",
             "sporting_event",
             "competition",
             "participant",
@@ -159,6 +168,8 @@ class MarketPublicSerializer(serializers.ModelSerializer):
 
 
 class MarketListQuerySerializer(serializers.Serializer):
+    event_group_id = serializers.UUIDField(required=False)
+    sporting_event_id = serializers.UUIDField(required=False)
     sport = serializers.UUIDField(
         required=False,
     )

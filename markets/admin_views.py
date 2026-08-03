@@ -30,6 +30,7 @@ class MarketAdminQuerysetMixin:
             "sport",
             "category",
             "template",
+            "event_group",
             "sporting_event",
             "sporting_event__sport",
             "sporting_event__competition",

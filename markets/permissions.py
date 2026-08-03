@@ -37,6 +37,15 @@ class HasManageMarketPermission(BasePermission):
         )
 
 
+class HasAnyMarketPermission(BasePermission):
+    message = "You do not have permission to moderate market proposals."
+
+    def has_permission(self, request, view) -> bool:
+        return PermissionService.has_any_permission(
+            request.user, ("manage_market", "approve_market")
+        )
+
+
 class HasApproveMarketPermission(BasePermission):
     message = "You do not have the approve_market " "permission."
 
