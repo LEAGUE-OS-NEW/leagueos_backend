@@ -1441,6 +1441,66 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedParticipantOpenOrderList'
           description: ''
+  /api/v1/markets/portfolio/activity/:
+    get:
+      operationId: markets_portfolio_activity_list
+      description: Return the authenticated participant's read-only, paginated UGX
+        market activity across fills, cancellations, settlements, and void refunds.
+      parameters:
+      - in: query
+        name: event_type
+        schema:
+          type: string
+          enum:
+          - BUY_FILL
+          - ORDER_CANCELLED
+          - SELL_FILL
+          - SETTLEMENT_LOSS
+          - SETTLEMENT_WIN
+          - VOID_REFUND
+      - in: query
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: occurred_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: occurred_to
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: outcome_id
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketPortfolioActivityList'
+          description: ''
   /api/v1/markets/portfolio/positions/:
     get:
       operationId: markets_portfolio_positions_list
@@ -2498,6 +2558,16 @@ components:
       - avatar_updated_at
       - avatar_url
       - id
+    CancellationReasonEnum:
+      enum:
+      - MANUAL
+      - MARKET_CLOSE
+      - MARKET_VOID
+      type: string
+      description: |-
+        * `MANUAL` - MANUAL
+        * `MARKET_CLOSE` - MARKET_CLOSE
+        * `MARKET_VOID` - MARKET_VOID
     ChannelCapability:
       type: object
       description: Serializer for channel capabilities.
@@ -3020,22 +3090,6 @@ components:
       required:
       - participant
       - position
-    EventTypeEnum:
-      enum:
-      - MATCH
-      - RACE
-      - TOURNAMENT
-      - BOUT
-      - SERIES
-      - OTHER
-      type: string
-      description: |-
-        * `MATCH` - Match
-        * `RACE` - Race
-        * `TOURNAMENT` - Tournament
-        * `BOUT` - Bout
-        * `SERIES` - Series
-        * `OTHER` - Other
     Gender:
       type: object
       description: Serializer for the Gender lookup table.
@@ -3749,6 +3803,125 @@ components:
       description: |-
         * `YES` - Yes
         * `NO` - No
+    MarketPortfolioActivity:
+      type: object
+      properties:
+        id:
+          type: string
+        event_type:
+          $ref: '#/components/schemas/MarketPortfolioActivityEventTypeEnum'
+        occurred_at:
+          type: string
+          format: date-time
+        currency:
+          type: string
+        market_id:
+          type: string
+          format: uuid
+        outcome_id:
+          type: string
+          format: uuid
+        market_question:
+          type: string
+        outcome_label:
+          type: string
+        side:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/MarketPortfolioActivitySideEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        order_id:
+          type: string
+          format: uuid
+          nullable: true
+        fill_id:
+          type: string
+          format: uuid
+          nullable: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          nullable: true
+        notional_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        wallet_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        realized_pnl_delta:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        released_wallet_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          nullable: true
+        released_position_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          nullable: true
+        cancellation_reason:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CancellationReasonEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - cancellation_reason
+      - currency
+      - event_type
+      - fill_id
+      - id
+      - market_id
+      - market_question
+      - notional_amount
+      - occurred_at
+      - order_id
+      - outcome_id
+      - outcome_label
+      - price
+      - quantity
+      - realized_pnl_delta
+      - released_position_quantity
+      - released_wallet_amount
+      - side
+      - wallet_amount
+    MarketPortfolioActivityEventTypeEnum:
+      enum:
+      - BUY_FILL
+      - SELL_FILL
+      - ORDER_CANCELLED
+      - SETTLEMENT_WIN
+      - SETTLEMENT_LOSS
+      - VOID_REFUND
+      type: string
+      description: |-
+        * `BUY_FILL` - BUY_FILL
+        * `SELL_FILL` - SELL_FILL
+        * `ORDER_CANCELLED` - ORDER_CANCELLED
+        * `SETTLEMENT_WIN` - SETTLEMENT_WIN
+        * `SETTLEMENT_LOSS` - SETTLEMENT_LOSS
+        * `VOID_REFUND` - VOID_REFUND
+    MarketPortfolioActivitySideEnum:
+      enum:
+      - BUY
+      - SELL
+      type: string
+      description: |-
+        * `BUY` - BUY
+        * `SELL` - SELL
     MarketPortfolioPosition:
       type: object
       properties:
@@ -4539,6 +4712,9 @@ components:
         * `CONSENT_WITHDRAWN` - Consent withdrawn
         * `RESET_TO_DEFAULTS` - Reset to defaults
         * `MANDATORY_NOTIFICATION_SENT` - Mandatory notification sent
+    NullEnum:
+      enum:
+      - null
     Onboarding:
       type: object
       description: Serializer for the full onboarding status response.
@@ -4817,6 +4993,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketOrderRead'
+    PaginatedMarketPortfolioActivityList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketPortfolioActivity'
     PaginatedMarketPortfolioPositionList:
       type: object
       required:
@@ -5741,7 +5940,7 @@ components:
           type: string
           maxLength: 255
         event_type:
-          $ref: '#/components/schemas/EventTypeEnum'
+          $ref: '#/components/schemas/SportingEventPublicEventTypeEnum'
         status:
           $ref: '#/components/schemas/SportingEventPublicStatusEnum'
         starts_at:
@@ -5777,6 +5976,22 @@ components:
       - participants
       - sport
       - starts_at
+    SportingEventPublicEventTypeEnum:
+      enum:
+      - MATCH
+      - RACE
+      - TOURNAMENT
+      - BOUT
+      - SERIES
+      - OTHER
+      type: string
+      description: |-
+        * `MATCH` - Match
+        * `RACE` - Race
+        * `TOURNAMENT` - Tournament
+        * `BOUT` - Bout
+        * `SERIES` - Series
+        * `OTHER` - Other
     SportingEventPublicStatusEnum:
       enum:
       - DRAFT
