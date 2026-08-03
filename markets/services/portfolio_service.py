@@ -1,6 +1,6 @@
 from decimal import ROUND_HALF_UP, Decimal
 
-from django.db.models import DecimalField, F, OuterRef, Q, Subquery
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
 
 from markets.models import Market, MarketFill, MarketOrder, MarketPosition
@@ -14,6 +14,13 @@ class MarketPortfolioService:
     MONEY_QUANTUM = Decimal("0.0001")
     QUANTITY_QUANTUM = Decimal("0.0001")
     PRICE_QUANTUM = Decimal("0.00001")
+    MARK_SOURCES = (
+        "resolution",
+        "void_cost_basis",
+        "best_bid",
+        "last_trade",
+        "unpriced",
+    )
 
     @classmethod
     def get_summary(cls, *, user, filters=None, as_of=None):
@@ -31,6 +38,62 @@ class MarketPortfolioService:
             position_queryset = position_queryset.filter(market_id=market_id)
             order_queryset = order_queryset.filter(market_id=market_id)
 
+        positions = list(cls._position_queryset(user=user, queryset=position_queryset, as_of=as_of))
+        orders = list(order_queryset)
+        wallet = WalletReadService.get_wallet(user=user, currency=cls.CURRENCY)
+
+        return {
+            "currency": cls.CURRENCY,
+            "scope": {"market_id": market_id},
+            "wallet": cls._wallet_summary(wallet),
+            "positions": cls._position_summary(positions),
+            "orders": cls._order_summary(orders),
+            "as_of": as_of,
+        }
+
+    @classmethod
+    def list_positions(cls, *, user, filters=None, as_of=None):
+        filters = filters or {}
+        as_of = as_of or timezone.now()
+        queryset = MarketPosition.objects.filter(user=user, quantity__gt=Decimal("0"))
+        for field in ("market_id", "outcome_id"):
+            value = filters.get(field)
+            if value is not None:
+                queryset = queryset.filter(**{field: value})
+        market_status = filters.get("market_status")
+        if market_status is not None:
+            queryset = queryset.filter(market__status=market_status)
+        queryset = queryset.order_by(
+            F("market__closes_at").asc(nulls_last=True),
+            "market__question",
+            "outcome__label",
+            "id",
+        )
+        positions = list(cls._position_queryset(user=user, queryset=queryset, as_of=as_of))
+        results = []
+        for position in positions:
+            valuation = cls.value_position(position)
+            for name, value in valuation.items():
+                setattr(position, name, value)
+            position.open_sell_order_count = position.active_sell_order_count or 0
+            position.reserved_sell_order_quantity = (
+                position.active_sell_reserved_quantity or Decimal("0.0000")
+            )
+            results.append(position)
+        mark_source = filters.get("mark_source")
+        if mark_source is not None:
+            results = [position for position in results if position.mark_source == mark_source]
+        valuation_complete = filters.get("valuation_complete")
+        if valuation_complete is not None:
+            results = [
+                position
+                for position in results
+                if position.valuation_complete is valuation_complete
+            ]
+        return results
+
+    @classmethod
+    def _position_queryset(cls, *, user, queryset, as_of):
         external_bid = (
             MarketOrder.objects.filter(
                 outcome_id=OuterRef("outcome_id"),
@@ -49,29 +112,43 @@ class MarketPortfolioService:
             .order_by("-created_at", "-id")
             .values("price")[:1]
         )
-        positions = list(
-            position_queryset.select_related("market", "outcome").annotate(
-                external_best_bid=Subquery(
-                    external_bid,
-                    output_field=DecimalField(max_digits=6, decimal_places=5),
-                ),
-                latest_fill_price=Subquery(
-                    latest_fill,
-                    output_field=DecimalField(max_digits=6, decimal_places=5),
-                ),
-            )
+        remaining = ExpressionWrapper(
+            F("quantity") - F("filled_quantity"),
+            output_field=DecimalField(max_digits=18, decimal_places=4),
         )
-        orders = list(order_queryset)
-        wallet = WalletReadService.get_wallet(user=user, currency=cls.CURRENCY)
-
-        return {
-            "currency": cls.CURRENCY,
-            "scope": {"market_id": market_id},
-            "wallet": cls._wallet_summary(wallet),
-            "positions": cls._position_summary(positions),
-            "orders": cls._order_summary(orders),
-            "as_of": as_of,
-        }
+        active_sells = MarketOrder.objects.filter(
+            user=user,
+            market_id=OuterRef("market_id"),
+            outcome_id=OuterRef("outcome_id"),
+            side=MarketOrder.Side.SELL,
+            status__in=ParticipantOpenOrderService.ACTIVE_STATUSES,
+            quantity__gt=F("filled_quantity"),
+        )
+        sell_count = (
+            active_sells.values("market_id", "outcome_id")
+            .annotate(total=Count("id"))
+            .values("total")[:1]
+        )
+        sell_quantity = (
+            active_sells.values("market_id", "outcome_id")
+            .annotate(total=Sum(remaining))
+            .values("total")[:1]
+        )
+        return queryset.select_related("market", "outcome").annotate(
+            external_best_bid=Subquery(
+                external_bid,
+                output_field=DecimalField(max_digits=6, decimal_places=5),
+            ),
+            latest_fill_price=Subquery(
+                latest_fill,
+                output_field=DecimalField(max_digits=6, decimal_places=5),
+            ),
+            active_sell_order_count=Subquery(sell_count),
+            active_sell_reserved_quantity=Subquery(
+                sell_quantity,
+                output_field=DecimalField(max_digits=18, decimal_places=4),
+            ),
+        )
 
     @classmethod
     def _wallet_summary(cls, wallet):
@@ -110,16 +187,15 @@ class MarketPortfolioService:
             totals["total_quantity"] += position.quantity
             totals["reserved_quantity"] += position.reserved_quantity
             totals["total_cost_basis"] += position.total_cost
-            mark, source = cls._mark(position)
-            sources[source] += 1
-            if mark is None:
+            valuation = cls.value_position(position)
+            sources[valuation["mark_source"]] += 1
+            if not valuation["valuation_complete"]:
                 totals["unpriced_cost_basis"] += position.total_cost
                 continue
             marked_count += 1
-            market_value = cls._money(position.quantity * mark)
             totals["marked_cost_basis"] += position.total_cost
-            totals["marked_market_value"] += market_value
-            totals["marked_unrealized_pnl"] += market_value - position.total_cost
+            totals["marked_market_value"] += valuation["market_value"]
+            totals["marked_unrealized_pnl"] += valuation["unrealized_pnl"]
 
         valuation_complete = marked_count == len(open_positions)
         unrealized = cls._money(totals["marked_unrealized_pnl"])
@@ -168,6 +244,30 @@ class MarketPortfolioService:
         if position.latest_fill_price is not None:
             return position.latest_fill_price, "last_trade"
         return None, "unpriced"
+
+    @classmethod
+    def value_position(cls, position):
+        mark, source = cls._mark(position)
+        if mark is None:
+            return {
+                "mark_price": None,
+                "mark_source": source,
+                "market_value": None,
+                "unrealized_pnl": None,
+                "total_position_pnl": None,
+                "valuation_complete": False,
+            }
+        mark = Decimal(mark).quantize(cls.PRICE_QUANTUM, rounding=ROUND_HALF_UP)
+        market_value = cls._money(position.quantity * mark)
+        unrealized = cls._money(market_value - position.total_cost)
+        return {
+            "mark_price": mark,
+            "mark_source": source,
+            "market_value": market_value,
+            "unrealized_pnl": unrealized,
+            "total_position_pnl": cls._money(position.realized_pnl + unrealized),
+            "valuation_complete": True,
+        }
 
     @classmethod
     def _order_summary(cls, orders):
