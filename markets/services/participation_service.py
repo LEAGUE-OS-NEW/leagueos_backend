@@ -2,6 +2,7 @@ from decimal import (
     ROUND_CEILING,
     Decimal,
 )
+from typing import TypedDict
 from uuid import uuid5
 
 from django.core.exceptions import ValidationError
@@ -21,9 +22,18 @@ from markets.models import (
 from markets.services.matching_service import (
     MarketMatchingService,
 )
+from wallets.models import LedgerEntry
 from wallets.services.wallet_service import (
     WalletService,
 )
+
+
+class LockedOrderCancellationResult(TypedDict):
+    order: MarketOrder
+    remaining_quantity: Decimal
+    released_wallet_amount: Decimal
+    released_position_quantity: Decimal
+    wallet_entry: LedgerEntry | None
 
 
 class MarketParticipationService:
@@ -132,7 +142,7 @@ class MarketParticipationService:
         return order
 
     @classmethod
-    def cancel_locked_order(cls, *, order: MarketOrder) -> dict:
+    def cancel_locked_order(cls, *, order: MarketOrder) -> LockedOrderCancellationResult:
         """Cancel a locked order without applying actor ownership policy."""
         cls._require_cancellable_order(order)
         remaining_quantity = order.quantity - order.filled_quantity

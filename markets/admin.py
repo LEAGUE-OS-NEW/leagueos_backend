@@ -3,6 +3,8 @@ from django.contrib import admin
 from markets.models import (
     Market,
     MarketCategory,
+    MarketCloseCleanup,
+    MarketCloseOrderCancellation,
     MarketOutcome,
     MarketPositionSettlement,
     MarketPositionVoidRefund,
@@ -246,6 +248,34 @@ class MarketVoidOrderCancellationAdmin(ImmutableSettlementAdmin):
     )
     list_filter = ("order_side", "created_at")
     search_fields = ("market_void_refund__market__question",)
+
+
+@admin.register(MarketCloseCleanup)
+class MarketCloseCleanupAdmin(ImmutableSettlementAdmin):
+    list_display = (
+        "market",
+        "total_cancelled_order_count",
+        "cancelled_buy_order_count",
+        "cancelled_sell_order_count",
+        "executed_by",
+        "executed_at",
+    )
+    list_filter = ("executed_at",)
+    search_fields = ("market__question",)
+
+
+@admin.register(MarketCloseOrderCancellation)
+class MarketCloseOrderCancellationAdmin(ImmutableSettlementAdmin):
+    list_display = (
+        "market_close_cleanup",
+        "market_order",
+        "order_side",
+        "remaining_quantity_cancelled",
+        "released_wallet_reservation_amount",
+        "released_position_reservation_quantity",
+    )
+    list_filter = ("order_side", "created_at")
+    search_fields = ("market_close_cleanup__market__question",)
 
 
 @admin.register(MarketPositionVoidRefund)

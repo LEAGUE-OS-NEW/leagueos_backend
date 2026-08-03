@@ -1141,6 +1141,80 @@ class MarketPositionVoidRefund(ImmutableVoidRefundModel):
         return f"{self.market_position_id}: {self.refund_amount}"
 
 
+class ImmutableCloseCleanupModel(TimeStampedUUIDModel):
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Market close cleanup audit records are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Market close cleanup audit records cannot be deleted.")
+
+
+class MarketCloseCleanup(ImmutableCloseCleanupModel):
+    market = models.OneToOneField(Market, on_delete=models.PROTECT, related_name="close_cleanup")
+    total_cancelled_order_count = models.PositiveIntegerField(default=0)
+    cancelled_buy_order_count = models.PositiveIntegerField(default=0)
+    cancelled_sell_order_count = models.PositiveIntegerField(default=0)
+    total_released_buy_reservation_amount = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    total_released_sell_reservation_quantity = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    executed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="executed_market_close_cleanups",
+    )
+    executed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-executed_at", "-id"]
+        indexes = [models.Index(fields=["executed_at"])]
+
+    def __str__(self):
+        return f"{self.market_id}: {self.total_cancelled_order_count} orders"
+
+
+class MarketCloseOrderCancellation(ImmutableCloseCleanupModel):
+    market_close_cleanup = models.ForeignKey(
+        MarketCloseCleanup,
+        on_delete=models.PROTECT,
+        related_name="order_cancellations",
+    )
+    market_order = models.OneToOneField(
+        MarketOrder,
+        on_delete=models.PROTECT,
+        related_name="close_cancellation_record",
+    )
+    order_side = models.CharField(max_length=10, choices=MarketOrder.Side.choices)
+    remaining_quantity_cancelled = models.DecimalField(max_digits=18, decimal_places=4)
+    released_wallet_reservation_amount = models.DecimalField(
+        max_digits=20, decimal_places=4, default=Decimal("0.0000")
+    )
+    released_position_reservation_quantity = models.DecimalField(
+        max_digits=18, decimal_places=4, default=Decimal("0.0000")
+    )
+    wallet_release_ledger_entry = models.OneToOneField(
+        "wallets.LedgerEntry",
+        on_delete=models.PROTECT,
+        related_name="market_close_order_cancellation",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        indexes = [models.Index(fields=["market_close_cleanup", "order_side"])]
+
+    def __str__(self):
+        return f"{self.market_order_id}: {self.remaining_quantity_cancelled}"
+
+
 class MarketStatusTransition(TimeStampedUUIDModel):
     class Action(models.TextChoices):
         SUBMIT = "SUBMIT", "Submit for approval"

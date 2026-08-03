@@ -299,6 +299,10 @@ class MarketLifecycleService:
 
         clean_notes = cls._clean_notes(notes)
 
+        from markets.services.close_cleanup_service import MarketCloseCleanupService
+
+        MarketCloseCleanupService.cleanup_locked_market(market=market, actor=actor)
+
         return cls._apply_transition(
             market=market,
             actor=actor,
