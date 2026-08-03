@@ -25,7 +25,10 @@ from markets.participation_views import (
     MarketPositionDetailView,
     MarketPositionListView,
 )
-from markets.portfolio_views import MarketPortfolioSummaryView
+from markets.portfolio_views import (
+    MarketPortfolioPositionListView,
+    MarketPortfolioSummaryView,
+)
 from markets.resolution_views import (
     MarketResolveView,
     MarketVoidView,
@@ -41,6 +44,11 @@ from markets.void_refund_views import MarketVoidRefundView
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "markets/portfolio/positions/",
+        MarketPortfolioPositionListView.as_view(),
+        name="market-portfolio-position-list",
+    ),
     path(
         "markets/portfolio/summary/",
         MarketPortfolioSummaryView.as_view(),

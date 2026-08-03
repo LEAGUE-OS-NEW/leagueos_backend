@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -97,6 +98,84 @@ class MarketPortfolioSummaryAPITests(MarketOrderHistoryFixtureMixin, APITestCase
         self.assertTrue(response.data["positions"]["valuation_complete"])
         self.assertEqual(response.data["orders"]["open_order_count"], 0)
         self.assertIsNotNone(response.data["as_of"])
+
+    def test_summary_uses_the_same_position_valuations_as_the_row_api(self):
+        markets = [self.open_market(self.create_market()) for _ in range(5)]
+        positions = []
+        for market in markets:
+            positions.append(
+                self.position(
+                    market=market,
+                    outcome=market.outcomes.get(side=self.outcome.Side.YES),
+                    reserved_quantity=Decimal("0"),
+                )
+            )
+
+        resolution_market, void_market, bid_market, fill_market, _ = markets
+        resolution_market.status = resolution_market.Status.RESOLVED
+        resolution_market.winning_outcome = positions[0].outcome
+        resolution_market.save(update_fields=["status", "winning_outcome", "updated_at"])
+        void_market.status = void_market.Status.VOIDED
+        void_market.save(update_fields=["status", "updated_at"])
+        self.order(
+            user=self.other_participant,
+            market=bid_market,
+            outcome=positions[2].outcome,
+            filled_quantity=Decimal("0"),
+            limit_price=Decimal("0.65000"),
+            status=MarketOrder.Status.OPEN,
+        )
+        buy = self.order(
+            user=self.other_participant,
+            market=fill_market,
+            outcome=positions[3].outcome,
+            filled_quantity=Decimal("1"),
+            status=MarketOrder.Status.FILLED,
+        )
+        sell = self.order(
+            market=fill_market,
+            outcome=positions[3].outcome,
+            side=MarketOrder.Side.SELL,
+            filled_quantity=Decimal("1"),
+            status=MarketOrder.Status.FILLED,
+        )
+        MarketFill.objects.create(
+            execution_reference=uuid4(),
+            market=fill_market,
+            outcome=positions[3].outcome,
+            buy_order=buy,
+            sell_order=sell,
+            maker_order=buy,
+            taker_order=sell,
+            quantity=Decimal("1"),
+            price=Decimal("0.55000"),
+        )
+
+        self.authenticate(self.owner)
+        rows_response = self.client.get(reverse("markets:market-portfolio-position-list"))
+        self.assertEqual(rows_response.status_code, status.HTTP_200_OK, rows_response.data)
+        rows = rows_response.data["results"]
+        summary = self.summary()["positions"]
+
+        self.assertEqual(
+            {row["mark_source"] for row in rows},
+            {"resolution", "void_cost_basis", "best_bid", "last_trade", "unpriced"},
+        )
+        marked = [row for row in rows if row["valuation_complete"]]
+        unpriced = [row for row in rows if not row["valuation_complete"]]
+        self.assertEqual(summary["marked_position_count"], len(marked))
+        self.assertEqual(summary["unpriced_position_count"], len(unpriced))
+        self.assertEqual(
+            Decimal(summary["marked_market_value"]),
+            sum((Decimal(row["market_value"]) for row in marked), Decimal("0")),
+        )
+        self.assertEqual(
+            Decimal(summary["marked_unrealized_pnl"]),
+            sum((Decimal(row["unrealized_pnl"]) for row in marked), Decimal("0")),
+        )
+        self.assertEqual(summary["valuation_complete"], not unpriced)
+        self.assertIsNone(summary["total_pnl"])
+        self.assertEqual(summary["mark_sources"], dict(Counter(row["mark_source"] for row in rows)))
 
     def test_exposure_realized_pnl_unpriced_and_privacy(self):
         self.position()

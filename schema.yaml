@@ -1441,6 +1441,73 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedParticipantOpenOrderList'
           description: ''
+  /api/v1/markets/portfolio/positions/:
+    get:
+      operationId: markets_portfolio_positions_list
+      description: Return the authenticated participant's positive current positions
+        with valuation details.
+      parameters:
+      - in: query
+        name: mark_source
+        schema:
+          type: string
+          enum:
+          - best_bid
+          - last_trade
+          - resolution
+          - unpriced
+          - void_cost_basis
+      - in: query
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: market_status
+        schema:
+          type: string
+          enum:
+          - APPROVED
+          - CLOSED
+          - DRAFT
+          - OPEN
+          - PENDING_APPROVAL
+          - REJECTED
+          - RESOLVED
+          - SUSPENDED
+          - VOIDED
+      - in: query
+        name: outcome_id
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: valuation_complete
+        schema:
+          type: boolean
+      tags:
+      - Market Participation
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketPortfolioPositionList'
+          description: ''
   /api/v1/markets/portfolio/summary/:
     get:
       operationId: markets_portfolio_summary_retrieve
@@ -3682,6 +3749,127 @@ components:
       description: |-
         * `YES` - Yes
         * `NO` - No
+    MarketPortfolioPosition:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        outcome_id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_question:
+          type: string
+          readOnly: true
+        outcome_label:
+          type: string
+          readOnly: true
+        market_status:
+          type: string
+          readOnly: true
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        reserved_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        available_quantity:
+          type: string
+          readOnly: true
+        average_entry_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          readOnly: true
+        total_cost_basis:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        realized_pnl:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        mark_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+          readOnly: true
+          nullable: true
+        mark_source:
+          type: string
+          readOnly: true
+        market_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+          nullable: true
+        unrealized_pnl:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+          nullable: true
+        total_position_pnl:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+          nullable: true
+        valuation_complete:
+          type: boolean
+          readOnly: true
+        open_sell_order_count:
+          type: integer
+          readOnly: true
+        reserved_sell_order_quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - available_quantity
+      - average_entry_price
+      - created_at
+      - id
+      - mark_price
+      - mark_source
+      - market_id
+      - market_question
+      - market_status
+      - market_value
+      - open_sell_order_count
+      - outcome_id
+      - outcome_label
+      - quantity
+      - realized_pnl
+      - reserved_quantity
+      - reserved_sell_order_quantity
+      - total_cost_basis
+      - total_position_pnl
+      - unrealized_pnl
+      - updated_at
+      - valuation_complete
     MarketPortfolioSummary:
       type: object
       properties:
@@ -4629,6 +4817,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketOrderRead'
+    PaginatedMarketPortfolioPositionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketPortfolioPosition'
     PaginatedMarketPositionReadList:
       type: object
       required:
