@@ -249,9 +249,9 @@ class DashboardService:
                 "display_name": profile.display_name if profile else "",
                 "avatar_url": profile.get_avatar_url() if profile else None,
                 "is_verified": user.is_verified,
-                "onboarding_completed": bool(onboarding and onboarding.completed)
-                if onboarding
-                else False,
+                "onboarding_completed": (
+                    bool(onboarding and onboarding.completed) if onboarding else False
+                ),
             }
 
         except Exception as e:  # noqa: BLE001

@@ -1,5 +1,7 @@
 """Tests for dashboard services."""
 
+from django.contrib.auth import get_user_model
+
 from dashboard.models import DashboardAnalytics, NavigationMenu
 from dashboard.services.dashboard_analytics_service import DashboardAnalyticsService
 from dashboard.services.dashboard_cache_service import DashboardCacheService
@@ -73,11 +75,10 @@ def test_navigation_service_filters_by_permission(user, navigation_menu):
     navigation = NavigationService.get_navigation(user)
     assert len(navigation) == 1  # Only the test menu (navigation_menu fixture)
 
-    # Give user permission
-    from django.contrib.auth.models import Permission
-
-    permission = Permission.objects.get(codename="add_user")
-    user.user_permissions.add(permission)
+    # Make user a superuser (has all permissions)
+    user.is_superuser = True
+    user.save()
+    user = get_user_model().objects.get(pk=user.pk)
 
     # Now user should see both menus
     navigation = NavigationService.get_navigation(user)

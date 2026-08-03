@@ -19,9 +19,14 @@ def user(db):
 
 
 @pytest.fixture
-def authenticated_client(client, user):
-    """Create an authenticated test client."""
-    client.force_login(user=user)
+def authenticated_client(user):
+    """Create an authenticated API client with JWT credentials."""
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    client = APIClient()
+    refresh = RefreshToken.for_user(user)
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return client
 
 

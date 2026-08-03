@@ -104,7 +104,7 @@ def test_analytics_view_records_event(authenticated_client, user):
         "metadata": {"key": "value"},
     }
 
-    response = authenticated_client.post(url, data)
+    response = authenticated_client.post(url, data, format="json")
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["status"] == "recorded"

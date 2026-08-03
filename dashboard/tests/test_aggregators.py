@@ -127,7 +127,7 @@ def test_aggregator_handles_exceptions(user):
     """Test that aggregators handle exceptions gracefully."""
     aggregator = ProfileAggregator()
 
-    with patch.object(aggregator, "_success_response", side_effect=Exception("Test error")):
+    with patch.object(aggregator, "_empty_response", side_effect=Exception("Test error")):
         result = aggregator.aggregate(user)
 
     assert result["status"] == "unavailable"
