@@ -49,6 +49,7 @@ class PublicMarketQuerysetMixin:
                 "sport",
                 "category",
                 "template",
+                "event_group",
                 "sporting_event",
                 "sporting_event__sport",
                 "sporting_event__competition",
@@ -112,6 +113,12 @@ class MarketListView(
             queryset = queryset.filter(
                 category_id=category_id,
             )
+
+        if event_group_id := filters.get("event_group_id"):
+            queryset = queryset.filter(event_group_id=event_group_id)
+
+        if sporting_event_id := filters.get("sporting_event_id"):
+            queryset = queryset.filter(sporting_event_id=sporting_event_id)
 
         if scope_type := filters.get("scope_type"):
             queryset = queryset.filter(

@@ -354,6 +354,92 @@ class MarketTemplate(TimeStampedUUIDModel):
         super().save(*args, **kwargs)
 
 
+class MarketEventGroup(TimeStampedUUIDModel):
+    class EventType(models.TextChoices):
+        SPORTING_EVENT = "SPORTING_EVENT", "Sporting event"
+        LEAGUE_EVENT = "LEAGUE_EVENT", "League event"
+        GENERAL_EVENT = "GENERAL_EVENT", "General event"
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PUBLISHED = "PUBLISHED", "Published"
+        ARCHIVED = "ARCHIVED", "Archived"
+
+    title = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=280, unique=True)
+    description = models.TextField(blank=True)
+    event_type = models.CharField(max_length=30, choices=EventType.choices, db_index=True)
+    sporting_event = models.ForeignKey(
+        SportingEvent,
+        on_delete=models.PROTECT,
+        related_name="market_event_groups",
+        null=True,
+        blank=True,
+    )
+    category = models.ForeignKey(
+        MarketCategory,
+        on_delete=models.PROTECT,
+        related_name="event_groups",
+        null=True,
+        blank=True,
+    )
+    scheduled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="created_market_event_groups",
+        null=True,
+        blank=True,
+    )
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="published_market_event_groups",
+        null=True,
+        blank=True,
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["scheduled_at", "title", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sporting_event"],
+                condition=Q(sporting_event__isnull=False),
+                name="unique_market_group_per_sporting_event",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["status", "scheduled_at"]),
+            models.Index(fields=["event_type", "status"]),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        self.title = self.title.strip()
+        self.description = self.description.strip()
+        if not self.slug:
+            self.slug = slugify(self.title)
+        if self.sporting_event_id and self.scheduled_at is None:
+            self.scheduled_at = self.sporting_event.starts_at
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.event_type == self.EventType.SPORTING_EVENT and not self.sporting_event_id:
+            raise ValidationError(
+                {"sporting_event": "A sporting-event group requires a sporting event."}
+            )
+        if self.event_type != self.EventType.SPORTING_EVENT and self.sporting_event_id:
+            raise ValidationError(
+                {"sporting_event": "Only sporting-event groups may reference a sporting event."}
+            )
+
+
 class Market(TimeStampedUUIDModel):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
@@ -382,6 +468,13 @@ class Market(TimeStampedUUIDModel):
     template = models.ForeignKey(
         MarketTemplate,
         on_delete=models.PROTECT,
+        related_name="markets",
+        null=True,
+        blank=True,
+    )
+    event_group = models.ForeignKey(
+        MarketEventGroup,
+        on_delete=models.SET_NULL,
         related_name="markets",
         null=True,
         blank=True,
@@ -418,6 +511,9 @@ class Market(TimeStampedUUIDModel):
     )
     question = models.CharField(
         max_length=500,
+    )
+    duplicate_fingerprint = models.CharField(  # noqa: DJ001 -- legacy rows stay unmodified
+        max_length=64, null=True, blank=True, db_index=True, editable=False
     )
     description = models.TextField(
         blank=True,
@@ -591,6 +687,28 @@ class Market(TimeStampedUUIDModel):
         self.resolution_notes = self.resolution_notes.strip()
         self.resolution_evidence = self.resolution_evidence.strip()
 
+        # New and updated canonical markets get an indexed duplicate key. Historical
+        # rows remain safely nullable and are covered by the service's bounded fallback.
+        from markets.services.proposal_service import build_market_duplicate_fingerprint
+
+        self.duplicate_fingerprint = build_market_duplicate_fingerprint(self)
+
+        # A restricted save that changes duplicate identity must persist the
+        # recalculated key as part of the same database write.
+        update_fields = kwargs.get("update_fields")
+        duplicate_context_fields = {
+            "question",
+            "category",
+            "category_id",
+            "sporting_event",
+            "sporting_event_id",
+            "event_group",
+            "event_group_id",
+            "scope_type",
+        }
+        if update_fields and duplicate_context_fields.intersection(update_fields):
+            kwargs["update_fields"] = set(update_fields) | {"duplicate_fingerprint"}
+
         super().save(*args, **kwargs)
 
     def clean(self):
@@ -608,6 +726,16 @@ class Market(TimeStampedUUIDModel):
 
         if self.sporting_event_id and self.sporting_event.sport_id != self.sport_id:
             errors["sporting_event"] = "Sporting event sport must match " "the market sport."
+
+        if self.event_group_id:
+            group_event_id = self.event_group.sporting_event_id
+            if group_event_id and group_event_id != self.sporting_event_id:
+                errors["event_group"] = "Market and event group sporting events must match."
+            if (
+                self.sporting_event_id
+                and self.event_group.event_type != MarketEventGroup.EventType.SPORTING_EVENT
+            ):
+                errors["event_group"] = "A sporting market requires a sporting-event group."
 
         if self.competition_id and self.competition.sport_id != self.sport_id:
             errors["competition"] = "Competition sport must match " "the market sport."
@@ -725,6 +853,205 @@ class Market(TimeStampedUUIDModel):
         }
 
 
+class MarketProposal(TimeStampedUUIDModel):
+    class Status(models.TextChoices):
+        SUBMITTED = "SUBMITTED", "Submitted"
+        UNDER_REVIEW = "UNDER_REVIEW", "Under review"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+        DUPLICATE = "DUPLICATE", "Duplicate"
+        WITHDRAWN = "WITHDRAWN", "Withdrawn"
+
+    class DuplicateStatus(models.TextChoices):
+        CLEAR = "CLEAR", "Clear"
+        POSSIBLE_DUPLICATE = "POSSIBLE_DUPLICATE", "Possible duplicate"
+        CONFIRMED_DUPLICATE = "CONFIRMED_DUPLICATE", "Confirmed duplicate"
+
+    proposer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="market_proposals"
+    )
+    question = models.CharField(max_length=500)
+    description = models.TextField(blank=True)
+    category = models.ForeignKey(MarketCategory, on_delete=models.PROTECT, related_name="proposals")
+    scope_type = models.CharField(
+        max_length=20, choices=MarketScope.choices, default=MarketScope.EVENT
+    )
+    sporting_event = models.ForeignKey(
+        SportingEvent,
+        on_delete=models.PROTECT,
+        related_name="market_proposals",
+        null=True,
+        blank=True,
+    )
+    proposed_event_group = models.ForeignKey(
+        MarketEventGroup,
+        on_delete=models.PROTECT,
+        related_name="proposals",
+        null=True,
+        blank=True,
+    )
+    proposed_event_title = models.CharField(max_length=255, blank=True)
+    proposed_closes_at = models.DateTimeField(null=True, blank=True)
+    proposed_resolution_source = models.CharField(max_length=255, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.SUBMITTED, db_index=True
+    )
+    duplicate_status = models.CharField(
+        max_length=30,
+        choices=DuplicateStatus.choices,
+        default=DuplicateStatus.CLEAR,
+        db_index=True,
+    )
+    duplicate_fingerprint = models.CharField(max_length=64, db_index=True, editable=False)
+    duplicate_of_market = models.ForeignKey(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="duplicate_proposals",
+        null=True,
+        blank=True,
+    )
+    duplicate_of_proposal = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="duplicates",
+        null=True,
+        blank=True,
+    )
+    approved_market = models.OneToOneField(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="source_proposal",
+        null=True,
+        blank=True,
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_market_proposals",
+        null=True,
+        blank=True,
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    withdrawn_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-submitted_at", "-id"]
+        indexes = [models.Index(fields=["status", "-submitted_at"])]
+
+    def __str__(self):
+        return self.question
+
+    def save(self, *args, **kwargs):
+        from markets.services.proposal_service import build_duplicate_fingerprint
+
+        self.question = self.question.strip()
+        self.description = self.description.strip()
+        self.proposed_event_title = self.proposed_event_title.strip()
+        self.proposed_resolution_source = self.proposed_resolution_source.strip()
+        self.duplicate_fingerprint = build_duplicate_fingerprint(
+            question=self.question,
+            category_id=self.category_id,
+            sporting_event_id=self.sporting_event_id,
+            event_group_id=self.proposed_event_group_id,
+        )
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        from markets.services.proposal_service import normalize_market_question
+
+        errors = {}
+        if not normalize_market_question(self.question):
+            errors["question"] = ValidationError(
+                "Question must contain meaningful characters.",
+                code="market_proposal_question_empty",
+            )
+        if self.scope_type != MarketScope.EVENT:
+            errors["scope_type"] = ValidationError(
+                "Only sporting-event proposals are currently supported.",
+                code="market_proposal_scope_unsupported",
+            )
+        if not self.sporting_event_id and not self.proposed_event_group_id:
+            errors["sporting_event"] = ValidationError(
+                "A sporting event is required.",
+                code="market_proposal_sporting_event_required",
+            )
+        if self.proposed_event_group_id:
+            group_event_id = self.proposed_event_group.sporting_event_id
+            if not group_event_id:
+                errors["proposed_event_group"] = ValidationError(
+                    "The selected group is not a sporting-event group.",
+                    code="market_proposal_event_group_invalid",
+                )
+            elif self.sporting_event_id and group_event_id != self.sporting_event_id:
+                errors["proposed_event_group"] = ValidationError(
+                    "The group and sporting event must match.",
+                    code="market_proposal_context_mismatch",
+                )
+        if self.proposed_closes_at is None:
+            errors["proposed_closes_at"] = ValidationError(
+                "A proposed close time is required.",
+                code="market_proposal_closes_at_required",
+            )
+        if errors:
+            raise ValidationError(errors)
+
+
+class ImmutableMarketProposalReviewQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Market proposal reviews are immutable.")
+
+    def delete(self):
+        raise ValidationError("Market proposal reviews are immutable.")
+
+
+class MarketProposalReview(TimeStampedUUIDModel):
+    class Action(models.TextChoices):
+        START_REVIEW = "START_REVIEW", "Start review"
+        APPROVE = "APPROVE", "Approve"
+        REJECT = "REJECT", "Reject"
+        MARK_DUPLICATE = "MARK_DUPLICATE", "Mark duplicate"
+
+    proposal = models.ForeignKey(MarketProposal, on_delete=models.PROTECT, related_name="reviews")
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="market_proposal_reviews"
+    )
+    action = models.CharField(max_length=30, choices=Action.choices)
+    previous_status = models.CharField(max_length=20, choices=MarketProposal.Status.choices)
+    new_status = models.CharField(max_length=20, choices=MarketProposal.Status.choices)
+    reason = models.TextField(blank=True)
+    duplicate_market = models.ForeignKey(
+        Market, on_delete=models.PROTECT, null=True, blank=True, related_name="proposal_reviews"
+    )
+    duplicate_proposal = models.ForeignKey(
+        MarketProposal,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="duplicate_review_references",
+    )
+    approved_market = models.ForeignKey(
+        Market, on_delete=models.PROTECT, null=True, blank=True, related_name="approval_reviews"
+    )
+    objects = ImmutableMarketProposalReviewQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["proposal", "-created_at", "-id"])]
+
+    def __str__(self):
+        return f"{self.action}: {self.proposal_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Market proposal reviews are immutable.")
+        self.reason = self.reason.strip()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Market proposal reviews are immutable.")
+
+
 class MarketOutcome(TimeStampedUUIDModel):
     class Side(models.TextChoices):
         YES = "YES", "Yes"
@@ -791,7 +1118,6 @@ class MarketOutcome(TimeStampedUUIDModel):
 
         super().save(*args, **kwargs)
 
-    def clean(self):
         errors = {}
 
         expected_position = {

@@ -9,6 +9,17 @@ from markets.compliance_views import (
     AdminParticipantComplianceReviewListView,
     MarketParticipantEligibilityView,
 )
+from markets.event_views import (
+    AdminMarketEventArchiveView,
+    AdminMarketEventAttachView,
+    AdminMarketEventDetachView,
+    AdminMarketEventDetailView,
+    AdminMarketEventListCreateView,
+    AdminMarketEventPublishView,
+    MarketEventDetailView,
+    MarketEventListView,
+    MarketEventMarketListView,
+)
 from markets.lifecycle_views import (
     MarketApproveView,
     MarketCloseView,
@@ -35,6 +46,15 @@ from markets.portfolio_views import (
     MarketPortfolioPositionListView,
     MarketPortfolioSummaryView,
 )
+from markets.proposal_views import (
+    AdminMarketProposalDetailView,
+    AdminMarketProposalListView,
+    AdminMarketProposalReviewListView,
+    AdminMarketProposalReviewView,
+    MarketProposalDetailView,
+    MarketProposalListCreateView,
+    MarketProposalWithdrawView,
+)
 from markets.resolution_views import (
     MarketResolveView,
     MarketVoidView,
@@ -58,6 +78,82 @@ from markets.void_refund_views import MarketVoidRefundView
 app_name = "markets"
 
 urlpatterns = [
+    path("market-events/", MarketEventListView.as_view(), name="market-event-list"),
+    path(
+        "market-events/<uuid:event_id>/",
+        MarketEventDetailView.as_view(),
+        name="market-event-detail",
+    ),
+    path(
+        "market-events/<uuid:event_id>/markets/",
+        MarketEventMarketListView.as_view(),
+        name="market-event-market-list",
+    ),
+    path(
+        "market-admin/events/",
+        AdminMarketEventListCreateView.as_view(),
+        name="admin-market-event-list-create",
+    ),
+    path(
+        "market-admin/events/<uuid:event_id>/",
+        AdminMarketEventDetailView.as_view(),
+        name="admin-market-event-detail",
+    ),
+    path(
+        "market-admin/events/<uuid:event_id>/publish/",
+        AdminMarketEventPublishView.as_view(),
+        name="admin-market-event-publish",
+    ),
+    path(
+        "market-admin/events/<uuid:event_id>/archive/",
+        AdminMarketEventArchiveView.as_view(),
+        name="admin-market-event-archive",
+    ),
+    path(
+        "market-admin/events/<uuid:event_id>/markets/",
+        AdminMarketEventAttachView.as_view(),
+        name="admin-market-event-attach-market",
+    ),
+    path(
+        "market-admin/events/<uuid:event_id>/markets/<uuid:market_id>/",
+        AdminMarketEventDetachView.as_view(),
+        name="admin-market-event-detach-market",
+    ),
+    path(
+        "markets/proposals/",
+        MarketProposalListCreateView.as_view(),
+        name="market-proposal-list-create",
+    ),
+    path(
+        "markets/proposals/<uuid:proposal_id>/",
+        MarketProposalDetailView.as_view(),
+        name="market-proposal-detail",
+    ),
+    path(
+        "markets/proposals/<uuid:proposal_id>/withdraw/",
+        MarketProposalWithdrawView.as_view(),
+        name="market-proposal-withdraw",
+    ),
+    path(
+        "market-admin/proposals/",
+        AdminMarketProposalListView.as_view(),
+        name="admin-market-proposal-list",
+    ),
+    path(
+        "market-admin/proposals/<uuid:proposal_id>/",
+        AdminMarketProposalDetailView.as_view(),
+        name="admin-market-proposal-detail",
+    ),
+    path(
+        "market-admin/proposals/<uuid:proposal_id>/review/",
+        AdminMarketProposalReviewView.as_view(),
+        name="admin-market-proposal-review",
+    ),
+    path(
+        "market-admin/proposals/<uuid:proposal_id>/reviews/",
+        AdminMarketProposalReviewListView.as_view(),
+        name="admin-market-proposal-review-list",
+    ),
     path(
         "markets/responsible-participation/",
         ResponsibleParticipationView.as_view(),
