@@ -5,6 +5,7 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils.text import slugify
@@ -119,6 +120,114 @@ class MarketComplianceReview(TimeStampedUUIDModel):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Compliance review records are immutable.")
+
+
+class MarketResponsibleParticipation(TimeStampedUUIDModel):
+    MONEY_FIELDS = (
+        "max_order_notional",
+        "daily_buy_notional_limit",
+        "weekly_buy_notional_limit",
+        "max_open_buy_commitment",
+        "max_market_exposure",
+        "max_total_exposure",
+        "max_cumulative_realized_loss",
+    )
+
+    participant = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="market_responsible_participation",
+    )
+    max_order_notional = models.DecimalField(
+        max_digits=20, decimal_places=4, null=True, blank=True, validators=[MinValueValidator(0)]
+    )
+    daily_buy_notional_limit = models.DecimalField(
+        max_digits=20, decimal_places=4, null=True, blank=True, validators=[MinValueValidator(0)]
+    )
+    weekly_buy_notional_limit = models.DecimalField(
+        max_digits=20, decimal_places=4, null=True, blank=True, validators=[MinValueValidator(0)]
+    )
+    max_open_buy_commitment = models.DecimalField(
+        max_digits=20, decimal_places=4, null=True, blank=True, validators=[MinValueValidator(0)]
+    )
+    max_market_exposure = models.DecimalField(
+        max_digits=20, decimal_places=4, null=True, blank=True, validators=[MinValueValidator(0)]
+    )
+    max_total_exposure = models.DecimalField(
+        max_digits=20, decimal_places=4, null=True, blank=True, validators=[MinValueValidator(0)]
+    )
+    max_cumulative_realized_loss = models.DecimalField(
+        max_digits=20, decimal_places=4, null=True, blank=True, validators=[MinValueValidator(0)]
+    )
+    cooling_off_until = models.DateTimeField(null=True, blank=True)
+    self_exclusion_until = models.DateTimeField(null=True, blank=True)
+    self_excluded_indefinitely = models.BooleanField(default=False)
+    administrative_block_until = models.DateTimeField(null=True, blank=True)
+    administrative_block_reason = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="market_responsible_reviews_performed",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Responsible participation for {self.participant_id}"
+
+
+class ImmutableResponsibleParticipationEventQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Responsible-participation events are immutable.")
+
+    def delete(self):
+        raise ValidationError("Responsible-participation events are immutable.")
+
+
+class MarketResponsibleParticipationEvent(TimeStampedUUIDModel):
+    class EventType(models.TextChoices):
+        LIMITS_SET = "LIMITS_SET", "Limits set"
+        LIMITS_TIGHTENED = "LIMITS_TIGHTENED", "Limits tightened"
+        ADMIN_LIMITS_UPDATED = "ADMIN_LIMITS_UPDATED", "Admin limits updated"
+        ADMIN_CONTROLS_UPDATED = "ADMIN_CONTROLS_UPDATED", "Admin controls updated"
+        COOLING_OFF_STARTED = "COOLING_OFF_STARTED", "Cooling off started"
+        COOLING_OFF_EXTENDED = "COOLING_OFF_EXTENDED", "Cooling off extended"
+        SELF_EXCLUSION_STARTED = "SELF_EXCLUSION_STARTED", "Self exclusion started"
+        SELF_EXCLUSION_EXTENDED = "SELF_EXCLUSION_EXTENDED", "Self exclusion extended"
+        ADMIN_BLOCK_STARTED = "ADMIN_BLOCK_STARTED", "Admin block started"
+        ADMIN_BLOCK_EXTENDED = "ADMIN_BLOCK_EXTENDED", "Admin block extended"
+
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_responsible_participation_events",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_responsible_participation_actions",
+    )
+    event_type = models.CharField(max_length=40, choices=EventType.choices)
+    previous_state = models.JSONField(default=dict)
+    new_state = models.JSONField(default=dict)
+    reason = models.TextField(blank=True)
+    objects = ImmutableResponsibleParticipationEventQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["participant", "-created_at", "-id"])]
+
+    def __str__(self):
+        return f"{self.event_type} for {self.participant_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Responsible-participation events are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Responsible-participation events are immutable.")
 
 
 class MarketCategory(TimeStampedUUIDModel):

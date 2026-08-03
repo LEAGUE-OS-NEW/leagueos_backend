@@ -344,7 +344,12 @@ class MarketParticipationAPITests(APITestCase):
         operation = schema["paths"]["/api/v1/markets/{market_id}/orders/"]["post"]
         self.assertEqual(set(operation["responses"]), {"201", "403"})
         forbidden = operation["responses"]["403"]["content"]["application/json"]["schema"]
-        self.assertTrue(forbidden["$ref"].endswith("/IneligibleOrderResponse"))
+        component_name = forbidden["$ref"].rsplit("/", 1)[-1]
+        alternatives = schema["components"]["schemas"][component_name]["oneOf"]
+        self.assertEqual(
+            {item["$ref"].rsplit("/", 1)[-1] for item in alternatives},
+            {"IneligibleOrderResponse", "ResponsibleOrderBlockedResponse"},
+        )
 
     def test_api_is_the_only_production_place_order_entry_point_and_audits_it(self):
         project_root = Path(__file__).resolve().parents[2]

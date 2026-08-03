@@ -39,6 +39,14 @@ from markets.resolution_views import (
     MarketResolveView,
     MarketVoidView,
 )
+from markets.responsible_participation_views import (
+    AdminResponsibleEventListView,
+    AdminResponsibleParticipationView,
+    CoolingOffView,
+    ParticipantResponsibleEventListView,
+    ResponsibleParticipationView,
+    SelfExclusionView,
+)
 from markets.settlement_views import MarketSettlementView
 from markets.views import (
     MarketCategoryListView,
@@ -50,6 +58,36 @@ from markets.void_refund_views import MarketVoidRefundView
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "markets/responsible-participation/",
+        ResponsibleParticipationView.as_view(),
+        name="market-responsible-participation",
+    ),
+    path(
+        "markets/responsible-participation/cooling-off/",
+        CoolingOffView.as_view(),
+        name="market-responsible-participation-cooling-off",
+    ),
+    path(
+        "markets/responsible-participation/self-exclusion/",
+        SelfExclusionView.as_view(),
+        name="market-responsible-participation-self-exclusion",
+    ),
+    path(
+        "markets/responsible-participation/events/",
+        ParticipantResponsibleEventListView.as_view(),
+        name="market-responsible-participation-events",
+    ),
+    path(
+        "market-admin/participants/<uuid:user_id>/responsible-participation/",
+        AdminResponsibleParticipationView.as_view(),
+        name="admin-participant-responsible-participation",
+    ),
+    path(
+        "market-admin/participants/<uuid:user_id>/responsible-participation/events/",
+        AdminResponsibleEventListView.as_view(),
+        name="admin-participant-responsible-participation-events",
+    ),
     path(
         "markets/eligibility/",
         MarketParticipantEligibilityView.as_view(),

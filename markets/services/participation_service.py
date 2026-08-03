@@ -1,5 +1,4 @@
 from decimal import (
-    ROUND_CEILING,
     Decimal,
 )
 from typing import TypedDict
@@ -14,18 +13,21 @@ from rest_framework.exceptions import PermissionDenied
 from authentication.services.permission_service import (
     PermissionService,
 )
-from markets.exceptions import MarketParticipationIneligible
+from markets.exceptions import MarketParticipationIneligible, MarketResponsibleParticipationBlocked
 from markets.models import (
     Market,
     MarketOrder,
     MarketOutcome,
     MarketParticipantCompliance,
     MarketPosition,
+    MarketResponsibleParticipation,
 )
 from markets.services.eligibility_service import MarketEligibilityService
 from markets.services.matching_service import (
     MarketMatchingService,
 )
+from markets.services.order_financials import calculate_buy_commitment
+from markets.services.responsible_participation_service import MarketResponsibleParticipationService
 from profiles.models import Profile
 from wallets.models import LedgerEntry
 from wallets.services.wallet_service import (
@@ -72,6 +74,12 @@ class MarketParticipationService:
         if not eligibility.eligible:
             raise MarketParticipationIneligible(eligibility)
 
+        responsible_controls = (
+            MarketResponsibleParticipation.objects.select_for_update()
+            .filter(participant=user)
+            .first()
+        )
+
         market = cls._get_locked_market(market_id)
 
         cls._require_open_market(market)
@@ -81,6 +89,18 @@ class MarketParticipationService:
             market=market,
             outcome_id=outcome_id,
         )
+
+        responsible = MarketResponsibleParticipationService.evaluate_order(
+            participant=user,
+            market=market,
+            outcome=outcome,
+            side=side,
+            quantity=quantity,
+            limit_price=limit_price,
+            controls=responsible_controls,
+        )
+        if not responsible.allowed:
+            raise MarketResponsibleParticipationBlocked(responsible)
 
         position = None
         if side == MarketOrder.Side.SELL:
@@ -219,11 +239,9 @@ class MarketParticipationService:
         cls,
         order: MarketOrder,
     ) -> Decimal:
-        maximum_cost = order.quantity * order.limit_price
-
-        return maximum_cost.quantize(
-            cls.WALLET_AMOUNT_QUANTUM,
-            rounding=ROUND_CEILING,
+        return calculate_buy_commitment(
+            quantity=order.quantity,
+            limit_price=order.limit_price,
         )
 
     @staticmethod
@@ -267,11 +285,9 @@ class MarketParticipationService:
         order: MarketOrder,
     ) -> Decimal:
         remaining_quantity = order.quantity - order.filled_quantity
-        remaining_exposure = remaining_quantity * order.limit_price
-
-        return remaining_exposure.quantize(
-            cls.WALLET_AMOUNT_QUANTUM,
-            rounding=ROUND_CEILING,
+        return calculate_buy_commitment(
+            quantity=remaining_quantity,
+            limit_price=order.limit_price,
         )
 
     @classmethod

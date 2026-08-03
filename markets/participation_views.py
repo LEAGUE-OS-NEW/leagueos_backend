@@ -3,7 +3,7 @@ from django.core.exceptions import (
 )
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import (
     ValidationError as APIValidationError,
@@ -20,7 +20,7 @@ from rest_framework.views import APIView
 
 from accounts.models import AuditLog
 from markets.compliance_serializers import IneligibleOrderResponseSerializer
-from markets.exceptions import MarketParticipationIneligible
+from markets.exceptions import MarketParticipationIneligible, MarketResponsibleParticipationBlocked
 from markets.models import (
     Market,
     MarketFill,
@@ -32,6 +32,9 @@ from markets.participation_serializers import (
     MarketOrderCreateSerializer,
     MarketOrderReadSerializer,
     MarketPositionReadSerializer,
+)
+from markets.responsible_participation_serializers import (
+    ResponsibleOrderBlockedResponseSerializer,
 )
 from markets.services.participation_service import (
     MarketParticipationService,
@@ -48,7 +51,14 @@ class MarketOrderCreateView(APIView):
         request=MarketOrderCreateSerializer,
         responses={
             201: MarketOrderReadSerializer,
-            403: IneligibleOrderResponseSerializer,
+            403: PolymorphicProxySerializer(
+                component_name="MarketOrderForbiddenResponse",
+                serializers=[
+                    IneligibleOrderResponseSerializer,
+                    ResponsibleOrderBlockedResponseSerializer,
+                ],
+                resource_type_field_name=None,
+            ),
         },
         tags=["Market Participation"],
     )
@@ -98,6 +108,31 @@ class MarketOrderCreateView(APIView):
                     "eligible": False,
                     "reason_codes": error.result.reason_codes,
                     "next_actions": error.result.next_actions,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except MarketResponsibleParticipationBlocked as error:
+            AuditLog.objects.create(
+                user=request.user,
+                action="MARKET_ORDER_BLOCKED",
+                metadata={
+                    "participant_id": str(request.user.id),
+                    "market_id": str(market_id),
+                    "outcome_id": str(serializer.validated_data["outcome_id"]),
+                    "side": serializer.validated_data["side"],
+                    "reason_codes": list(error.result.reason_codes),
+                    "evaluated_at": error.result.evaluated_at.isoformat(),
+                    "block_source": "RESPONSIBLE_PARTICIPATION",
+                },
+            )
+            return Response(
+                {
+                    "detail": "Market participation is temporarily unavailable.",
+                    "code": "market_responsible_participation_blocked",
+                    "allowed": False,
+                    "reason_codes": error.result.reason_codes,
+                    "next_actions": error.result.next_actions,
+                    "utilization": error.result.utilization(),
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
