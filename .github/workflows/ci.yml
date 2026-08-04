@@ -89,6 +89,7 @@ jobs:
           pytest
           --cov=accounts
           --cov=authentication
+          --cov=discovery
           --cov=markets
           --cov=sports
           --cov=system

@@ -173,20 +173,23 @@ class ClubListView(ListAPIView):
 class ClubDetailView(RetrieveAPIView):
     """Public club profile detail."""
 
+    serializer_class = ClubDetailResponseSerializer
     permission_classes = [AllowAny]
     lookup_url_kwarg = "club_id"
 
-    def get(self, request, *args, **kwargs):
-        club_id = self.kwargs["club_id"]
-        data = club_service.get_public_club(club_id, request=request)
-        if data is None:
-            return Response(
-                {"detail": "Club not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        club_service.record_view(club_id, user=request.user, request=request)
-        return Response(data)
+    def get_object(self):
+        club_id = self.kwargs[self.lookup_url_kwarg]
+        club = club_service.get_public_club(club_id, request=self.request)
+        if club is None:
+            from django.http import Http404
+            raise Http404("Club not found.")
+        return club
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        club_service.record_view(instance["id"], user=request.user, request=request)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 # =============================================================================
 # Players
@@ -325,16 +328,19 @@ class FixtureDetailView(RetrieveAPIView):
     permission_classes = [AllowAny]
     lookup_url_kwarg = "fixture_id"
 
-    def get(self, request, *args, **kwargs):
-        fixture_id = self.kwargs["fixture_id"]
-        data = fixture_service.get_public_fixture(fixture_id, request=request)
-        if data is None:
-            return Response(
-                {"detail": "Fixture not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        fixture_service.record_view(fixture_id, user=request.user, request=request)
-        return Response(data)
+    def get_object(self):
+        fixture_id = self.kwargs[self.lookup_url_kwarg]
+        fixture = fixture_service.get_public_fixture(fixture_id, request=self.request)
+        if fixture is None:
+            from django.http import Http404
+            raise Http404("Fixture not found.")
+        return fixture
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        fixture_service.record_view(instance["id"], user=request.user, request=request)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 @extend_schema_view(
