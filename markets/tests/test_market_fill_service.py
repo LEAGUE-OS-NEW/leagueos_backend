@@ -5,7 +5,10 @@ from uuid import uuid4
 
 from django.apps import apps
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 from django.utils import timezone
 
 from authentication.tests.factories import (
@@ -1432,3 +1435,256 @@ class MarketFillServiceTests(TestCase):
                 )
 
         self.assert_fill_wallet_rollback()
+
+    def price_history_url(self):
+        return reverse(
+            "markets:market-outcome-price-history",
+            kwargs={
+                "market_id": self.market.id,
+                "outcome_id": self.outcome.id,
+            },
+        )
+
+    def test_price_history_uses_canonical_immutable_fills(self):
+        url = self.price_history_url()
+
+        empty_response = self.client.get(
+            url,
+            {"interval": "RAW"},
+        )
+        self.assertEqual(empty_response.status_code, 200)
+        self.assertEqual(empty_response.json()["points"], [])
+
+        first_fill = self.execute_fill(
+            execution_reference=uuid4(),
+            quantity=Decimal("2.0000"),
+            price=Decimal("0.55000"),
+        )
+        second_fill = self.execute_fill(
+            execution_reference=uuid4(),
+            quantity=Decimal("3.0000"),
+            price=Decimal("0.57000"),
+        )
+        third_fill = self.execute_fill(
+            execution_reference=uuid4(),
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.60000"),
+        )
+
+        raw_response = self.client.get(
+            url,
+            {
+                "interval": "RAW",
+                "limit": 10,
+            },
+        )
+
+        self.assertEqual(raw_response.status_code, 200)
+
+        raw_data = raw_response.json()
+        points = raw_data["points"]
+
+        self.assertEqual(raw_data["interval"], "RAW")
+        self.assertEqual(
+            [point["fill_id"] for point in points],
+            [
+                str(first_fill.id),
+                str(second_fill.id),
+                str(third_fill.id),
+            ],
+        )
+        self.assertEqual(
+            [point["price"] for point in points],
+            [
+                "0.5500",
+                "0.5700",
+                "0.6000",
+            ],
+        )
+        self.assertEqual(
+            [point["quantity"] for point in points],
+            [
+                "2.0000",
+                "3.0000",
+                "4.0000",
+            ],
+        )
+
+        for point in points:
+            self.assertEqual(
+                set(point),
+                {
+                    "fill_id",
+                    "executed_at",
+                    "price",
+                    "quantity",
+                },
+            )
+
+        serialized = str(raw_data).lower()
+
+        for private_field in (
+            "buy_order",
+            "sell_order",
+            "maker_order",
+            "taker_order",
+            "participant",
+            "buyer",
+            "seller",
+            "email",
+        ):
+            self.assertNotIn(private_field, serialized)
+
+        self.assertEqual(self.fill_model.objects.count(), 3)
+
+    def test_real_fills_produce_correct_hour_and_day_ohlcv(self):
+        url = self.price_history_url()
+
+        self.execute_fill(
+            execution_reference=uuid4(),
+            quantity=Decimal("2.0000"),
+            price=Decimal("0.55000"),
+        )
+        self.execute_fill(
+            execution_reference=uuid4(),
+            quantity=Decimal("3.0000"),
+            price=Decimal("0.57000"),
+        )
+        self.execute_fill(
+            execution_reference=uuid4(),
+            quantity=Decimal("4.0000"),
+            price=Decimal("0.60000"),
+        )
+
+        for interval in ("HOUR", "DAY"):
+            with self.subTest(interval=interval):
+                response = self.client.get(
+                    url,
+                    {
+                        "interval": interval,
+                        "limit": 10,
+                    },
+                )
+
+                self.assertEqual(response.status_code, 200)
+
+                data = response.json()
+                self.assertEqual(data["interval"], interval)
+                self.assertEqual(len(data["points"]), 1)
+
+                bucket = data["points"][0]
+
+                self.assertEqual(bucket["open"], "0.5500")
+                self.assertEqual(bucket["high"], "0.6000")
+                self.assertEqual(bucket["low"], "0.5500")
+                self.assertEqual(bucket["close"], "0.6000")
+                self.assertEqual(bucket["volume"], "9.0000")
+                self.assertEqual(bucket["trade_count"], 3)
+
+        self.assertEqual(self.fill_model.objects.count(), 3)
+
+    def test_price_history_endpoint_is_read_only(self):
+        fill = self.execute_fill(
+            quantity=Decimal("2.0000"),
+            price=Decimal("0.55000"),
+        )
+        url = self.price_history_url()
+
+        before = list(
+            self.fill_model.objects.order_by("id").values_list(
+                "id",
+                "execution_reference",
+                "market_id",
+                "outcome_id",
+                "buy_order_id",
+                "sell_order_id",
+                "maker_order_id",
+                "taker_order_id",
+                "quantity",
+                "price",
+                "created_at",
+            )
+        )
+
+        get_response = self.client.get(
+            url,
+            {"interval": "RAW"},
+        )
+        self.assertEqual(get_response.status_code, 200)
+
+        for method in (
+            self.client.post,
+            self.client.put,
+            self.client.patch,
+            self.client.delete,
+        ):
+            response = method(
+                url,
+                data={},
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 405)
+
+        after = list(
+            self.fill_model.objects.order_by("id").values_list(
+                "id",
+                "execution_reference",
+                "market_id",
+                "outcome_id",
+                "buy_order_id",
+                "sell_order_id",
+                "maker_order_id",
+                "taker_order_id",
+                "quantity",
+                "price",
+                "created_at",
+            )
+        )
+
+        self.assertEqual(after, before)
+        self.assertEqual(self.fill_model.objects.get().id, fill.id)
+
+    def test_price_history_query_counts_do_not_grow_with_real_fills(self):
+        url = self.price_history_url()
+
+        for _index in range(5):
+            self.execute_fill(
+                execution_reference=uuid4(),
+                quantity=Decimal("1.0000"),
+                price=Decimal("0.55000"),
+            )
+
+        def query_counts():
+            counts = {}
+
+            for interval in ("RAW", "HOUR", "DAY"):
+                with CaptureQueriesContext(connection) as captured:
+                    response = self.client.get(
+                        url,
+                        {
+                            "interval": interval,
+                            "limit": 100,
+                        },
+                    )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.json()["points"])
+                counts[interval] = len(captured)
+
+            return counts
+
+        baseline = query_counts()
+
+        for _index in range(4):
+            self.execute_fill(
+                execution_reference=uuid4(),
+                quantity=Decimal("1.0000"),
+                price=Decimal("0.55000"),
+            )
+
+        expanded = query_counts()
+
+        self.assertEqual(expanded, baseline)
+        self.assertLessEqual(baseline["RAW"], 4, baseline)
+        self.assertLessEqual(baseline["HOUR"], 4, baseline)
+        self.assertLessEqual(baseline["DAY"], 4, baseline)
