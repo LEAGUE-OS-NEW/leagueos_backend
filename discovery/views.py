@@ -328,6 +328,7 @@ class FixtureDetailView(RetrieveAPIView):
     """Public fixture detail."""
 
     permission_classes = [AllowAny]
+    serializer_class = FixtureSerializer
     lookup_url_kwarg = "fixture_id"
 
     def get_object(self):
