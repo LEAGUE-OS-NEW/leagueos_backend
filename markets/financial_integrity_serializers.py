@@ -4,6 +4,7 @@ from markets.models import (
     MarketFeeSchedule,
     MarketFinancialAdjustment,
     MarketFinancialAdjustmentLine,
+    MarketOrder,
     MarketReconciliationMismatch,
     MarketReconciliationRun,
 )
@@ -44,11 +45,25 @@ class FeeScheduleSerializer(serializers.ModelSerializer):
 
 class FeePreviewSerializer(serializers.Serializer):
     outcome_id = serializers.UUIDField()
-    side = serializers.ChoiceField(choices=("BUY", "SELL"))
+    side = serializers.ChoiceField(choices=MarketOrder.Side.choices)
     quantity = serializers.DecimalField(max_digits=18, decimal_places=4)
     limit_price = serializers.DecimalField(max_digits=6, decimal_places=5)
-    time_in_force = serializers.ChoiceField(choices=("GTC", "GTD", "IOC", "FOK"), default="GTC")
+    time_in_force = serializers.ChoiceField(
+        choices=MarketOrder.TimeInForce.choices,
+        default=MarketOrder.TimeInForce.GTC,
+    )
     expires_at = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class FeePreviewResponseSerializer(serializers.Serializer):
+    estimated_order_notional = serializers.DecimalField(max_digits=20, decimal_places=4)
+    estimated_maximum_buyer_reservation = serializers.DecimalField(max_digits=20, decimal_places=4)
+    estimated_maker_fee = serializers.DecimalField(max_digits=20, decimal_places=4)
+    estimated_taker_fee = serializers.DecimalField(max_digits=20, decimal_places=4)
+    schedule_id = serializers.UUIDField(allow_null=True)
+    schedule_version = serializers.IntegerField()
+    currency = serializers.CharField()
+    role_statement = serializers.CharField()
 
 
 class ReconciliationStartSerializer(serializers.Serializer):

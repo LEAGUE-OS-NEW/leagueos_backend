@@ -1018,6 +1018,44 @@ class FinancialIntegrityAPIAndCommandTests(FinancialIntegrityServiceTests):
     def authenticate(self, user):
         self.api.force_authenticate(user=user)
 
+    def test_openapi_documents_financial_integrity_contracts(self):
+        schema = self.api.get(reverse("api-schema"), {"format": "json"}).json()
+        paths = schema["paths"]
+        required_paths = {
+            "/api/v1/markets/{market_id}/orders/fee-preview/",
+            "/api/v1/market-admin/fee-schedules/",
+            "/api/v1/market-admin/fee-schedules/{schedule_id}/",
+            "/api/v1/market-admin/fee-schedules/{schedule_id}/activate/",
+            "/api/v1/market-admin/fee-schedules/{schedule_id}/retire/",
+            "/api/v1/market-admin/reconciliation/start/",
+            "/api/v1/market-admin/reconciliation/runs/",
+            "/api/v1/market-admin/reconciliation/runs/{run_id}/",
+            "/api/v1/market-admin/reconciliation/runs/{run_id}/export/",
+            "/api/v1/market-admin/reconciliation/mismatches/",
+            "/api/v1/market-admin/reconciliation/mismatches/{mismatch_id}/",
+            "/api/v1/market-admin/financial-adjustments/",
+            "/api/v1/market-admin/financial-adjustments/propose/",
+            "/api/v1/market-admin/financial-adjustments/{adjustment_id}/",
+            "/api/v1/market-admin/financial-adjustments/{adjustment_id}/approve/",
+            "/api/v1/market-admin/financial-adjustments/{adjustment_id}/reject/",
+        }
+        self.assertTrue(required_paths <= set(paths))
+
+        fee_list = paths["/api/v1/market-admin/fee-schedules/"]["get"]
+        fee_detail = paths["/api/v1/market-admin/fee-schedules/{schedule_id}/"]["get"]
+        self.assertNotEqual(fee_list["operationId"], fee_detail["operationId"])
+
+        fee_preview = paths["/api/v1/markets/{market_id}/orders/fee-preview/"]["post"]
+        self.assertIn("schema", fee_preview["requestBody"]["content"]["application/json"])
+        self.assertIn("schema", fee_preview["responses"]["200"]["content"]["application/json"])
+
+        export = paths["/api/v1/market-admin/reconciliation/runs/{run_id}/export/"]["get"]
+        self.assertIn("text/csv", export["responses"]["200"]["content"])
+
+        adjustment_base = "/api/v1/market-admin/financial-adjustments/"
+        for suffix in ("propose/", "{adjustment_id}/approve/", "{adjustment_id}/reject/"):
+            self.assertIn("post", paths[f"{adjustment_base}{suffix}"])
+
     def test_reconciliation_scope_filters_export_and_privacy(self):
         self.authenticate(self.operations_user)
         response = self.api.post(

@@ -2,8 +2,10 @@ import csv
 
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +14,7 @@ from markets.financial_integrity_serializers import (
     AdjustmentDecisionSerializer,
     AdjustmentProposalSerializer,
     AdjustmentSerializer,
+    FeePreviewResponseSerializer,
     FeePreviewSerializer,
     FeeScheduleSerializer,
     ReconciliationMismatchSerializer,
@@ -33,10 +36,19 @@ from markets.services.reconciliation_service import MarketReconciliationService
 from system.pagination import PublicCatalogPagination
 from wallets.models import Wallet
 
+FINANCIAL_INTEGRITY_TAG = ["Market Financial Integrity"]
 
-class FeePreviewView(APIView):
+
+class FeePreviewView(GenericAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = FeePreviewSerializer
 
+    @extend_schema(
+        operation_id="market_fee_preview",
+        request=FeePreviewSerializer,
+        responses={200: FeePreviewResponseSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
     def post(self, request, market_id):
         market = get_object_or_404(Market, id=market_id)
         serializer = FeePreviewSerializer(data=request.data)
@@ -49,13 +61,25 @@ class FeePreviewView(APIView):
         return Response(data)
 
 
-class FeeScheduleListCreateView(APIView):
+class FeeScheduleListCreateView(GenericAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
+    serializer_class = FeeScheduleSerializer
 
+    @extend_schema(
+        operation_id="market_admin_fee_schedules_list",
+        responses={200: FeeScheduleSerializer(many=True)},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
     def get(self, request):
         queryset = MarketFeeSchedule.objects.select_related("market").all()
         return Response(FeeScheduleSerializer(queryset, many=True).data)
 
+    @extend_schema(
+        operation_id="market_admin_fee_schedules_create",
+        request=FeeScheduleSerializer,
+        responses={201: FeeScheduleSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
     def post(self, request):
         serializer = FeeScheduleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -71,9 +95,18 @@ class FeeScheduleDetailView(RetrieveAPIView):
     queryset = MarketFeeSchedule.objects.all()
     lookup_url_kwarg = "schedule_id"
 
+    @extend_schema(
+        operation_id="market_admin_fee_schedules_retrieve",
+        responses={200: FeeScheduleSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
-class FeeScheduleDecisionView(APIView):
+
+class FeeScheduleDecisionView(GenericAPIView):
     permission_classes = [IsAuthenticated, HasApproveMarketPermission]
+    serializer_class = FeeScheduleSerializer
     action = None
 
     def post(self, request, schedule_id):
@@ -86,11 +119,30 @@ class FeeScheduleDecisionView(APIView):
 class FeeScheduleActivateView(FeeScheduleDecisionView):
     action = "activate"
 
+    @extend_schema(
+        operation_id="market_admin_fee_schedules_activate",
+        request=None,
+        responses={200: FeeScheduleSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
+    def post(self, request, schedule_id):
+        return super().post(request, schedule_id)
+
 
 class FeeScheduleRetireView(FeeScheduleDecisionView):
     action = "retire"
 
+    @extend_schema(
+        operation_id="market_admin_fee_schedules_retire",
+        request=None,
+        responses={200: FeeScheduleSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
+    def post(self, request, schedule_id):
+        return super().post(request, schedule_id)
 
+
+@extend_schema(tags=FINANCIAL_INTEGRITY_TAG)
 class ReconciliationRunListView(ListAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
     serializer_class = ReconciliationRunSerializer
@@ -98,6 +150,7 @@ class ReconciliationRunListView(ListAPIView):
     queryset = MarketReconciliationRun.objects.all()
 
 
+@extend_schema(tags=FINANCIAL_INTEGRITY_TAG)
 class ReconciliationRunDetailView(RetrieveAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
     serializer_class = ReconciliationRunSerializer
@@ -105,9 +158,16 @@ class ReconciliationRunDetailView(RetrieveAPIView):
     lookup_url_kwarg = "run_id"
 
 
-class ReconciliationStartView(APIView):
+class ReconciliationStartView(GenericAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
+    serializer_class = ReconciliationStartSerializer
 
+    @extend_schema(
+        operation_id="market_admin_reconciliation_start",
+        request=ReconciliationStartSerializer,
+        responses={201: ReconciliationRunSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
     def post(self, request):
         serializer = ReconciliationStartSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -123,6 +183,7 @@ class ReconciliationStartView(APIView):
         return Response(ReconciliationRunSerializer(run).data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(tags=FINANCIAL_INTEGRITY_TAG)
 class ReconciliationMismatchListView(ListAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
     serializer_class = ReconciliationMismatchSerializer
@@ -137,6 +198,7 @@ class ReconciliationMismatchListView(ListAPIView):
         return queryset.order_by("-detected_at", "-id")
 
 
+@extend_schema(tags=FINANCIAL_INTEGRITY_TAG)
 class ReconciliationMismatchDetailView(RetrieveAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
     serializer_class = ReconciliationMismatchSerializer
@@ -147,6 +209,11 @@ class ReconciliationMismatchDetailView(RetrieveAPIView):
 class ReconciliationExportView(APIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
 
+    @extend_schema(
+        operation_id="market_admin_reconciliation_export",
+        responses={(200, "text/csv"): OpenApiTypes.BINARY},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
     def get(self, request, run_id):
         run = get_object_or_404(MarketReconciliationRun, id=run_id)
         response = HttpResponse(content_type="text/csv")
@@ -182,6 +249,7 @@ class ReconciliationExportView(APIView):
         return response
 
 
+@extend_schema(tags=FINANCIAL_INTEGRITY_TAG)
 class AdjustmentListView(ListAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
     serializer_class = AdjustmentSerializer
@@ -189,6 +257,7 @@ class AdjustmentListView(ListAPIView):
     queryset = MarketFinancialAdjustment.objects.prefetch_related("lines").all()
 
 
+@extend_schema(tags=FINANCIAL_INTEGRITY_TAG)
 class AdjustmentDetailView(RetrieveAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
     serializer_class = AdjustmentSerializer
@@ -196,9 +265,16 @@ class AdjustmentDetailView(RetrieveAPIView):
     lookup_url_kwarg = "adjustment_id"
 
 
-class AdjustmentProposeView(APIView):
+class AdjustmentProposeView(GenericAPIView):
     permission_classes = [IsAuthenticated, HasManageMarketPermission]
+    serializer_class = AdjustmentProposalSerializer
 
+    @extend_schema(
+        operation_id="market_admin_financial_adjustments_propose",
+        request=AdjustmentProposalSerializer,
+        responses={201: AdjustmentSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
     def post(self, request):
         serializer = AdjustmentProposalSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -215,8 +291,9 @@ class AdjustmentProposeView(APIView):
         return Response(AdjustmentSerializer(adjustment).data, status=status.HTTP_201_CREATED)
 
 
-class AdjustmentDecisionView(APIView):
+class AdjustmentDecisionView(GenericAPIView):
     permission_classes = [IsAuthenticated, HasApproveMarketPermission]
+    serializer_class = AdjustmentDecisionSerializer
     decision = None
 
     def post(self, request, adjustment_id):
@@ -234,6 +311,24 @@ class AdjustmentDecisionView(APIView):
 class AdjustmentApproveView(AdjustmentDecisionView):
     decision = MarketFinancialAdjustmentApproval.Decision.APPROVED
 
+    @extend_schema(
+        operation_id="market_admin_financial_adjustments_approve",
+        request=AdjustmentDecisionSerializer,
+        responses={200: AdjustmentSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
+    def post(self, request, adjustment_id):
+        return super().post(request, adjustment_id)
+
 
 class AdjustmentRejectView(AdjustmentDecisionView):
     decision = MarketFinancialAdjustmentApproval.Decision.REJECTED
+
+    @extend_schema(
+        operation_id="market_admin_financial_adjustments_reject",
+        request=AdjustmentDecisionSerializer,
+        responses={200: AdjustmentSerializer},
+        tags=FINANCIAL_INTEGRITY_TAG,
+    )
+    def post(self, request, adjustment_id):
+        return super().post(request, adjustment_id)
