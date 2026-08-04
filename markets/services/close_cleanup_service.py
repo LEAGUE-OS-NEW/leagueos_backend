@@ -3,6 +3,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.core.exceptions import ValidationError
 
 from markets.models import MarketCloseCleanup, MarketCloseOrderCancellation, MarketOrder
+from markets.services.market_notification_service import MarketNotificationService
 from markets.services.participation_service import MarketParticipationService
 
 
@@ -48,7 +49,7 @@ class MarketCloseCleanupService:
             executed_by=actor,
         )
         for order, result in cancellation_results:
-            MarketCloseOrderCancellation.objects.create(
+            cancellation = MarketCloseOrderCancellation.objects.create(
                 market_close_cleanup=cleanup,
                 market_order=order,
                 order_side=order.side,
@@ -58,6 +59,22 @@ class MarketCloseCleanupService:
                     result["released_position_quantity"]
                 ),
                 wallet_release_ledger_entry=result["wallet_entry"],
+            )
+            MarketNotificationService.schedule(
+                recipient=order.user,
+                category="MARKET_ORDERS",
+                event_type="MARKET_CLOSE_ORDER_CANCELLED",
+                title="Order cancelled at market close",
+                message=(
+                    f"The remaining quantity {cancellation.remaining_quantity_cancelled} "
+                    "was cancelled at market close."
+                ),
+                key=f"market-close-cancellation:{cancellation.id}",
+                market_id=market.id,
+                data={
+                    "cancellation_id": str(cancellation.id),
+                    "remaining_quantity": str(cancellation.remaining_quantity_cancelled),
+                },
             )
         return cleanup
 

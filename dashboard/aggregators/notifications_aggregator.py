@@ -30,7 +30,7 @@ class NotificationsAggregator(BaseAggregator):
         try:
             # Get unread notification count
             unread_count = (
-                user.notifications.filter(read=False).count()
+                user.notifications.filter(read_at__isnull=True, archived_at__isnull=True).count()
                 if hasattr(user, "notifications")
                 else 0
             )
@@ -38,7 +38,9 @@ class NotificationsAggregator(BaseAggregator):
             # Get recent notifications (last 5)
             recent_notifications = []
             if hasattr(user, "notifications"):
-                recent_qs = user.notifications.select_related("category").filter(read=False)[:5]
+                recent_qs = user.notifications.select_related("category").filter(
+                    read_at__isnull=True, archived_at__isnull=True
+                )[:5]
                 recent_notifications = [
                     {
                         "id": str(notif.id),
@@ -46,7 +48,7 @@ class NotificationsAggregator(BaseAggregator):
                         "title": notif.title or "",
                         "message": notif.message or "",
                         "created_at": notif.created_at.isoformat(),
-                        "read": notif.read,
+                        "read": notif.read_at is not None,
                     }
                     for notif in recent_qs
                 ]

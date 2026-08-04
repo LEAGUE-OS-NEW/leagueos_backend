@@ -78,6 +78,17 @@ class MarketFinancialAdjustmentService:
                 amount=line["amount"],
                 idempotency_reference=uuid5(adjustment.id, f"line:{index}"),
             )
+        from notifications.services.operational_alert_service import OperationalAlertService
+
+        OperationalAlertService.create(
+            permissions=("approve_market",),
+            event_type="FINANCIAL_ADJUSTMENT_PENDING",
+            title="Financial adjustment awaiting approval",
+            message="A financial adjustment requires independent approval.",
+            source_key=f"market-adjustment:{adjustment.id}:pending",
+            data={"adjustment_id": str(adjustment.id)},
+            severity="CRITICAL",
+        )
         return adjustment
 
     @classmethod
@@ -121,6 +132,28 @@ class MarketFinancialAdjustmentService:
             decision=decision,
             notes=str(notes or "").strip(),
         )
+        if decision == MarketFinancialAdjustmentApproval.Decision.APPROVED:
+            from markets.services.market_notification_service import MarketNotificationService
+
+            for line in lines:
+                MarketNotificationService.schedule(
+                    recipient=line.wallet.user,
+                    category="MARKET_SETTLEMENTS",
+                    event_type="FINANCIAL_ADJUSTMENT_APPROVED",
+                    title="Financial adjustment completed",
+                    message=(
+                        f"An approved {line.direction.lower()} adjustment "
+                        f"of {line.amount} was applied."
+                    ),
+                    key=f"market-adjustment:{adjustment.id}:participant:{line.wallet.user_id}",
+                    market_id=adjustment.market_id,
+                    data={
+                        "adjustment_id": str(adjustment.id),
+                        "direction": line.direction,
+                        "amount": str(line.amount),
+                    },
+                    mandatory=True,
+                )
         return adjustment
 
     @staticmethod

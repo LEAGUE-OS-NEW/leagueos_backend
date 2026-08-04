@@ -8,6 +8,7 @@ database-driven.
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -280,3 +281,166 @@ class NotificationPreferenceAudit(models.Model):
 
     def __str__(self) -> str:
         return f"{self.action} - {self.timestamp.isoformat()}"
+
+
+class ImmutableDeliveryAttemptQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Delivery attempts are immutable.")
+
+    def delete(self):
+        raise ValidationError("Delivery attempts are immutable.")
+
+
+class Notification(models.Model):
+    class Severity(models.TextChoices):
+        INFO = "INFO", "Information"
+        WARNING = "WARNING", "Warning"
+        CRITICAL = "CRITICAL", "Critical"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications"
+    )
+    category = models.ForeignKey(
+        NotificationCategory, on_delete=models.PROTECT, related_name="notifications"
+    )
+    event_type = models.CharField(max_length=100, db_index=True)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    severity = models.CharField(
+        max_length=12, choices=Severity.choices, default=Severity.INFO, db_index=True
+    )
+    data = models.JSONField(default=dict, blank=True)
+    deep_link_path = models.CharField(max_length=500, blank=True)
+    market_id = models.UUIDField(null=True, blank=True, db_index=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="authored_notifications",
+    )
+    deduplication_key = models.CharField(max_length=255)
+    mandatory = models.BooleanField(default=False)
+    occurred_at = models.DateTimeField(default=timezone.now, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-occurred_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recipient", "deduplication_key"], name="notification_recipient_dedupe_uniq"
+            )
+        ]
+        indexes = [models.Index(fields=["recipient", "-occurred_at", "-id"])]
+
+    def __str__(self):
+        return f"{self.event_type} for {self.recipient_id}"
+
+
+class ProtectedDeliveryQuerySet(models.QuerySet):
+    TERMINAL = {"DELIVERED", "FAILED", "CANCELLED"}
+
+    def update(self, **kwargs):
+        if kwargs.get("status") in self.TERMINAL or self.filter(status__in=self.TERMINAL).exists():
+            raise ValidationError("Terminal delivery transitions require the delivery service.")
+        return super().update(**kwargs)
+
+    def delete(self):
+        if self.filter(status__in=self.TERMINAL).exists():
+            raise ValidationError("Terminal notification deliveries are immutable.")
+        return super().delete()
+
+
+class NotificationDelivery(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        DEFERRED = "DEFERRED", "Deferred"
+        PROCESSING = "PROCESSING", "Processing"
+        DELIVERED = "DELIVERED", "Delivered"
+        FAILED = "FAILED", "Failed"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    notification = models.ForeignKey(
+        Notification, on_delete=models.CASCADE, related_name="deliveries"
+    )
+    channel = models.ForeignKey(
+        NotificationChannel, on_delete=models.PROTECT, related_name="deliveries"
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    attempt_count = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(default=timezone.now, db_index=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    provider_message_id = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    last_error_code = models.CharField(max_length=100, blank=True)
+    last_error_message = models.CharField(max_length=500, blank=True)
+    idempotency_key = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    objects = ProtectedDeliveryQuerySet.as_manager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["notification", "channel"], name="notification_channel_delivery_uniq"
+            )
+        ]
+        ordering = ["next_attempt_at", "created_at", "id"]
+
+    def __str__(self):
+        return f"{self.channel_id} delivery for {self.notification_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).values("status").first()
+            terminal = {self.Status.DELIVERED, self.Status.FAILED, self.Status.CANCELLED}
+            if previous and previous["status"] in terminal:
+                raise ValidationError("Terminal notification deliveries are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        terminal = {self.Status.DELIVERED, self.Status.FAILED, self.Status.CANCELLED}
+        if self.status in terminal:
+            raise ValidationError("Terminal notification deliveries are immutable.")
+        return super().delete(*args, **kwargs)
+
+
+class NotificationDeliveryAttempt(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    delivery = models.ForeignKey(
+        NotificationDelivery, on_delete=models.PROTECT, related_name="attempts"
+    )
+    attempt_number = models.PositiveIntegerField()
+    started_at = models.DateTimeField()
+    completed_at = models.DateTimeField()
+    outcome = models.CharField(max_length=16)
+    provider_reference = models.CharField(max_length=255, blank=True)
+    error_code = models.CharField(max_length=100, blank=True)
+    error_message = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = ImmutableDeliveryAttemptQuerySet.as_manager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["delivery", "attempt_number"], name="delivery_attempt_number_uniq"
+            )
+        ]
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"Attempt {self.attempt_number} for {self.delivery_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Delivery attempts are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Delivery attempts are immutable.")

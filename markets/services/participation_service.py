@@ -24,6 +24,7 @@ from markets.models import (
 )
 from markets.services.eligibility_service import MarketEligibilityService
 from markets.services.fee_service import MarketFeeService
+from markets.services.market_notification_service import MarketNotificationService
 from markets.services.matching_service import (
     MarketMatchingService,
 )
@@ -148,6 +149,7 @@ class MarketParticipationService:
             )
 
         order.save(force_insert=True)
+        MarketNotificationService.order_accepted(order)
 
         if order.side == MarketOrder.Side.BUY:
             reservation_amount = cls._calculate_buy_reservation(order)
@@ -192,6 +194,7 @@ class MarketParticipationService:
         cls._require_cancellable_order(order)
 
         cls.cancel_locked_order(order=order)
+        MarketNotificationService.order_cancelled(order)
         return order
 
     @classmethod

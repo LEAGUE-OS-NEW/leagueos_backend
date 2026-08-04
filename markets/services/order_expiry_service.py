@@ -10,6 +10,7 @@ from markets.models import (
     MarketOrderExpiryAudit,
     MarketPosition,
 )
+from markets.services.market_notification_service import MarketNotificationService
 from markets.services.order_financials import (
     calculate_buy_commitment,
 )
@@ -167,6 +168,7 @@ class MarketOrderExpiryService:
             expired_at=current_time,
         )
         audit.save(force_insert=True)
+        MarketNotificationService.expired(audit)
 
         return audit
 
