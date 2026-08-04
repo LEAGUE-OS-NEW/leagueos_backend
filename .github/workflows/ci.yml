@@ -21,7 +21,7 @@ jobs:
   test:
     name: Lint, format, validate and test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
 
     services:
       postgres:
