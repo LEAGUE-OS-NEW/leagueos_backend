@@ -182,6 +182,7 @@ class ClubDetailView(RetrieveAPIView):
         club = club_service.get_public_club(club_id, request=self.request)
         if club is None:
             from django.http import Http404
+
             raise Http404("Club not found.")
         return club
 
@@ -190,6 +191,7 @@ class ClubDetailView(RetrieveAPIView):
         club_service.record_view(instance["id"], user=request.user, request=request)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
 
 # =============================================================================
 # Players
@@ -333,6 +335,7 @@ class FixtureDetailView(RetrieveAPIView):
         fixture = fixture_service.get_public_fixture(fixture_id, request=self.request)
         if fixture is None:
             from django.http import Http404
+
             raise Http404("Fixture not found.")
         return fixture
 
