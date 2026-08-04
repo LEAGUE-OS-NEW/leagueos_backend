@@ -1,0 +1,492 @@
+"""Views for the discovery module."""
+
+from __future__ import annotations
+
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework import status
+from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from discovery.serializers import (
+    AutocompleteQuerySerializer,
+    AutocompleteResultSerializer,
+    ClubDetailResponseSerializer,
+    ClubListQuerySerializer,
+    CompetitionSerializer,
+    DiscoveryClubSerializer,
+    FixtureListQuerySerializer,
+    FixtureSerializer,
+    FollowSerializer,
+    MatchCentreSerializer,
+    NewsListQuerySerializer,
+    NewsSerializer,
+    PlayerDetailResponseSerializer,
+    PlayerListQuerySerializer,
+    PlayerSerializer,
+    SearchQuerySerializer,
+    SearchResponseSerializer,
+    SuggestionSerializer,
+)
+from discovery.services.club_service import club_service
+from discovery.services.fixture_service import fixture_service
+from discovery.services.following_service import following_service
+from discovery.services.match_centre_service import match_centre_service
+from discovery.services.news_service import news_service
+from discovery.services.player_service import player_service
+from discovery.services.search_service import search_service
+from system.pagination import PublicCatalogPagination
+
+SystemPagination = PublicCatalogPagination
+
+
+# =============================================================================
+# Search
+# =============================================================================
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[SearchQuerySerializer],
+        responses=SearchResponseSerializer,
+        tags=["Discovery"],
+    )
+)
+class SearchView(APIView):
+    """Enterprise search across clubs, players, competitions, fixtures."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        query = SearchQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        params = query.validated_data
+
+        filters = {}
+        for key in ("sport", "competition", "country", "club", "season"):
+            if params.get(key):
+                filters[key] = str(params[key])
+
+        result = search_service.search(
+            query=params.get("q", ""),
+            filters=filters,
+            ordering=params.get("ordering", "relevance"),
+            page=params.get("page", 1),
+            page_size=params.get("page_size", 20),
+            user=request.user,
+            request=request,
+        )
+
+        return Response(result)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[AutocompleteQuerySerializer],
+        responses=AutocompleteResultSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class SearchAutocompleteView(APIView):
+    """Search autocomplete for clubs, players, competitions, venues."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        query = AutocompleteQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        params = query.validated_data
+
+        results = search_service.autocomplete(
+            query=params.get("q", ""),
+            entity_type=params.get("entity_type", "all"),
+            limit=params.get("limit", 10),
+        )
+
+        return Response(results)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=SuggestionSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class SearchSuggestionsView(APIView):
+    """Database-driven search suggestions."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        limit = request.query_params.get("limit", 10)
+        try:
+            limit = max(1, min(int(limit), 20))
+        except (TypeError, ValueError):
+            limit = 10
+
+        results = search_service.suggestions(
+            user=request.user,
+            limit=limit,
+        )
+        return Response(results)
+
+
+# =============================================================================
+# Clubs
+# =============================================================================
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[ClubListQuerySerializer],
+        responses=DiscoveryClubSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class ClubListView(ListAPIView):
+    """Public club list."""
+
+    permission_classes = [AllowAny]
+    serializer_class = DiscoveryClubSerializer
+    pagination_class = SystemPagination
+
+    def get_queryset(self):
+        query = ClubListQuerySerializer(data=self.request.query_params)
+        query.is_valid(raise_exception=True)
+        params = query.validated_data
+
+        return club_service.get_public_clubs(
+            sport=params.get("sport"),
+            country=params.get("country"),
+            search=params.get("search"),
+            ordering=params.get("ordering", "name"),
+        )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=ClubDetailResponseSerializer,
+        tags=["Discovery"],
+    )
+)
+class ClubDetailView(RetrieveAPIView):
+    """Public club profile detail."""
+
+    permission_classes = [AllowAny]
+    lookup_url_kwarg = "club_id"
+
+    def get(self, request, *args, **kwargs):
+        club_id = self.kwargs["club_id"]
+        data = club_service.get_public_club(club_id, request=request)
+        if data is None:
+            return Response(
+                {"detail": "Club not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        club_service.record_view(club_id, user=request.user, request=request)
+        return Response(data)
+
+
+# =============================================================================
+# Players
+# =============================================================================
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[PlayerListQuerySerializer],
+        responses=PlayerSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class PlayerListView(ListAPIView):
+    """Public player list."""
+
+    permission_classes = [AllowAny]
+    serializer_class = PlayerSerializer
+    pagination_class = SystemPagination
+
+    def get_queryset(self):
+        query = PlayerListQuerySerializer(data=self.request.query_params)
+        query.is_valid(raise_exception=True)
+        params = query.validated_data
+
+        return player_service.get_public_players(
+            sport=params.get("sport"),
+            club=params.get("club"),
+            search=params.get("search"),
+            ordering=params.get("ordering", "name"),
+        )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=PlayerDetailResponseSerializer,
+        tags=["Discovery"],
+    )
+)
+class PlayerDetailView(RetrieveAPIView):
+    """Public player profile detail."""
+
+    permission_classes = [AllowAny]
+    lookup_url_kwarg = "player_id"
+
+    def get(self, request, *args, **kwargs):
+        player_id = self.kwargs["player_id"]
+        data = player_service.get_public_player(player_id, request=request)
+        if data is None:
+            return Response(
+                {"detail": "Player not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        player_service.record_view(player_id, user=request.user, request=request)
+        return Response(data)
+
+
+# =============================================================================
+# Competitions
+# =============================================================================
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=CompetitionSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class CompetitionListView(ListAPIView):
+    """Public competition list."""
+
+    permission_classes = [AllowAny]
+    serializer_class = CompetitionSerializer
+    pagination_class = SystemPagination
+
+    def get_queryset(self):
+        from sports.models import Competition
+
+        qs = Competition.objects.filter(
+            is_active=True,
+            is_verified=True,
+            sport__is_active=True,
+        ).select_related("sport")
+
+        sport = self.request.query_params.get("sport")
+        if sport:
+            qs = qs.filter(sport_id=sport)
+
+        return qs.order_by("sport__name", "name")
+
+
+# =============================================================================
+# Fixtures & Results
+# =============================================================================
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[FixtureListQuerySerializer],
+        responses=FixtureSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class FixtureListView(ListAPIView):
+    """Public fixture list."""
+
+    permission_classes = [AllowAny]
+    serializer_class = FixtureSerializer
+    pagination_class = SystemPagination
+
+    def get_queryset(self):
+        query = FixtureListQuerySerializer(data=self.request.query_params)
+        query.is_valid(raise_exception=True)
+        params = query.validated_data
+
+        return fixture_service.get_public_fixtures(
+            sport=params.get("sport"),
+            competition=params.get("competition"),
+            club=params.get("club"),
+            status=params.get("status"),
+            date_from=params.get("date_from"),
+            date_to=params.get("date_to"),
+            ordering=params.get("ordering", "starts_at"),
+        )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=FixtureSerializer,
+        tags=["Discovery"],
+    )
+)
+class FixtureDetailView(RetrieveAPIView):
+    """Public fixture detail."""
+
+    permission_classes = [AllowAny]
+    lookup_url_kwarg = "fixture_id"
+
+    def get(self, request, *args, **kwargs):
+        fixture_id = self.kwargs["fixture_id"]
+        data = fixture_service.get_public_fixture(fixture_id, request=request)
+        if data is None:
+            return Response(
+                {"detail": "Fixture not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        fixture_service.record_view(fixture_id, user=request.user, request=request)
+        return Response(data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[FixtureListQuerySerializer],
+        responses=FixtureSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class ResultListView(ListAPIView):
+    """Public results list (completed fixtures)."""
+
+    permission_classes = [AllowAny]
+    serializer_class = FixtureSerializer
+    pagination_class = SystemPagination
+
+    def get_queryset(self):
+        query = FixtureListQuerySerializer(data=self.request.query_params)
+        query.is_valid(raise_exception=True)
+        params = query.validated_data
+
+        return fixture_service.get_results(
+            sport=params.get("sport"),
+            competition=params.get("competition"),
+            club=params.get("club"),
+            date_from=params.get("date_from"),
+            date_to=params.get("date_to"),
+        )
+
+
+# =============================================================================
+# News
+# =============================================================================
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[NewsListQuerySerializer],
+        responses=NewsSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class NewsListView(ListAPIView):
+    """Public news list (published & verified only)."""
+
+    permission_classes = [AllowAny]
+    serializer_class = NewsSerializer
+    pagination_class = SystemPagination
+
+    def get_queryset(self):
+        query = NewsListQuerySerializer(data=self.request.query_params)
+        query.is_valid(raise_exception=True)
+        params = query.validated_data
+
+        return news_service.get_public_news(
+            category=params.get("category"),
+            sport=params.get("sport"),
+            competition=params.get("competition"),
+            club=params.get("club"),
+            featured=params.get("featured"),
+            search=params.get("search"),
+            ordering=params.get("ordering", "-published_at"),
+        )
+
+
+# =============================================================================
+# Match Centre
+# =============================================================================
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=MatchCentreSerializer,
+        tags=["Discovery"],
+    )
+)
+class MatchCentreView(APIView):
+    """Aggregated match centre for a canonical fixture."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, fixture_id):
+        data = match_centre_service.get_match_centre(fixture_id, request=request)
+        if data is None:
+            return Response(
+                {"detail": "Fixture not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        match_centre_service.record_view(fixture_id, user=request.user, request=request)
+        return Response(data)
+
+
+# =============================================================================
+# Following
+# =============================================================================
+
+
+@extend_schema_view(
+    post=extend_schema(
+        responses=FollowSerializer,
+        tags=["Discovery"],
+    )
+)
+class ClubFollowView(APIView):
+    """Follow a club."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = FollowSerializer
+
+    def post(self, request, club_id):
+        try:
+            preference = following_service.follow_club(
+                request.user,
+                club_id,
+                request=request,
+            )
+        except Exception:
+            return Response(
+                {"detail": "Club not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(
+            FollowSerializer(preference).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def delete(self, request, club_id):
+        removed = following_service.unfollow_club(
+            request.user,
+            club_id,
+            request=request,
+        )
+        if not removed:
+            return Response(
+                {"detail": "Club not followed."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=FollowSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class FollowingListView(ListAPIView):
+    """List clubs the authenticated user follows."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = FollowSerializer
+    pagination_class = SystemPagination
+
+    def get_queryset(self):
+        return following_service.get_followed_clubs(self.request.user)

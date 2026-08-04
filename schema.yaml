@@ -396,6 +396,7 @@ paths:
           description: ''
   /api/v1/clubs/:
     get:
+<<<<<<< HEAD
       operationId: clubs_list
       description: List all active clubs for favourite club selection.
       tags:
@@ -414,7 +415,33 @@ paths:
   /api/v1/competitions/:
     get:
       operationId: competitions_list
+=======
+      operationId: api_v1_clubs_list
+      description: Public club list.
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
+      - in: query
+        name: country
+        schema:
+          type: string
+          maxLength: 2
+          minLength: 1
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - founded
+          - -founded
+          type: string
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `founded` - founded
+          * `-founded` - -founded
       - name: page
         required: false
         in: query
@@ -432,14 +459,13 @@ paths:
         schema:
           type: string
           maxLength: 180
-          minLength: 1
       - in: query
         name: sport
         schema:
           type: string
           format: uuid
       tags:
-      - Sports
+      - Discovery
       security:
       - jwtAuth: []
       - {}
@@ -448,7 +474,223 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedCompetitionPublicList'
+                $ref: '#/components/schemas/PaginatedDiscoveryClubList'
+          description: ''
+  /api/v1/clubs/{club_id}/:
+    get:
+      operationId: api_v1_clubs_retrieve
+      description: Public club profile detail.
+      parameters:
+      - in: path
+        name: club_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubDetailResponse'
+          description: ''
+  /api/v1/clubs/{club_id}/follow/:
+    post:
+      operationId: api_v1_clubs_follow_create
+      description: Follow a club.
+      parameters:
+      - in: path
+        name: club_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Discovery
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Follow'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Follow'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Follow'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Follow'
+          description: ''
+    delete:
+      operationId: api_v1_clubs_follow_destroy
+      description: Follow a club.
+      parameters:
+      - in: path
+        name: club_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/competitions/:
+    get:
+      operationId: api_v1_competitions_list
+      description: Public competition list.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCompetitionList'
+          description: ''
+  /api/v1/fixtures/:
+    get:
+      operationId: api_v1_fixtures_list
+      description: Public fixture list.
+      parameters:
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - starts_at
+          - -starts_at
+          - name
+          - -name
+          type: string
+          default: starts_at
+          minLength: 1
+        description: |-
+          * `starts_at` - starts_at
+          * `-starts_at` - -starts_at
+          * `name` - name
+          * `-name` - -name
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - DRAFT
+          - SCHEDULED
+          - LIVE
+          - COMPLETED
+          - POSTPONED
+          - CANCELLED
+          - ABANDONED
+          type: string
+          minLength: 1
+        description: |-
+          * `DRAFT` - Draft
+          * `SCHEDULED` - Scheduled
+          * `LIVE` - Live
+          * `COMPLETED` - Completed
+          * `POSTPONED` - Postponed
+          * `CANCELLED` - Cancelled
+          * `ABANDONED` - Abandoned
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFixtureList'
+          description: ''
+  /api/v1/fixtures/{fixture_id}/:
+    get:
+      operationId: api_v1_fixtures_retrieve
+      description: Public fixture detail.
+      parameters:
+      - in: path
+        name: fixture_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fixture'
           description: ''
   /api/v1/lookups/countries/:
     get:
@@ -1131,7 +1373,11 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/resolve/:
     post:
+<<<<<<< HEAD
       operationId: market_admin_markets_resolve_create
+=======
+      operationId: api_v1_market_admin_markets_resolve_create
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: market_id
@@ -1230,7 +1476,11 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/void/:
     post:
+<<<<<<< HEAD
       operationId: market_admin_markets_void_create
+=======
+      operationId: api_v1_market_admin_markets_void_create
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: market_id
@@ -1261,6 +1511,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketAdminRead'
           description: ''
+<<<<<<< HEAD
   /api/v1/market-admin/participants/{user_id}/compliance/:
     get:
       operationId: market_admin_participants_compliance_retrieve
@@ -1656,6 +1907,11 @@ paths:
   /api/v1/market-fills/:
     get:
       operationId: market_fills_list
+=======
+  /api/v1/market-fills/:
+    get:
+      operationId: api_v1_market_fills_list
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - name: page
         required: false
@@ -1682,7 +1938,11 @@ paths:
           description: ''
   /api/v1/market-fills/{fill_id}/:
     get:
+<<<<<<< HEAD
       operationId: market_fills_retrieve
+=======
+      operationId: api_v1_market_fills_retrieve
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: fill_id
@@ -1703,7 +1963,11 @@ paths:
           description: ''
   /api/v1/market-orders/:
     get:
+<<<<<<< HEAD
       operationId: market_orders_list
+=======
+      operationId: api_v1_market_orders_list
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - name: page
         required: false
@@ -1730,7 +1994,11 @@ paths:
           description: ''
   /api/v1/market-orders/{order_id}/:
     get:
+<<<<<<< HEAD
       operationId: market_orders_retrieve
+=======
+      operationId: api_v1_market_orders_retrieve
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: order_id
@@ -1751,7 +2019,11 @@ paths:
           description: ''
   /api/v1/market-orders/{order_id}/cancel/:
     post:
+<<<<<<< HEAD
       operationId: market_orders_cancel_create
+=======
+      operationId: api_v1_market_orders_cancel_create
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: order_id
@@ -1772,7 +2044,11 @@ paths:
           description: ''
   /api/v1/market-positions/:
     get:
+<<<<<<< HEAD
       operationId: market_positions_list
+=======
+      operationId: api_v1_market_positions_list
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - name: page
         required: false
@@ -1799,7 +2075,11 @@ paths:
           description: ''
   /api/v1/market-positions/{position_id}/:
     get:
+<<<<<<< HEAD
       operationId: market_positions_retrieve
+=======
+      operationId: api_v1_market_positions_retrieve
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: position_id
@@ -1933,7 +2213,11 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/orders/:
     post:
+<<<<<<< HEAD
       operationId: markets_orders_create
+=======
+      operationId: api_v1_markets_orders_create
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: market_id
@@ -1964,6 +2248,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketOrderRead'
           description: ''
+<<<<<<< HEAD
         '403':
           content:
             application/json:
@@ -1973,6 +2258,11 @@ paths:
   /api/v1/markets/{market_id}/outcomes/{outcome_id}/order-book/:
     get:
       operationId: markets_outcomes_order_book_retrieve
+=======
+  /api/v1/markets/{market_id}/outcomes/{outcome_id}/order-book/:
+    get:
+      operationId: api_v1_markets_outcomes_order_book_retrieve
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: query
         name: levels
@@ -2014,7 +2304,11 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/settle/:
     post:
+<<<<<<< HEAD
       operationId: markets_settle_create
+=======
+      operationId: api_v1_markets_settle_create
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: market_id
@@ -2035,7 +2329,11 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/void-refund/:
     post:
+<<<<<<< HEAD
       operationId: markets_void_refund_create
+=======
+      operationId: api_v1_markets_void_refund_create
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: market_id
@@ -2082,6 +2380,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedMarketCategoryPublicList'
           description: ''
+<<<<<<< HEAD
   /api/v1/markets/eligibility/:
     get:
       operationId: markets_eligibility_retrieve
@@ -2099,6 +2398,11 @@ paths:
   /api/v1/markets/orders/open/:
     get:
       operationId: markets_orders_open_list
+=======
+  /api/v1/markets/orders/open/:
+    get:
+      operationId: api_v1_markets_orders_open_list
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       description: Return the authenticated participant's active OPEN and PARTIALLY_FILLED
         orders.
       parameters:
@@ -2149,6 +2453,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedParticipantOpenOrderList'
           description: ''
+<<<<<<< HEAD
   /api/v1/markets/portfolio/activity/:
     get:
       operationId: markets_portfolio_activity_list
@@ -2358,19 +2663,36 @@ paths:
       parameters:
       - in: path
         name: proposal_id
+=======
+  /api/v1/match-centre/{fixture_id}/:
+    get:
+      operationId: api_v1_match_centre_retrieve
+      description: Aggregated match centre for a canonical fixture.
+      parameters:
+      - in: path
+        name: fixture_id
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
         schema:
           type: string
           format: uuid
         required: true
       tags:
+<<<<<<< HEAD
       - markets
       security:
       - jwtAuth: []
+=======
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       responses:
         '200':
           content:
             application/json:
               schema:
+<<<<<<< HEAD
                 $ref: '#/components/schemas/MarketProposalParticipant'
           description: ''
     patch:
@@ -2553,6 +2875,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResponsibleStatus'
+=======
+                $ref: '#/components/schemas/MatchCentre'
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
           description: ''
   /api/v1/modules/:
     get:
@@ -2591,6 +2916,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NavigationMenu'
+          description: ''
+  /api/v1/news/:
+    get:
+      operationId: api_v1_news_list
+      description: Public news list (published & verified only).
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: featured
+        schema:
+          type: boolean
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -published_at
+          - published_at
+          - -created_at
+          type: string
+          default: -published_at
+          minLength: 1
+        description: |-
+          * `-published_at` - -published_at
+          * `published_at` - published_at
+          * `-created_at` - -created_at
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+          maxLength: 180
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNewsList'
           description: ''
   /api/v1/notification-categories/:
     get:
@@ -3050,6 +3447,87 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedParticipantPublicList'
           description: ''
+  /api/v1/players/:
+    get:
+      operationId: api_v1_players_list
+      description: Public player list.
+      parameters:
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - created_at
+          - -created_at
+          type: string
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `created_at` - created_at
+          * `-created_at` - -created_at
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+          maxLength: 180
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPlayerList'
+          description: ''
+  /api/v1/players/{player_id}/:
+    get:
+      operationId: api_v1_players_retrieve
+      description: Public player profile detail.
+      parameters:
+      - in: path
+        name: player_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerDetailResponse'
+          description: ''
   /api/v1/preferences/clubs/:
     get:
       operationId: preferences_clubs_list
@@ -3217,6 +3695,267 @@ paths:
       responses:
         '200':
           description: Avatar deleted successfully
+  /api/v1/profile/following/:
+    get:
+      operationId: api_v1_profile_following_list
+      description: List clubs the authenticated user follows.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFollowList'
+          description: ''
+  /api/v1/results/:
+    get:
+      operationId: api_v1_results_list
+      description: Public results list (completed fixtures).
+      parameters:
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - starts_at
+          - -starts_at
+          - name
+          - -name
+          type: string
+          default: starts_at
+          minLength: 1
+        description: |-
+          * `starts_at` - starts_at
+          * `-starts_at` - -starts_at
+          * `name` - name
+          * `-name` - -name
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - DRAFT
+          - SCHEDULED
+          - LIVE
+          - COMPLETED
+          - POSTPONED
+          - CANCELLED
+          - ABANDONED
+          type: string
+          minLength: 1
+        description: |-
+          * `DRAFT` - Draft
+          * `SCHEDULED` - Scheduled
+          * `LIVE` - Live
+          * `COMPLETED` - Completed
+          * `POSTPONED` - Postponed
+          * `CANCELLED` - Cancelled
+          * `ABANDONED` - Abandoned
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFixtureList'
+          description: ''
+  /api/v1/search/:
+    get:
+      operationId: api_v1_search_retrieve
+      description: Enterprise search across clubs, players, competitions, fixtures.
+      parameters:
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: country
+        schema:
+          type: string
+          maxLength: 2
+          minLength: 1
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - relevance
+          - name
+          - -created_at
+          type: string
+          default: relevance
+          minLength: 1
+        description: |-
+          * `relevance` - relevance
+          * `name` - name
+          * `-created_at` - -created_at
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 200
+      - in: query
+        name: season
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+          description: ''
+  /api/v1/search/autocomplete/:
+    get:
+      operationId: api_v1_search_autocomplete_list
+      description: Search autocomplete for clubs, players, competitions, venues.
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          enum:
+          - club
+          - player
+          - competition
+          - venue
+          - all
+          type: string
+          default: all
+          minLength: 1
+        description: |-
+          * `club` - club
+          * `player` - player
+          * `competition` - competition
+          * `venue` - venue
+          * `all` - all
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 20
+          minimum: 1
+          default: 10
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 200
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AutocompleteResult'
+          description: ''
+  /api/v1/search/suggestions/:
+    get:
+      operationId: api_v1_search_suggestions_list
+      description: Database-driven search suggestions.
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Suggestion'
+          description: ''
   /api/v1/sporting-events/:
     get:
       operationId: sporting_events_list
@@ -3352,7 +4091,11 @@ paths:
           description: ''
   /api/v1/wallets/:
     get:
+<<<<<<< HEAD
       operationId: wallets_list
+=======
+      operationId: api_v1_wallets_list
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - name: page
         required: false
@@ -3381,7 +4124,11 @@ paths:
           description: Authentication credentials are required.
   /api/v1/wallets/{currency}/:
     get:
+<<<<<<< HEAD
       operationId: wallets_retrieve
+=======
+      operationId: api_v1_wallets_retrieve
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: path
         name: currency
@@ -3407,7 +4154,11 @@ paths:
           description: Wallet not found.
   /api/v1/wallets/{currency}/ledger/:
     get:
+<<<<<<< HEAD
       operationId: wallets_ledger_list
+=======
+      operationId: api_v1_wallets_ledger_list
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       parameters:
       - in: query
         name: created_from
@@ -3493,6 +4244,7 @@ paths:
           description: ''
 components:
   schemas:
+<<<<<<< HEAD
     AdminComplianceDetail:
       type: object
       properties:
@@ -3626,6 +4378,25 @@ components:
       - sell_allowed
       - sell_reason_codes
       - utilization
+=======
+    AutocompleteResult:
+      type: object
+      description: A single autocomplete result.
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        entity_type:
+          type: string
+        logo:
+          type: string
+      required:
+      - display_name
+      - entity_type
+      - uuid
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     Avatar:
       type: object
       description: Serializer for returning avatar metadata and URL.
@@ -3746,6 +4517,62 @@ components:
       - id
       - name
       - slug
+    ClubDetailResponse:
+      type: object
+      description: Full club profile response.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          nullable: true
+        founded:
+          type: integer
+          nullable: true
+        profile:
+          allOf:
+          - $ref: '#/components/schemas/ClubProfile'
+          nullable: true
+      required:
+      - id
+      - name
+      - slug
+    ClubProfile:
+      type: object
+      description: Extended club profile data.
+      properties:
+        logo:
+          type: string
+          nullable: true
+        country:
+          type: string
+          format: uuid
+          nullable: true
+        stadium:
+          type: string
+        coach:
+          type: string
+        league:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+        social_links: {}
+        current_season:
+          type: string
+          format: uuid
+          nullable: true
     ClubSelection:
       type: object
       description: |-
@@ -3813,6 +4640,34 @@ components:
       - source
       - user_agent
       - withdrawn_at
+    Competition:
+      type: object
+      description: Public competition serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 180
+        slug:
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
+        country_code:
+          type: string
+          default: UG
+          maxLength: 2
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+      required:
+      - id
+      - name
+      - slug
+      - sport
     CompetitionCatalogue:
       type: object
       description: Serializer for the competition preference catalogue.
@@ -4213,6 +5068,7 @@ components:
       - module_name
       - permission_required
       - title
+<<<<<<< HEAD
     Duration:
       type: object
       properties:
@@ -4257,6 +5113,43 @@ components:
       - next_actions
       - reason_codes
       - requirements
+=======
+    DiscoveryClub:
+      type: object
+      description: Public club serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+        competition:
+          type: string
+          format: uuid
+          readOnly: true
+        founded:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+      required:
+      - competition
+      - id
+      - name
+      - slug
+      - sport
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     EntryTypeEnum:
       enum:
       - CREDIT
@@ -4285,6 +5178,94 @@ components:
       required:
       - participant
       - position
+<<<<<<< HEAD
+=======
+    Fixture:
+      type: object
+      description: Public fixture serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        event_type:
+          type: string
+        status:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+          nullable: true
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+        venue:
+          type: string
+        country_code:
+          type: string
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          nullable: true
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/FixtureParticipant'
+      required:
+      - event_type
+      - id
+      - name
+      - status
+    FixtureParticipant:
+      type: object
+      description: A participant in a fixture.
+      properties:
+        role:
+          type: string
+        position:
+          type: integer
+        participant:
+          type: object
+          additionalProperties: {}
+      required:
+      - participant
+      - position
+      - role
+    Follow:
+      type: object
+      description: Serializer for a followed club.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+          readOnly: true
+        club_name:
+          type: string
+          readOnly: true
+        club_slug:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - club
+      - club_name
+      - club_slug
+      - created_at
+      - id
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     Gender:
       type: object
       description: Serializer for the Gender lookup table.
@@ -4486,6 +5467,7 @@ components:
       - order_id
       - reserved_balance_after
       - reserved_balance_before
+<<<<<<< HEAD
     Limits:
       type: object
       properties:
@@ -4524,6 +5506,8 @@ components:
           format: decimal
           pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
           nullable: true
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     Login:
       type: object
       properties:
@@ -4834,6 +5818,7 @@ components:
       required:
       - id
       - name
+<<<<<<< HEAD
     MarketEventError:
       type: object
       properties:
@@ -4983,6 +5968,8 @@ components:
       - slug
       - status
       - title
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     MarketFillRead:
       type: object
       properties:
@@ -5121,10 +6108,13 @@ components:
       - outcome_id
       - quantity
       - side
+<<<<<<< HEAD
     MarketOrderForbiddenResponse:
       oneOf:
       - $ref: '#/components/schemas/IneligibleOrderResponse'
       - $ref: '#/components/schemas/ResponsibleOrderBlockedResponse'
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     MarketOrderRead:
       type: object
       properties:
@@ -5249,6 +6239,7 @@ components:
       description: |-
         * `YES` - Yes
         * `NO` - No
+<<<<<<< HEAD
     MarketPortfolioActivity:
       type: object
       properties:
@@ -5522,6 +6513,8 @@ components:
       - positions
       - scope
       - wallet
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     MarketPositionRead:
       type: object
       properties:
@@ -5586,6 +6579,7 @@ components:
       - total_cost
       - updated_at
       - user
+<<<<<<< HEAD
     MarketProposalAdmin:
       type: object
       properties:
@@ -5875,6 +6869,8 @@ components:
         * `REJECTED` - Rejected
         * `DUPLICATE` - Duplicate
         * `WITHDRAWN` - Withdrawn
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     MarketPublic:
       type: object
       properties:
@@ -6257,6 +7253,261 @@ components:
       - total_refunded_position_quantity
       - total_released_buy_reservation_amount
       - total_released_sell_reservation_quantity
+<<<<<<< HEAD
+=======
+    MatchCentre:
+      type: object
+      description: Aggregated match centre response.
+      properties:
+        fixture:
+          $ref: '#/components/schemas/MatchCentreFixture'
+        result:
+          type: string
+        home_score:
+          type: integer
+          nullable: true
+        away_score:
+          type: integer
+          nullable: true
+        attendance:
+          type: integer
+          nullable: true
+        venue:
+          allOf:
+          - $ref: '#/components/schemas/MatchCentreVenue'
+          nullable: true
+        lineups:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentreLineup'
+        player_statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentrePlayerStat'
+        team_statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentreTeamStat'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentreTimeline'
+        officials:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentreOfficial'
+        broadcasts:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        data_confidence:
+          type: string
+        feed_status:
+          type: string
+        last_updated:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - fixture
+    MatchCentreFixture:
+      type: object
+      description: Fixture summary within match centre.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+          nullable: true
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - id
+      - name
+      - status
+    MatchCentreLineup:
+      type: object
+      description: Lineup entry serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        side:
+          $ref: '#/components/schemas/MatchCentreLineupSideEnum'
+        position:
+          type: string
+          maxLength: 100
+        shirt_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        is_starter:
+          type: boolean
+        player:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+      required:
+      - id
+      - player
+      - side
+    MatchCentreLineupSideEnum:
+      enum:
+      - HOME
+      - AWAY
+      type: string
+      description: |-
+        * `HOME` - Home
+        * `AWAY` - Away
+    MatchCentreOfficial:
+      type: object
+      description: Official serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        role:
+          type: string
+          maxLength: 100
+        name:
+          type: string
+          maxLength: 180
+      required:
+      - id
+      - name
+      - role
+    MatchCentrePlayerStat:
+      type: object
+      description: Player statistic serializer.
+      properties:
+        participant:
+          type: string
+          format: uuid
+          readOnly: true
+        stat_type:
+          type: string
+          maxLength: 100
+        value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - participant
+      - stat_type
+    MatchCentreTeamStat:
+      type: object
+      description: Team statistic serializer.
+      properties:
+        participant:
+          type: string
+          format: uuid
+          readOnly: true
+        stat_type:
+          type: string
+          maxLength: 100
+        value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - participant
+      - stat_type
+    MatchCentreTimeline:
+      type: object
+      description: Timeline event serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        event_type:
+          $ref: '#/components/schemas/MatchCentreTimelineEventTypeEnum'
+        minute:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        participant:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        player:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        description:
+          type: string
+          maxLength: 500
+      required:
+      - event_type
+      - id
+      - minute
+      - participant
+      - player
+    MatchCentreTimelineEventTypeEnum:
+      enum:
+      - GOAL
+      - ASSIST
+      - YELLOW_CARD
+      - RED_CARD
+      - SUBSTITUTION
+      - PENALTY
+      - OWN_GOAL
+      - MATCH_START
+      - MATCH_END
+      - HALF_TIME
+      - OTHER
+      type: string
+      description: |-
+        * `GOAL` - Goal
+        * `ASSIST` - Assist
+        * `YELLOW_CARD` - Yellow card
+        * `RED_CARD` - Red card
+        * `SUBSTITUTION` - Substitution
+        * `PENALTY` - Penalty
+        * `OWN_GOAL` - Own goal
+        * `MATCH_START` - Match start
+        * `MATCH_END` - Match end
+        * `HALF_TIME` - Half time
+        * `OTHER` - Other
+    MatchCentreVenue:
+      type: object
+      description: Venue serializer for match centre.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        city:
+          type: string
+        capacity:
+          type: integer
+          nullable: true
+      required:
+      - id
+      - name
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     NavigationMenu:
       type: object
       description: Serializer for navigation menu items.
@@ -6306,6 +7557,58 @@ components:
       - parent
       - permission_required
       - route
+    News:
+      type: object
+      description: Public news serializer (published & verified only).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 300
+        slug:
+          type: string
+          maxLength: 320
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+        body:
+          type: string
+        category:
+          type: string
+          format: uuid
+          readOnly: true
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        club:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        is_featured:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - body
+      - category
+      - club
+      - competition
+      - id
+      - sport
+      - title
     NotificationCategory:
       type: object
       description: |-
@@ -6561,6 +7864,7 @@ components:
       - id
       - label
       - side
+<<<<<<< HEAD
     OrderPortfolioSummary:
       type: object
       properties:
@@ -6596,6 +7900,9 @@ components:
       - reserved_buy_amount
       - reserved_sell_quantity
     PaginatedCompetitionPublicList:
+=======
+    PaginatedCompetitionList:
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       type: object
       required:
       - count
@@ -6617,8 +7924,13 @@ components:
         results:
           type: array
           items:
+<<<<<<< HEAD
             $ref: '#/components/schemas/CompetitionPublic'
     PaginatedComplianceReviewList:
+=======
+            $ref: '#/components/schemas/Competition'
+    PaginatedDiscoveryClubList:
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       type: object
       required:
       - count
@@ -6640,7 +7952,57 @@ components:
         results:
           type: array
           items:
+<<<<<<< HEAD
             $ref: '#/components/schemas/ComplianceReview'
+=======
+            $ref: '#/components/schemas/DiscoveryClub'
+    PaginatedFixtureList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Fixture'
+    PaginatedFollowList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Follow'
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     PaginatedLedgerEntryReadList:
       type: object
       required:
@@ -6710,6 +8072,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketCategoryPublic'
+<<<<<<< HEAD
     PaginatedMarketEventPublicList:
       type: object
       required:
@@ -6733,6 +8096,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketEventPublic'
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     PaginatedMarketFillReadList:
       type: object
       required:
@@ -6779,6 +8144,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketOrderRead'
+<<<<<<< HEAD
     PaginatedMarketPortfolioActivityList:
       type: object
       required:
@@ -6825,6 +8191,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketPortfolioPosition'
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     PaginatedMarketPositionReadList:
       type: object
       required:
@@ -6848,6 +8216,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketPositionRead'
+<<<<<<< HEAD
     PaginatedMarketProposalAdminList:
       type: object
       required:
@@ -6917,6 +8286,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketProposalReview'
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     PaginatedMarketPublicList:
       type: object
       required:
@@ -6940,6 +8311,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketPublic'
+<<<<<<< HEAD
+=======
+    PaginatedNewsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/News'
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     PaginatedParticipantOpenOrderList:
       type: object
       required:
@@ -6986,7 +8383,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ParticipantPublic'
+<<<<<<< HEAD
     PaginatedParticipantResponsibleEventList:
+=======
+    PaginatedPlayerList:
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       type: object
       required:
       - count
@@ -7008,6 +8409,7 @@ components:
         results:
           type: array
           items:
+<<<<<<< HEAD
             $ref: '#/components/schemas/ParticipantResponsibleEvent'
     PaginatedResponsibleEventList:
       type: object
@@ -7032,6 +8434,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ResponsibleEvent'
+=======
+            $ref: '#/components/schemas/Player'
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     PaginatedSportPublicList:
       type: object
       required:
@@ -7658,6 +9063,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+<<<<<<< HEAD
     PortfolioScope:
       type: object
       properties:
@@ -7758,6 +9164,87 @@ components:
       - unpriced_cost_basis
       - unpriced_position_count
       - valuation_complete
+=======
+    Player:
+      type: object
+      description: Public player serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 180
+        short_name:
+          type: string
+          maxLength: 80
+        slug:
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+        country_code:
+          type: string
+          maxLength: 2
+      required:
+      - id
+      - name
+      - sport
+    PlayerDetailResponse:
+      type: object
+      description: Full player profile response.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        short_name:
+          type: string
+        slug:
+          type: string
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        country_code:
+          type: string
+        profile:
+          allOf:
+          - $ref: '#/components/schemas/PlayerProfile'
+          nullable: true
+      required:
+      - id
+      - name
+      - slug
+    PlayerProfile:
+      type: object
+      description: Extended player profile data.
+      properties:
+        club:
+          type: string
+          format: uuid
+          nullable: true
+        position:
+          type: string
+        shirt_number:
+          type: integer
+          nullable: true
+        nationality:
+          type: string
+          format: uuid
+          nullable: true
+        biography:
+          type: string
+        career_history: {}
+        statistics: {}
+        status:
+          type: string
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     Profile:
       type: object
       description: |-
@@ -8115,6 +9602,7 @@ components:
         * `COMPETITOR` - Competitor
         * `SUBJECT` - Subject
         * `OTHER` - Other
+<<<<<<< HEAD
     SelfExclusion:
       type: object
       properties:
@@ -8136,6 +9624,62 @@ components:
         * `THIRTY_DAYS` - THIRTY_DAYS
         * `NINETY_DAYS` - NINETY_DAYS
         * `INDEFINITE` - INDEFINITE
+=======
+    SearchResponse:
+      type: object
+      description: Search response envelope.
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+      required:
+      - count
+      - page
+      - page_size
+      - results
+    SearchResult:
+      type: object
+      description: A single search result.
+      properties:
+        id:
+          type: string
+          format: uuid
+        entity_type:
+          type: string
+        display_name:
+          type: string
+        slug:
+          type: string
+        country_code:
+          type: string
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+          nullable: true
+        logo:
+          type: string
+      required:
+      - display_name
+      - entity_type
+      - id
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     Session:
       type: object
       properties:
@@ -8260,7 +9804,11 @@ components:
           type: string
           maxLength: 255
         event_type:
+<<<<<<< HEAD
           $ref: '#/components/schemas/SportingEventTypeEnum'
+=======
+          $ref: '#/components/schemas/SportingEventPublicEventTypeEnum'
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
         status:
           $ref: '#/components/schemas/SportingEventStatusEnum'
         starts_at:
@@ -8296,7 +9844,27 @@ components:
       - participants
       - sport
       - starts_at
+<<<<<<< HEAD
     SportingEventStatusEnum:
+=======
+    SportingEventPublicEventTypeEnum:
+      enum:
+      - MATCH
+      - RACE
+      - TOURNAMENT
+      - BOUT
+      - SERIES
+      - OTHER
+      type: string
+      description: |-
+        * `MATCH` - Match
+        * `RACE` - Race
+        * `TOURNAMENT` - Tournament
+        * `BOUT` - Bout
+        * `SERIES` - Series
+        * `OTHER` - Other
+    SportingEventPublicStatusEnum:
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
       enum:
       - DRAFT
       - SCHEDULED
@@ -8361,6 +9929,24 @@ components:
         * `SPORTS` - SPORTS
         * `COMPETITIONS` - COMPETITIONS
         * `CLUBS` - CLUBS
+    Suggestion:
+      type: object
+      description: A single search suggestion.
+      properties:
+        suggestion_type:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+      required:
+      - display_name
+      - entity_id
+      - entity_type
+      - suggestion_type
     Timezone:
       type: object
       description: Serializer for the Timezone lookup table.
@@ -8505,6 +10091,7 @@ components:
       required:
       - email
       - otp
+<<<<<<< HEAD
     WalletPortfolioSummary:
       type: object
       properties:
@@ -8531,6 +10118,8 @@ components:
       - exists
       - reserved_balance
       - total_balance
+=======
+>>>>>>> 69c175a (feat: add discovery module with search, clubs, players, fixtures, news, match centre, and following)
     WalletRead:
       type: object
       properties:
