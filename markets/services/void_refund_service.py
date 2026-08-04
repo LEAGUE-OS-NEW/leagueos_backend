@@ -16,6 +16,12 @@ from markets.models import (
     MarketVoidRefund,
 )
 from markets.services.participation_service import MarketParticipationService
+from markets.services.provisional_result_service import (
+    MarketProvisionalResultService,
+)
+from markets.services.result_dispute_service import (
+    MarketResultDisputeService,
+)
 from wallets.services.wallet_service import WalletService
 
 
@@ -44,6 +50,8 @@ class MarketVoidRefundService:
                 {"finalization": "A normally settled market cannot be void-refunded."}
             )
         cls._require_refundable_market(market)
+        MarketProvisionalResultService.require_dispute_window_closed(market)
+        MarketResultDisputeService.require_no_open_disputes(market)
 
         orders = cls._lock_orders(market)
         positions = cls._lock_positions(market)

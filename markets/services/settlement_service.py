@@ -13,6 +13,12 @@ from markets.models import (
     MarketPositionSettlement,
     MarketSettlement,
 )
+from markets.services.provisional_result_service import (
+    MarketProvisionalResultService,
+)
+from markets.services.result_dispute_service import (
+    MarketResultDisputeService,
+)
 from wallets.services.wallet_service import WalletService
 
 
@@ -45,6 +51,8 @@ class MarketSettlementService:
             )
 
         cls._require_settleable_market(market)
+        MarketProvisionalResultService.require_dispute_window_closed(market)
+        MarketResultDisputeService.require_no_open_disputes(market)
         cls._lock_and_require_no_outstanding_orders(market)
         positions = cls._lock_positions(market)
         cls._require_no_position_reservations(positions)
