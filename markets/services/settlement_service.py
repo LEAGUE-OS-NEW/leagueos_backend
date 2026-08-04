@@ -8,11 +8,13 @@ from rest_framework.exceptions import PermissionDenied
 from authentication.services.permission_service import PermissionService
 from markets.models import (
     Market,
+    MarketFeeLedgerEntry,
     MarketOrder,
     MarketPosition,
     MarketPositionSettlement,
     MarketSettlement,
 )
+from markets.services.fee_service import MarketFeeService
 from markets.services.provisional_result_service import (
     MarketProvisionalResultService,
 )
@@ -100,14 +102,17 @@ class MarketSettlementService:
         payout_amount = (
             cls._money(quantity * cls.PAYOUT_PER_UNIT) if was_winner else Decimal("0.0000")
         )
+        fee_schedule, fee_rates = MarketFeeService.rates(market=market)
+        payout_fee = MarketFeeService.calculate_fee(payout_amount, fee_rates["settlement"])
+        net_payout = payout_amount - payout_fee
         realized_delta = cls._money(payout_amount - cost_basis)
         ledger_entry = None
 
-        if payout_amount > Decimal("0.0000"):
+        if net_payout > Decimal("0.0000"):
             ledger_entry = WalletService.credit(
                 user=position.user,
                 currency=cls.MARKET_CURRENCY,
-                amount=payout_amount,
+                amount=net_payout,
                 idempotency_reference=cls.payout_idempotency_reference(
                     market_id=market.id,
                     position_id=position.id,
@@ -115,6 +120,17 @@ class MarketSettlementService:
                     payout_per_unit=cls.PAYOUT_PER_UNIT,
                 ),
                 market=market,
+            )
+
+        if payout_amount > Decimal("0.0000"):
+            MarketFeeService.record_fee(
+                parent_id=position.id,
+                market=market,
+                participant=position.user,
+                fee_type=MarketFeeLedgerEntry.FeeType.SETTLEMENT,
+                rate_bps=fee_rates["settlement"],
+                gross=payout_amount,
+                schedule=fee_schedule,
             )
 
         MarketPositionSettlement.objects.create(
@@ -126,6 +142,8 @@ class MarketSettlementService:
             settled_quantity=quantity,
             payout_per_unit=cls.PAYOUT_PER_UNIT,
             payout_amount=payout_amount,
+            payout_fee_amount=payout_fee,
+            net_payout_amount=net_payout,
             cost_basis=cost_basis,
             realized_pnl_delta=realized_delta,
             wallet_ledger_entry=ledger_entry,

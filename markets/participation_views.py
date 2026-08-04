@@ -87,6 +87,8 @@ class MarketOrderCreateView(APIView):
                 side=(serializer.validated_data["side"]),
                 quantity=(serializer.validated_data["quantity"]),
                 limit_price=(serializer.validated_data["limit_price"]),
+                time_in_force=serializer.validated_data["time_in_force"],
+                expires_at=serializer.validated_data.get("expires_at"),
             )
         except MarketParticipationIneligible as error:
             AuditLog.objects.create(
@@ -208,7 +210,7 @@ class MarketOrderListView(ListAPIView):
     pagination_class = PublicCatalogPagination
 
     def get_queryset(self):
-        return (
+        queryset = (
             MarketOrder.objects.filter(
                 user=self.request.user,
             )
@@ -221,6 +223,12 @@ class MarketOrderListView(ListAPIView):
                 "-id",
             )
         )
+        requested_status = self.request.query_params.get("status")
+        if requested_status:
+            if requested_status not in MarketOrder.Status.values:
+                raise APIValidationError({"status": "A valid order status is required."})
+            queryset = queryset.filter(status=requested_status)
+        return queryset
 
     @extend_schema(
         responses=MarketOrderReadSerializer(many=True),

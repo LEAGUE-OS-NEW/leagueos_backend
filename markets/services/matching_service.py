@@ -33,6 +33,18 @@ class MarketMatchingService:
             taker=taker,
             candidate_ids=candidate_ids,
         )
+        if taker.time_in_force == MarketOrder.TimeInForce.FOK:
+            required = taker.quantity - taker.filled_quantity
+            available = sum(
+                (
+                    maker.quantity - maker.filled_quantity
+                    for maker in makers
+                    if cls._is_eligible_maker(taker=taker, maker=maker)
+                ),
+                Decimal("0.0000"),
+            )
+            if available < required:
+                return []
         fills = []
 
         for maker in makers:
@@ -84,6 +96,10 @@ class MarketMatchingService:
             )
             .exclude(user_id=taker.user_id)
             .exclude(id=taker.id)
+            .exclude(
+                time_in_force=MarketOrder.TimeInForce.GTD,
+                expires_at__lte=timezone.now(),
+            )
         )
 
         if taker.side == MarketOrder.Side.BUY:
@@ -131,6 +147,11 @@ class MarketMatchingService:
         return (
             order.status in cls.FILLABLE_STATUSES
             and order.quantity - order.filled_quantity > Decimal("0.0000")
+            and not (
+                order.time_in_force == MarketOrder.TimeInForce.GTD
+                and order.expires_at is not None
+                and order.expires_at <= timezone.now()
+            )
         )
 
     @classmethod

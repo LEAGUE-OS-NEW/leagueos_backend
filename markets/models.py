@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import slugify
 
 from sports.models import (
@@ -1772,7 +1773,14 @@ class MarketOrder(TimeStampedUUIDModel):
         )
         FILLED = "FILLED", "Filled"
         CANCELLED = "CANCELLED", "Cancelled"
+        EXPIRED = "EXPIRED", "Expired"
         REJECTED = "REJECTED", "Rejected"
+
+    class TimeInForce(models.TextChoices):
+        GTC = "GTC", "Good till cancelled"
+        GTD = "GTD", "Good till date"
+        IOC = "IOC", "Immediate or cancel"
+        FOK = "FOK", "Fill or kill"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -1820,6 +1828,30 @@ class MarketOrder(TimeStampedUUIDModel):
         default=Status.PENDING,
         db_index=True,
     )
+    time_in_force = models.CharField(
+        max_length=3,
+        choices=TimeInForce.choices,
+        default=TimeInForce.GTC,
+        db_index=True,
+    )
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    expired_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    fee_schedule = models.ForeignKey(
+        "MarketFeeSchedule",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )
+    maximum_fee_bps = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = [
@@ -1850,6 +1882,29 @@ class MarketOrder(TimeStampedUUIDModel):
                 ),
                 name=("market_order_average_fill_" "price_valid"),
             ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        time_in_force="GTD",
+                        expires_at__isnull=False,
+                    )
+                    | Q(
+                        time_in_force__in=["GTC", "IOC", "FOK"],
+                        expires_at__isnull=True,
+                    )
+                ),
+                name="market_order_tif_expiry_consistent",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        status="EXPIRED",
+                        expired_at__isnull=False,
+                    )
+                    | (~Q(status="EXPIRED") & Q(expired_at__isnull=True))
+                ),
+                name="market_order_expired_at_consistent",
+            ),
         ]
         indexes = [
             models.Index(
@@ -1873,6 +1928,14 @@ class MarketOrder(TimeStampedUUIDModel):
                     "status",
                     "limit_price",
                 ],
+            ),
+            models.Index(
+                fields=[
+                    "time_in_force",
+                    "status",
+                    "expires_at",
+                ],
+                name="mkt_order_expiry_due_idx",
             ),
         ]
 
@@ -1905,6 +1968,164 @@ class MarketOrder(TimeStampedUUIDModel):
                 errors["average_fill_price"] = (
                     "Average fill price must be " "greater than 0 and less than 1."
                 )
+
+        if self.time_in_force == self.TimeInForce.GTD:
+            if self.expires_at is None:
+                errors["expires_at"] = "GTD orders require an expiry time."
+            else:
+                if self._state.adding and self.expires_at <= timezone.now():
+                    errors["expires_at"] = "The order expiry time must be in the future."
+
+                if (
+                    self.market_id
+                    and self.market.closes_at is not None
+                    and self.expires_at > self.market.closes_at
+                ):
+                    errors["expires_at"] = (
+                        "The order expiry time cannot be after " "the market close time."
+                    )
+        elif self.expires_at is not None:
+            errors["expires_at"] = "Only GTD orders may define an expiry time."
+
+        if self.status == self.Status.EXPIRED:
+            if self.expired_at is None:
+                errors["expired_at"] = "Expired orders require an expiry timestamp."
+        elif self.expired_at is not None:
+            errors["expired_at"] = "Only expired orders may have an expiry timestamp."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class ImmutableOrderExpiryAuditQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Market order expiry audit records are immutable.")
+
+    def delete(self):
+        raise ValidationError("Market order expiry audit records are immutable.")
+
+
+class MarketOrderExpiryAudit(TimeStampedUUIDModel):
+    class Source(models.TextChoices):
+        SYSTEM = "SYSTEM", "System"
+        ADMIN = "ADMIN", "Administrator"
+
+    market_order = models.OneToOneField(
+        MarketOrder,
+        on_delete=models.PROTECT,
+        related_name="expiry_audit",
+    )
+    source = models.CharField(
+        max_length=10,
+        choices=Source.choices,
+        db_index=True,
+    )
+    previous_status = models.CharField(
+        max_length=30,
+        choices=MarketOrder.Status.choices,
+    )
+    expired_quantity = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+    )
+    released_wallet_reservation_amount = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        default=Decimal("0.0000"),
+    )
+    released_position_reservation_quantity = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        default=Decimal("0.0000"),
+    )
+    wallet_release_ledger_entry = models.OneToOneField(
+        "wallets.LedgerEntry",
+        on_delete=models.PROTECT,
+        related_name="market_order_expiry_audit",
+        null=True,
+        blank=True,
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_order_expiry_actions",
+        null=True,
+        blank=True,
+    )
+    reason = models.TextField()
+    expired_at = models.DateTimeField(
+        db_index=True,
+    )
+
+    objects = ImmutableOrderExpiryAuditQuerySet.as_manager()
+
+    class Meta:
+        ordering = [
+            "-expired_at",
+            "-id",
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "source",
+                    "-expired_at",
+                ],
+                name="mkt_order_exp_source_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(expired_quantity__gt=0),
+                name="mkt_order_exp_qty_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(released_wallet_reservation_amount__gte=0),
+                name="mkt_order_exp_cash_nonneg",
+            ),
+            models.CheckConstraint(
+                condition=Q(released_position_reservation_quantity__gte=0),
+                name="mkt_order_exp_shares_nonneg",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.market_order_id}: " f"{self.expired_quantity}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Market order expiry audit records are immutable.")
+
+        self.reason = (self.reason or "").strip()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Market order expiry audit records cannot be deleted.")
+
+    def clean(self):
+        errors = {}
+
+        if not self.reason:
+            errors["reason"] = "An expiry reason is required."
+
+        if self.expired_quantity is None or self.expired_quantity <= Decimal("0.0000"):
+            errors["expired_quantity"] = "Expired quantity must be positive."
+
+        if (
+            self.released_wallet_reservation_amount is None
+            or self.released_wallet_reservation_amount < Decimal("0.0000")
+        ):
+            errors["released_wallet_reservation_amount"] = (
+                "Released wallet reservation amount " "cannot be negative."
+            )
+
+        if (
+            self.released_position_reservation_quantity is None
+            or self.released_position_reservation_quantity < Decimal("0.0000")
+        ):
+            errors["released_position_reservation_quantity"] = (
+                "Released position reservation quantity " "cannot be negative."
+            )
 
         if errors:
             raise ValidationError(errors)
@@ -2118,6 +2339,8 @@ class MarketPositionSettlement(TimeStampedUUIDModel):
     settled_quantity = models.DecimalField(max_digits=18, decimal_places=4)
     payout_per_unit = models.DecimalField(max_digits=20, decimal_places=4)
     payout_amount = models.DecimalField(max_digits=20, decimal_places=4)
+    payout_fee_amount = models.DecimalField(max_digits=20, decimal_places=4, default=Decimal("0"))
+    net_payout_amount = models.DecimalField(max_digits=20, decimal_places=4, default=Decimal("0"))
     cost_basis = models.DecimalField(max_digits=20, decimal_places=4)
     realized_pnl_delta = models.DecimalField(max_digits=20, decimal_places=4)
     wallet_ledger_entry = models.OneToOneField(
@@ -2257,6 +2480,8 @@ class MarketPositionVoidRefund(ImmutableVoidRefundModel):
     refunded_quantity = models.DecimalField(max_digits=18, decimal_places=4)
     cost_basis = models.DecimalField(max_digits=20, decimal_places=4)
     refund_amount = models.DecimalField(max_digits=20, decimal_places=4)
+    refund_fee_amount = models.DecimalField(max_digits=20, decimal_places=4, default=Decimal("0"))
+    net_refund_amount = models.DecimalField(max_digits=20, decimal_places=4, default=Decimal("0"))
     realized_pnl_delta = models.DecimalField(
         max_digits=20, decimal_places=4, default=Decimal("0.0000")
     )
@@ -2649,3 +2874,414 @@ class MarketFill(models.Model):
 
         if errors:
             raise DjangoValidationError(errors)
+
+
+class ImmutableFinancialQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise DjangoValidationError("Financial audit records are immutable.")
+
+    def delete(self):
+        raise DjangoValidationError("Financial audit records are immutable.")
+
+
+class MarketFeeScheduleQuerySet(models.QuerySet):
+    FINANCIAL_FIELDS = {
+        "status",
+        "maker_fee_bps",
+        "taker_fee_bps",
+        "settlement_fee_bps",
+        "refund_fee_bps",
+        "effective_at",
+        "market",
+        "market_id",
+        "version",
+        "activated_by",
+        "activated_by_id",
+        "activated_at",
+        "retired_by",
+        "retired_by_id",
+        "retired_at",
+    }
+
+    def update(self, **kwargs):
+        if self.exclude(status=MarketFeeSchedule.Status.DRAFT).exists():
+            raise DjangoValidationError("Activated fee schedules are immutable.")
+        if self.FINANCIAL_FIELDS.intersection(kwargs):
+            raise DjangoValidationError("Fee schedule lifecycle changes require the service.")
+        return super().update(**kwargs)
+
+    def delete(self):
+        if self.exclude(status=MarketFeeSchedule.Status.DRAFT).exists():
+            raise DjangoValidationError("Activated fee schedules cannot be deleted.")
+        return super().delete()
+
+
+class MarketFeeSchedule(TimeStampedUUIDModel):  # noqa: DJ008
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        ACTIVE = "ACTIVE", "Active"
+        RETIRED = "RETIRED", "Retired"
+
+    MAX_RATE_BPS = 1000
+    market = models.ForeignKey(
+        Market, on_delete=models.PROTECT, related_name="fee_schedules", null=True, blank=True
+    )
+    version = models.PositiveIntegerField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
+    maker_fee_bps = models.PositiveIntegerField(default=0)
+    taker_fee_bps = models.PositiveIntegerField(default=0)
+    settlement_fee_bps = models.PositiveIntegerField(default=0)
+    refund_fee_bps = models.PositiveIntegerField(default=0)
+    effective_at = models.DateTimeField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_fee_schedules"
+    )
+    activated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="activated_fee_schedules",
+        null=True,
+        blank=True,
+    )
+    activated_at = models.DateTimeField(null=True, blank=True)
+    retired_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="retired_fee_schedules",
+        null=True,
+        blank=True,
+    )
+    retired_at = models.DateTimeField(null=True, blank=True)
+    objects = MarketFeeScheduleQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-version", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["market", "version"],
+                name="mkt_fee_scope_version_uniq",
+                nulls_distinct=False,
+            ),
+            models.CheckConstraint(
+                condition=Q(maker_fee_bps__lte=1000),
+                name="mkt_fee_maker_bps_max",
+            ),
+            models.CheckConstraint(
+                condition=Q(taker_fee_bps__lte=1000),
+                name="mkt_fee_taker_bps_max",
+            ),
+            models.CheckConstraint(
+                condition=Q(settlement_fee_bps__lte=1000),
+                name="mkt_fee_settle_bps_max",
+            ),
+            models.CheckConstraint(
+                condition=Q(refund_fee_bps__lte=1000),
+                name="mkt_fee_refund_bps_max",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if (
+            self.pk
+            and type(self).objects.filter(pk=self.pk).exclude(status=self.Status.DRAFT).exists()
+        ):
+            raise DjangoValidationError("Activated fee schedules are immutable.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.status != self.Status.DRAFT:
+            raise DjangoValidationError("Activated fee schedules cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        for field in (
+            "maker_fee_bps",
+            "taker_fee_bps",
+            "settlement_fee_bps",
+            "refund_fee_bps",
+        ):
+            value = getattr(self, field)
+            if value is not None and value > self.MAX_RATE_BPS:
+                errors[field] = f"Fee rate cannot exceed {self.MAX_RATE_BPS} basis points."
+        if self.status == self.Status.ACTIVE and (
+            self.activated_by_id is None or self.activated_at is None
+        ):
+            errors["status"] = "Active schedules require activation metadata."
+        if errors:
+            raise DjangoValidationError(errors)
+
+
+class MarketFeeLedgerEntry(TimeStampedUUIDModel):  # noqa: DJ008
+    class FeeType(models.TextChoices):
+        MAKER = "MAKER", "Maker"
+        TAKER = "TAKER", "Taker"
+        SETTLEMENT = "SETTLEMENT", "Settlement"
+        REFUND = "REFUND", "Refund"
+
+    idempotency_reference = models.UUIDField(unique=True)
+    schedule = models.ForeignKey(
+        MarketFeeSchedule,
+        on_delete=models.PROTECT,
+        related_name="ledger_entries",
+        null=True,
+        blank=True,
+    )
+    schedule_version = models.PositiveIntegerField(default=0)
+    market = models.ForeignKey(Market, on_delete=models.PROTECT, related_name="fee_entries")
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="market_fee_entries"
+    )
+    fill = models.ForeignKey(
+        MarketFill, on_delete=models.PROTECT, related_name="fee_entries", null=True, blank=True
+    )
+    order = models.ForeignKey(
+        MarketOrder, on_delete=models.PROTECT, related_name="fee_entries", null=True, blank=True
+    )
+    fee_type = models.CharField(max_length=12, choices=FeeType.choices)
+    rate_bps = models.PositiveIntegerField()
+    gross_amount = models.DecimalField(max_digits=20, decimal_places=4)
+    fee_amount = models.DecimalField(max_digits=20, decimal_places=4)
+    net_amount = models.DecimalField(max_digits=20, decimal_places=4)
+    currency = models.CharField(max_length=3, default="UGX")
+    objects = ImmutableFinancialQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(condition=Q(rate_bps__lte=1000), name="mkt_fee_entry_rate_max"),
+            models.CheckConstraint(condition=Q(gross_amount__gte=0), name="mkt_fee_gross_nonneg"),
+            models.CheckConstraint(condition=Q(fee_amount__gte=0), name="mkt_fee_amount_nonneg"),
+            models.CheckConstraint(condition=Q(net_amount__gte=0), name="mkt_fee_net_nonneg"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise DjangoValidationError("Fee ledger entries are immutable.")
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise DjangoValidationError("Fee ledger entries cannot be deleted.")
+
+
+class MarketReconciliationRun(TimeStampedUUIDModel):  # noqa: DJ008
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        RUNNING = "RUNNING", "Running"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    reference = models.UUIDField(unique=True)
+    run_date = models.DateField()
+    market = models.ForeignKey(
+        Market, on_delete=models.PROTECT, related_name="reconciliation_runs", null=True, blank=True
+    )
+    wallet = models.ForeignKey(
+        "wallets.Wallet",
+        on_delete=models.PROTECT,
+        related_name="market_reconciliation_runs",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    started_at = models.DateTimeField(null=True)
+    completed_at = models.DateTimeField(null=True)
+    initiated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_reconciliation_runs",
+        null=True,
+        blank=True,
+    )
+    order_count = models.PositiveIntegerField(default=0)
+    fill_count = models.PositiveIntegerField(default=0)
+    mismatch_count = models.PositiveIntegerField(default=0)
+    total_fee_amount = models.DecimalField(max_digits=20, decimal_places=4, default=Decimal("0"))
+
+    objects = ImmutableFinancialQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        service_transition = kwargs.pop("_service_transition", False)
+        if (
+            self.pk
+            and type(self)
+            ._base_manager.filter(
+                pk=self.pk,
+                status__in=[self.Status.COMPLETED, self.Status.FAILED],
+            )
+            .exists()
+        ):
+            raise DjangoValidationError("Final reconciliation runs are immutable.")
+        if not self._state.adding and not service_transition:
+            raise DjangoValidationError("Reconciliation runs may only be finalized by the service.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise DjangoValidationError("Reconciliation runs cannot be deleted.")
+
+
+class MarketReconciliationMismatch(TimeStampedUUIDModel):  # noqa: DJ008
+    class Severity(models.TextChoices):
+        INFO = "INFO", "Info"
+        WARNING = "WARNING", "Warning"
+        ERROR = "ERROR", "Error"
+        CRITICAL = "CRITICAL", "Critical"
+
+    class ResolutionStatus(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        RESOLVED = "RESOLVED", "Resolved"
+
+    run = models.ForeignKey(
+        MarketReconciliationRun, on_delete=models.PROTECT, related_name="mismatches"
+    )
+    code = models.CharField(max_length=64, db_index=True)
+    severity = models.CharField(max_length=10, choices=Severity.choices)
+    market_id_snapshot = models.UUIDField(null=True)
+    participant_id_snapshot = models.UUIDField(null=True)
+    wallet_id_snapshot = models.UUIDField(null=True)
+    order_id_snapshot = models.UUIDField(null=True)
+    fill_id_snapshot = models.UUIDField(null=True)
+    expected_value = models.DecimalField(max_digits=24, decimal_places=4, null=True)
+    actual_value = models.DecimalField(max_digits=24, decimal_places=4, null=True)
+    unit = models.CharField(max_length=12, blank=True)
+    explanation = models.TextField()
+    detected_at = models.DateTimeField(default=timezone.now)
+    resolution_status = models.CharField(
+        max_length=10, choices=ResolutionStatus.choices, default=ResolutionStatus.OPEN
+    )
+    objects = ImmutableFinancialQuerySet.as_manager()
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise DjangoValidationError("Reconciliation mismatches are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise DjangoValidationError("Reconciliation mismatches cannot be deleted.")
+
+
+class MarketFinancialAdjustment(TimeStampedUUIDModel):  # noqa: DJ008
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+
+    reason = models.TextField()
+    evidence_reference = models.CharField(max_length=255)
+    currency = models.CharField(max_length=3, default="UGX")
+    market = models.ForeignKey(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="financial_adjustments",
+        null=True,
+        blank=True,
+    )
+    mismatch = models.ForeignKey(
+        MarketReconciliationMismatch,
+        on_delete=models.PROTECT,
+        related_name="adjustments",
+        null=True,
+        blank=True,
+    )
+    proposed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="proposed_adjustments"
+    )
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    executed_at = models.DateTimeField(null=True)
+
+    objects = ImmutableFinancialQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        service_transition = kwargs.pop("_service_transition", False)
+        if (
+            self.pk
+            and type(self)
+            ._base_manager.filter(pk=self.pk)
+            .exclude(status=self.Status.PENDING)
+            .exists()
+        ):
+            raise DjangoValidationError("Final financial adjustments are immutable.")
+        if not self._state.adding and not service_transition:
+            raise DjangoValidationError("Adjustment decisions require the approval service.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise DjangoValidationError("Financial adjustments cannot be deleted.")
+
+
+class MarketFinancialAdjustmentLine(TimeStampedUUIDModel):  # noqa: DJ008
+    class Direction(models.TextChoices):
+        DEBIT = "DEBIT", "Debit"
+        CREDIT = "CREDIT", "Credit"
+
+    adjustment = models.ForeignKey(
+        MarketFinancialAdjustment, on_delete=models.PROTECT, related_name="lines"
+    )
+    wallet = models.ForeignKey(
+        "wallets.Wallet", on_delete=models.PROTECT, related_name="market_adjustment_lines"
+    )
+    direction = models.CharField(max_length=6, choices=Direction.choices)
+    amount = models.DecimalField(max_digits=20, decimal_places=4)
+    idempotency_reference = models.UUIDField(unique=True)
+    wallet_ledger_entry = models.OneToOneField(
+        "wallets.LedgerEntry",
+        on_delete=models.PROTECT,
+        related_name="market_adjustment_line",
+        null=True,
+        blank=True,
+    )
+
+    objects = ImmutableFinancialQuerySet.as_manager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(amount__gt=0), name="mkt_adjust_line_positive")
+        ]
+
+    def save(self, *args, **kwargs):
+        service_link = kwargs.pop("_service_link", False)
+        if not self._state.adding and not service_link:
+            raise DjangoValidationError("Financial adjustment lines are immutable.")
+        if service_link and set(kwargs.get("update_fields") or ()) - {
+            "wallet_ledger_entry",
+            "updated_at",
+        }:
+            raise DjangoValidationError("Only the executed ledger link may be updated.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise DjangoValidationError("Financial adjustment lines cannot be deleted.")
+
+
+class MarketFinancialAdjustmentApproval(TimeStampedUUIDModel):  # noqa: DJ008
+    class Decision(models.TextChoices):
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+
+    adjustment = models.OneToOneField(
+        MarketFinancialAdjustment, on_delete=models.PROTECT, related_name="approval"
+    )
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="adjustment_decisions"
+    )
+    decision = models.CharField(max_length=10, choices=Decision.choices)
+    notes = models.TextField(blank=True)
+    decided_at = models.DateTimeField(default=timezone.now)
+    objects = ImmutableFinancialQuerySet.as_manager()
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise DjangoValidationError("Adjustment approvals are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise DjangoValidationError("Adjustment approvals cannot be deleted.")
