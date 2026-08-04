@@ -6,13 +6,15 @@ info:
 paths:
   /api/v1/:
     get:
-      operationId: root_retrieve
+      operationId: api_v1_retrieve
       description: |-
         Get dashboard data for the current user.
 
         Returns:
             Complete dashboard response with user summary, navigation,
             widgets, module data, and recommendations.
+      tags:
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -24,7 +26,7 @@ paths:
           description: ''
   /api/v1/analytics/:
     post:
-      operationId: analytics_create
+      operationId: api_v1_analytics_create
       description: |-
         Record analytics event.
 
@@ -37,7 +39,7 @@ paths:
         Returns:
             Success response
       tags:
-      - analytics
+      - api
       requestBody:
         content:
           application/json:
@@ -61,9 +63,9 @@ paths:
           description: ''
   /api/v1/auth/login/:
     post:
-      operationId: auth_login_create
+      operationId: api_v1_auth_login_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -88,9 +90,9 @@ paths:
           description: ''
   /api/v1/auth/logout/:
     post:
-      operationId: auth_logout_create
+      operationId: api_v1_auth_logout_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -114,9 +116,9 @@ paths:
           description: ''
   /api/v1/auth/logout-all/:
     post:
-      operationId: auth_logout_all_create
+      operationId: api_v1_auth_logout_all_create
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -124,9 +126,9 @@ paths:
           description: No response body
   /api/v1/auth/me/:
     get:
-      operationId: auth_me_retrieve
+      operationId: api_v1_auth_me_retrieve
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -138,9 +140,9 @@ paths:
           description: ''
   /api/v1/auth/password-reset/confirm/:
     post:
-      operationId: auth_password_reset_confirm_create
+      operationId: api_v1_auth_password_reset_confirm_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -165,9 +167,9 @@ paths:
           description: ''
   /api/v1/auth/password-reset/request/:
     post:
-      operationId: auth_password_reset_request_create
+      operationId: api_v1_auth_password_reset_request_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -192,9 +194,9 @@ paths:
           description: ''
   /api/v1/auth/password-reset/verify/:
     post:
-      operationId: auth_password_reset_verify_create
+      operationId: api_v1_auth_password_reset_verify_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -219,9 +221,9 @@ paths:
           description: ''
   /api/v1/auth/profile/:
     get:
-      operationId: auth_profile_retrieve
+      operationId: api_v1_auth_profile_retrieve
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -233,9 +235,9 @@ paths:
           description: ''
   /api/v1/auth/register/:
     post:
-      operationId: auth_register_create
+      operationId: api_v1_auth_register_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -260,9 +262,9 @@ paths:
           description: ''
   /api/v1/auth/registration-status/:
     get:
-      operationId: auth_registration_status_retrieve
+      operationId: api_v1_auth_registration_status_retrieve
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -275,9 +277,9 @@ paths:
           description: ''
   /api/v1/auth/resend-otp/:
     post:
-      operationId: auth_resend_otp_create
+      operationId: api_v1_auth_resend_otp_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -302,9 +304,9 @@ paths:
           description: ''
   /api/v1/auth/resend-verification/:
     post:
-      operationId: auth_resend_verification_create
+      operationId: api_v1_auth_resend_verification_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -329,9 +331,9 @@ paths:
           description: ''
   /api/v1/auth/sessions/:
     get:
-      operationId: auth_sessions_retrieve
+      operationId: api_v1_auth_sessions_retrieve
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -343,9 +345,9 @@ paths:
           description: ''
   /api/v1/auth/token/refresh/:
     post:
-      operationId: auth_token_refresh_create
+      operationId: api_v1_auth_token_refresh_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -369,9 +371,9 @@ paths:
           description: ''
   /api/v1/auth/verify-otp/:
     post:
-      operationId: auth_verify_otp_create
+      operationId: api_v1_auth_verify_otp_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -396,25 +398,31 @@ paths:
           description: ''
   /api/v1/clubs/:
     get:
-      operationId: clubs_list
-      description: List all active clubs for favourite club selection.
-      tags:
-      - clubs
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Club'
-          description: ''
-  /api/v1/competitions/:
-    get:
-      operationId: competitions_list
+      operationId: api_v1_clubs_list
+      description: Public club list.
       parameters:
+      - in: query
+        name: country
+        schema:
+          type: string
+          maxLength: 2
+          minLength: 1
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - founded
+          - -founded
+          type: string
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `founded` - founded
+          * `-founded` - -founded
       - name: page
         required: false
         in: query
@@ -432,14 +440,13 @@ paths:
         schema:
           type: string
           maxLength: 180
-          minLength: 1
       - in: query
         name: sport
         schema:
           type: string
           format: uuid
       tags:
-      - Sports
+      - Discovery
       security:
       - jwtAuth: []
       - {}
@@ -448,14 +455,55 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedCompetitionPublicList'
+                $ref: '#/components/schemas/PaginatedDiscoveryClubList'
           description: ''
-  /api/v1/lookups/countries/:
+  /api/v1/clubs/{club_id}/:
     get:
-      operationId: lookups_countries_list
-      description: List all active countries for profile lookup.
+      operationId: api_v1_clubs_retrieve
+      description: Public club profile detail.
+      parameters:
+      - in: path
+        name: club_id
+        schema:
+          type: string
+          format: uuid
+        required: true
       tags:
-      - lookups
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubDetailResponse'
+          description: ''
+  /api/v1/clubs/{club_id}/follow/:
+    post:
+      operationId: api_v1_clubs_follow_create
+      description: Follow a club.
+      parameters:
+      - in: path
+        name: club_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Discovery
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Follow'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Follow'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Follow'
       security:
       - jwtAuth: []
       responses:
@@ -463,64 +511,29 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Country'
+                $ref: '#/components/schemas/Follow'
           description: ''
-  /api/v1/lookups/genders/:
-    get:
-      operationId: lookups_genders_list
-      description: List all active genders for profile lookup.
+    delete:
+      operationId: api_v1_clubs_follow_destroy
+      description: Follow a club.
+      parameters:
+      - in: path
+        name: club_id
+        schema:
+          type: string
+          format: uuid
+        required: true
       tags:
-      - lookups
+      - api
       security:
       - jwtAuth: []
       responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Gender'
-          description: ''
-  /api/v1/lookups/languages/:
+        '204':
+          description: No response body
+  /api/v1/competitions/:
     get:
-      operationId: lookups_languages_list
-      description: List all active languages for profile lookup.
-      tags:
-      - lookups
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Language'
-          description: ''
-  /api/v1/lookups/timezones/:
-    get:
-      operationId: lookups_timezones_list
-      description: List all active timezones for profile lookup.
-      tags:
-      - lookups
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Timezone'
-          description: ''
-  /api/v1/market-admin/events/:
-    get:
-      operationId: market_admin_events_list
+      operationId: api_v1_competitions_list
+      description: Public competition list.
       parameters:
       - name: page
         required: false
@@ -535,7 +548,217 @@ paths:
         schema:
           type: integer
       tags:
-      - market-admin
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCompetitionList'
+          description: ''
+  /api/v1/fixtures/:
+    get:
+      operationId: api_v1_fixtures_list
+      description: Public fixture list.
+      parameters:
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - starts_at
+          - -starts_at
+          - name
+          - -name
+          type: string
+          default: starts_at
+          minLength: 1
+        description: |-
+          * `starts_at` - starts_at
+          * `-starts_at` - -starts_at
+          * `name` - name
+          * `-name` - -name
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - DRAFT
+          - SCHEDULED
+          - LIVE
+          - COMPLETED
+          - POSTPONED
+          - CANCELLED
+          - ABANDONED
+          type: string
+          minLength: 1
+        description: |-
+          * `DRAFT` - Draft
+          * `SCHEDULED` - Scheduled
+          * `LIVE` - Live
+          * `COMPLETED` - Completed
+          * `POSTPONED` - Postponed
+          * `CANCELLED` - Cancelled
+          * `ABANDONED` - Abandoned
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFixtureList'
+          description: ''
+  /api/v1/fixtures/{fixture_id}/:
+    get:
+      operationId: api_v1_fixtures_retrieve
+      description: Public fixture detail.
+      parameters:
+      - in: path
+        name: fixture_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fixture'
+          description: ''
+  /api/v1/lookups/countries/:
+    get:
+      operationId: api_v1_lookups_countries_list
+      description: List all active countries for profile lookup.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Country'
+          description: ''
+  /api/v1/lookups/genders/:
+    get:
+      operationId: api_v1_lookups_genders_list
+      description: List all active genders for profile lookup.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Gender'
+          description: ''
+  /api/v1/lookups/languages/:
+    get:
+      operationId: api_v1_lookups_languages_list
+      description: List all active languages for profile lookup.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Language'
+          description: ''
+  /api/v1/lookups/timezones/:
+    get:
+      operationId: api_v1_lookups_timezones_list
+      description: List all active timezones for profile lookup.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Timezone'
+          description: ''
+  /api/v1/market-admin/events/:
+    get:
+      operationId: api_v1_market_admin_events_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -546,9 +769,9 @@ paths:
                 $ref: '#/components/schemas/PaginatedMarketEventPublicList'
           description: ''
     post:
-      operationId: market_admin_events_create
+      operationId: api_v1_market_admin_events_create
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -572,7 +795,7 @@ paths:
           description: ''
   /api/v1/market-admin/events/{event_id}/:
     get:
-      operationId: market_admin_events_retrieve
+      operationId: api_v1_market_admin_events_retrieve
       parameters:
       - in: path
         name: event_id
@@ -581,7 +804,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -592,7 +815,7 @@ paths:
                 $ref: '#/components/schemas/MarketEventWrite'
           description: ''
     patch:
-      operationId: market_admin_events_partial_update
+      operationId: api_v1_market_admin_events_partial_update
       parameters:
       - in: path
         name: event_id
@@ -601,7 +824,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -624,7 +847,8 @@ paths:
           description: ''
   /api/v1/market-admin/events/{event_id}/archive/:
     post:
-      operationId: market_admin_events_archive_create
+      operationId: api_v1_market_admin_events_archive_create
+      description: The type of the None singleton.
       parameters:
       - in: path
         name: event_id
@@ -633,7 +857,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -675,7 +899,7 @@ paths:
           description: ''
   /api/v1/market-admin/events/{event_id}/markets/:
     post:
-      operationId: market_admin_events_markets_create
+      operationId: api_v1_market_admin_events_markets_create
       parameters:
       - in: path
         name: event_id
@@ -684,7 +908,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -732,7 +956,7 @@ paths:
           description: ''
   /api/v1/market-admin/events/{event_id}/markets/{market_id}/:
     delete:
-      operationId: market_admin_events_markets_destroy
+      operationId: api_v1_market_admin_events_markets_destroy
       parameters:
       - in: path
         name: event_id
@@ -747,7 +971,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -755,7 +979,8 @@ paths:
           description: No response body
   /api/v1/market-admin/events/{event_id}/publish/:
     post:
-      operationId: market_admin_events_publish_create
+      operationId: api_v1_market_admin_events_publish_create
+      description: The type of the None singleton.
       parameters:
       - in: path
         name: event_id
@@ -764,7 +989,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -806,7 +1031,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/:
     get:
-      operationId: market_admin_markets_list
+      operationId: api_v1_market_admin_markets_list
       parameters:
       - in: query
         name: category
@@ -888,7 +1113,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedMarketAdminReadList'
           description: ''
     post:
-      operationId: market_admin_markets_create
+      operationId: api_v1_market_admin_markets_create
       tags:
       - Market Administration
       requestBody:
@@ -914,7 +1139,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/:
     get:
-      operationId: market_admin_markets_retrieve
+      operationId: api_v1_market_admin_markets_retrieve
       parameters:
       - in: path
         name: market_id
@@ -934,7 +1159,7 @@ paths:
                 $ref: '#/components/schemas/MarketAdminRead'
           description: ''
     patch:
-      operationId: market_admin_markets_partial_update
+      operationId: api_v1_market_admin_markets_partial_update
       parameters:
       - in: path
         name: market_id
@@ -966,7 +1191,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/approve/:
     post:
-      operationId: market_admin_markets_approve_create
+      operationId: api_v1_market_admin_markets_approve_create
       parameters:
       - in: path
         name: market_id
@@ -999,7 +1224,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/close/:
     post:
-      operationId: market_admin_markets_close_create
+      operationId: api_v1_market_admin_markets_close_create
       parameters:
       - in: path
         name: market_id
@@ -1032,7 +1257,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/open/:
     post:
-      operationId: market_admin_markets_open_create
+      operationId: api_v1_market_admin_markets_open_create
       parameters:
       - in: path
         name: market_id
@@ -1065,7 +1290,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/reject/:
     post:
-      operationId: market_admin_markets_reject_create
+      operationId: api_v1_market_admin_markets_reject_create
       parameters:
       - in: path
         name: market_id
@@ -1098,7 +1323,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/reopen/:
     post:
-      operationId: market_admin_markets_reopen_create
+      operationId: api_v1_market_admin_markets_reopen_create
       parameters:
       - in: path
         name: market_id
@@ -1131,7 +1356,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/resolve/:
     post:
-      operationId: market_admin_markets_resolve_create
+      operationId: api_v1_market_admin_markets_resolve_create
       parameters:
       - in: path
         name: market_id
@@ -1164,7 +1389,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/submit/:
     post:
-      operationId: market_admin_markets_submit_create
+      operationId: api_v1_market_admin_markets_submit_create
       parameters:
       - in: path
         name: market_id
@@ -1197,7 +1422,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/suspend/:
     post:
-      operationId: market_admin_markets_suspend_create
+      operationId: api_v1_market_admin_markets_suspend_create
       parameters:
       - in: path
         name: market_id
@@ -1230,7 +1455,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/void/:
     post:
-      operationId: market_admin_markets_void_create
+      operationId: api_v1_market_admin_markets_void_create
       parameters:
       - in: path
         name: market_id
@@ -1263,7 +1488,7 @@ paths:
           description: ''
   /api/v1/market-admin/participants/{user_id}/compliance/:
     get:
-      operationId: market_admin_participants_compliance_retrieve
+      operationId: api_v1_market_admin_participants_compliance_retrieve
       parameters:
       - in: path
         name: user_id
@@ -1283,7 +1508,7 @@ paths:
                 $ref: '#/components/schemas/AdminComplianceDetail'
           description: ''
     patch:
-      operationId: market_admin_participants_compliance_partial_update
+      operationId: api_v1_market_admin_participants_compliance_partial_update
       parameters:
       - in: path
         name: user_id
@@ -1315,7 +1540,7 @@ paths:
           description: ''
   /api/v1/market-admin/participants/{user_id}/compliance/reviews/:
     get:
-      operationId: market_admin_participants_compliance_reviews_list
+      operationId: api_v1_market_admin_participants_compliance_reviews_list
       parameters:
       - name: page
         required: false
@@ -1336,7 +1561,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1348,7 +1573,7 @@ paths:
           description: ''
   /api/v1/market-admin/participants/{user_id}/responsible-participation/:
     get:
-      operationId: market_admin_participants_responsible_participation_retrieve
+      operationId: api_v1_market_admin_participants_responsible_participation_retrieve
       parameters:
       - in: path
         name: user_id
@@ -1368,7 +1593,7 @@ paths:
                 $ref: '#/components/schemas/AdminResponsibleStatus'
           description: ''
     patch:
-      operationId: market_admin_participants_responsible_participation_partial_update
+      operationId: api_v1_market_admin_participants_responsible_participation_partial_update
       parameters:
       - in: path
         name: user_id
@@ -1400,7 +1625,7 @@ paths:
           description: ''
   /api/v1/market-admin/participants/{user_id}/responsible-participation/events/:
     get:
-      operationId: market_admin_participants_responsible_participation_events_list
+      operationId: api_v1_market_admin_participants_responsible_participation_events_list
       parameters:
       - name: page
         required: false
@@ -1421,7 +1646,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1433,7 +1658,7 @@ paths:
           description: ''
   /api/v1/market-admin/proposals/:
     get:
-      operationId: market_admin_proposals_list
+      operationId: api_v1_market_admin_proposals_list
       parameters:
       - name: page
         required: false
@@ -1448,7 +1673,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1460,7 +1685,7 @@ paths:
           description: ''
   /api/v1/market-admin/proposals/{proposal_id}/:
     get:
-      operationId: market_admin_proposals_retrieve
+      operationId: api_v1_market_admin_proposals_retrieve
       parameters:
       - in: path
         name: proposal_id
@@ -1469,7 +1694,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1481,7 +1706,7 @@ paths:
           description: ''
   /api/v1/market-admin/proposals/{proposal_id}/review/:
     post:
-      operationId: market_admin_proposals_review_create
+      operationId: api_v1_market_admin_proposals_review_create
       parameters:
       - in: path
         name: proposal_id
@@ -1490,7 +1715,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -1538,7 +1763,7 @@ paths:
           description: ''
   /api/v1/market-admin/proposals/{proposal_id}/reviews/:
     get:
-      operationId: market_admin_proposals_reviews_list
+      operationId: api_v1_market_admin_proposals_reviews_list
       parameters:
       - name: page
         required: false
@@ -1559,7 +1784,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1571,7 +1796,7 @@ paths:
           description: ''
   /api/v1/market-events/:
     get:
-      operationId: market_events_list
+      operationId: api_v1_market_events_list
       parameters:
       - name: page
         required: false
@@ -1586,7 +1811,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-events
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -1599,7 +1824,7 @@ paths:
           description: ''
   /api/v1/market-events/{event_id}/:
     get:
-      operationId: market_events_retrieve
+      operationId: api_v1_market_events_retrieve
       parameters:
       - in: path
         name: event_id
@@ -1608,7 +1833,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-events
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -1621,7 +1846,7 @@ paths:
           description: ''
   /api/v1/market-events/{event_id}/markets/:
     get:
-      operationId: market_events_markets_list
+      operationId: api_v1_market_events_markets_list
       parameters:
       - in: path
         name: event_id
@@ -1642,7 +1867,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-events
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -1655,7 +1880,7 @@ paths:
           description: ''
   /api/v1/market-fills/:
     get:
-      operationId: market_fills_list
+      operationId: api_v1_market_fills_list
       parameters:
       - name: page
         required: false
@@ -1682,7 +1907,7 @@ paths:
           description: ''
   /api/v1/market-fills/{fill_id}/:
     get:
-      operationId: market_fills_retrieve
+      operationId: api_v1_market_fills_retrieve
       parameters:
       - in: path
         name: fill_id
@@ -1703,7 +1928,7 @@ paths:
           description: ''
   /api/v1/market-orders/:
     get:
-      operationId: market_orders_list
+      operationId: api_v1_market_orders_list
       parameters:
       - name: page
         required: false
@@ -1730,7 +1955,7 @@ paths:
           description: ''
   /api/v1/market-orders/{order_id}/:
     get:
-      operationId: market_orders_retrieve
+      operationId: api_v1_market_orders_retrieve
       parameters:
       - in: path
         name: order_id
@@ -1751,7 +1976,7 @@ paths:
           description: ''
   /api/v1/market-orders/{order_id}/cancel/:
     post:
-      operationId: market_orders_cancel_create
+      operationId: api_v1_market_orders_cancel_create
       parameters:
       - in: path
         name: order_id
@@ -1772,7 +1997,7 @@ paths:
           description: ''
   /api/v1/market-positions/:
     get:
-      operationId: market_positions_list
+      operationId: api_v1_market_positions_list
       parameters:
       - name: page
         required: false
@@ -1799,7 +2024,7 @@ paths:
           description: ''
   /api/v1/market-positions/{position_id}/:
     get:
-      operationId: market_positions_retrieve
+      operationId: api_v1_market_positions_retrieve
       parameters:
       - in: path
         name: position_id
@@ -1820,7 +2045,7 @@ paths:
           description: ''
   /api/v1/markets/:
     get:
-      operationId: markets_list
+      operationId: api_v1_markets_list
       parameters:
       - in: query
         name: category
@@ -1911,7 +2136,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/:
     get:
-      operationId: markets_retrieve
+      operationId: api_v1_markets_retrieve
       parameters:
       - in: path
         name: market_id
@@ -1933,7 +2158,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/orders/:
     post:
-      operationId: markets_orders_create
+      operationId: api_v1_markets_orders_create
       parameters:
       - in: path
         name: market_id
@@ -1972,7 +2197,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/outcomes/{outcome_id}/order-book/:
     get:
-      operationId: markets_outcomes_order_book_retrieve
+      operationId: api_v1_markets_outcomes_order_book_retrieve
       parameters:
       - in: query
         name: levels
@@ -2014,7 +2239,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/settle/:
     post:
-      operationId: markets_settle_create
+      operationId: api_v1_markets_settle_create
       parameters:
       - in: path
         name: market_id
@@ -2035,7 +2260,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/void-refund/:
     post:
-      operationId: markets_void_refund_create
+      operationId: api_v1_markets_void_refund_create
       parameters:
       - in: path
         name: market_id
@@ -2056,7 +2281,7 @@ paths:
           description: ''
   /api/v1/markets/categories/:
     get:
-      operationId: markets_categories_list
+      operationId: api_v1_markets_categories_list
       parameters:
       - name: page
         required: false
@@ -2084,7 +2309,7 @@ paths:
           description: ''
   /api/v1/markets/eligibility/:
     get:
-      operationId: markets_eligibility_retrieve
+      operationId: api_v1_markets_eligibility_retrieve
       tags:
       - Market Participation
       security:
@@ -2098,7 +2323,7 @@ paths:
           description: ''
   /api/v1/markets/orders/open/:
     get:
-      operationId: markets_orders_open_list
+      operationId: api_v1_markets_orders_open_list
       description: Return the authenticated participant's active OPEN and PARTIALLY_FILLED
         orders.
       parameters:
@@ -2151,7 +2376,7 @@ paths:
           description: ''
   /api/v1/markets/portfolio/activity/:
     get:
-      operationId: markets_portfolio_activity_list
+      operationId: api_v1_markets_portfolio_activity_list
       description: Return the authenticated participant's read-only, paginated UGX
         market activity across fills, cancellations, settlements, and void refunds.
       parameters:
@@ -2211,7 +2436,7 @@ paths:
           description: ''
   /api/v1/markets/portfolio/positions/:
     get:
-      operationId: markets_portfolio_positions_list
+      operationId: api_v1_markets_portfolio_positions_list
       description: Return the authenticated participant's positive current positions
         with valuation details.
       parameters:
@@ -2278,7 +2503,7 @@ paths:
           description: ''
   /api/v1/markets/portfolio/summary/:
     get:
-      operationId: markets_portfolio_summary_retrieve
+      operationId: api_v1_markets_portfolio_summary_retrieve
       description: Return the authenticated participant's read-only UGX portfolio
         summary. Money and quantities use four decimal places. total_pnl is null when
         any positive position is unpriced; mark_sources reports valuation coverage.
@@ -2302,7 +2527,7 @@ paths:
           description: ''
   /api/v1/markets/proposals/:
     get:
-      operationId: markets_proposals_list
+      operationId: api_v1_markets_proposals_list
       parameters:
       - name: page
         required: false
@@ -2317,7 +2542,7 @@ paths:
         schema:
           type: integer
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2328,9 +2553,9 @@ paths:
                 $ref: '#/components/schemas/PaginatedMarketProposalParticipantList'
           description: ''
     post:
-      operationId: markets_proposals_create
+      operationId: api_v1_markets_proposals_create
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -2354,7 +2579,7 @@ paths:
           description: ''
   /api/v1/markets/proposals/{proposal_id}/:
     get:
-      operationId: markets_proposals_retrieve
+      operationId: api_v1_markets_proposals_retrieve
       parameters:
       - in: path
         name: proposal_id
@@ -2363,7 +2588,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2374,7 +2599,7 @@ paths:
                 $ref: '#/components/schemas/MarketProposalParticipant'
           description: ''
     patch:
-      operationId: markets_proposals_partial_update
+      operationId: api_v1_markets_proposals_partial_update
       parameters:
       - in: path
         name: proposal_id
@@ -2383,7 +2608,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -2406,7 +2631,7 @@ paths:
           description: ''
   /api/v1/markets/proposals/{proposal_id}/withdraw/:
     post:
-      operationId: markets_proposals_withdraw_create
+      operationId: api_v1_markets_proposals_withdraw_create
       parameters:
       - in: path
         name: proposal_id
@@ -2415,7 +2640,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -2439,7 +2664,7 @@ paths:
           description: ''
   /api/v1/markets/responsible-participation/:
     get:
-      operationId: markets_responsible_participation_retrieve
+      operationId: api_v1_markets_responsible_participation_retrieve
       tags:
       - Market Responsible Participation
       security:
@@ -2452,7 +2677,7 @@ paths:
                 $ref: '#/components/schemas/ResponsibleStatus'
           description: ''
     patch:
-      operationId: markets_responsible_participation_partial_update
+      operationId: api_v1_markets_responsible_participation_partial_update
       tags:
       - Market Responsible Participation
       requestBody:
@@ -2477,7 +2702,7 @@ paths:
           description: ''
   /api/v1/markets/responsible-participation/cooling-off/:
     post:
-      operationId: markets_responsible_participation_cooling_off_create
+      operationId: api_v1_markets_responsible_participation_cooling_off_create
       tags:
       - Market Responsible Participation
       requestBody:
@@ -2503,7 +2728,7 @@ paths:
           description: ''
   /api/v1/markets/responsible-participation/events/:
     get:
-      operationId: markets_responsible_participation_events_list
+      operationId: api_v1_markets_responsible_participation_events_list
       parameters:
       - name: page
         required: false
@@ -2518,7 +2743,7 @@ paths:
         schema:
           type: integer
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2530,7 +2755,7 @@ paths:
           description: ''
   /api/v1/markets/responsible-participation/self-exclusion/:
     post:
-      operationId: markets_responsible_participation_self_exclusion_create
+      operationId: api_v1_markets_responsible_participation_self_exclusion_create
       tags:
       - Market Responsible Participation
       requestBody:
@@ -2554,16 +2779,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/ResponsibleStatus'
           description: ''
+  /api/v1/match-centre/{fixture_id}/:
+    get:
+      operationId: api_v1_match_centre_retrieve
+      description: Aggregated match centre for a canonical fixture.
+      parameters:
+      - in: path
+        name: fixture_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchCentre'
+          description: ''
   /api/v1/modules/:
     get:
-      operationId: modules_retrieve
+      operationId: api_v1_modules_retrieve
       description: |-
         Get available dashboard modules.
 
         Returns:
             List of active dashboard modules
       tags:
-      - modules
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2575,14 +2823,14 @@ paths:
           description: ''
   /api/v1/navigation/:
     get:
-      operationId: navigation_retrieve
+      operationId: api_v1_navigation_retrieve
       description: |-
         Get navigation menu for the current user.
 
         Returns:
             Hierarchical navigation structure
       tags:
-      - navigation
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2592,12 +2840,84 @@ paths:
               schema:
                 $ref: '#/components/schemas/NavigationMenu'
           description: ''
+  /api/v1/news/:
+    get:
+      operationId: api_v1_news_list
+      description: Public news list (published & verified only).
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: featured
+        schema:
+          type: boolean
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -published_at
+          - published_at
+          - -created_at
+          type: string
+          default: -published_at
+          minLength: 1
+        description: |-
+          * `-published_at` - -published_at
+          * `published_at` - published_at
+          * `-created_at` - -created_at
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+          maxLength: 180
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNewsList'
+          description: ''
   /api/v1/notification-categories/:
     get:
-      operationId: notification_categories_retrieve
+      operationId: api_v1_notification_categories_retrieve
       description: Get all active notification categories.
       tags:
-      - notification-categories
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2609,10 +2929,10 @@ paths:
           description: ''
   /api/v1/notification-channels/:
     get:
-      operationId: notification_channels_retrieve
+      operationId: api_v1_notification_channels_retrieve
       description: Get all active notification channels.
       tags:
-      - notification-channels
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2624,10 +2944,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/:
     get:
-      operationId: notification_preferences_retrieve
+      operationId: api_v1_notification_preferences_retrieve
       description: Get user notification preferences.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2638,10 +2958,10 @@ paths:
                 $ref: '#/components/schemas/UserNotificationPreference'
           description: ''
     patch:
-      operationId: notification_preferences_partial_update
+      operationId: api_v1_notification_preferences_partial_update
       description: Bulk update user notification preferences.
       tags:
-      - notification-preferences
+      - api
       requestBody:
         content:
           application/json:
@@ -2664,10 +2984,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/audit-log/:
     get:
-      operationId: notification_preferences_audit_log_retrieve
+      operationId: api_v1_notification_preferences_audit_log_retrieve
       description: Get user's notification audit logs.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2679,10 +2999,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/capabilities/:
     get:
-      operationId: notification_preferences_capabilities_retrieve
+      operationId: api_v1_notification_preferences_capabilities_retrieve
       description: Get channel capabilities for current user.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2694,10 +3014,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/consents/:
     get:
-      operationId: notification_preferences_consents_retrieve
+      operationId: api_v1_notification_preferences_consents_retrieve
       description: Get current consent status.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2708,10 +3028,10 @@ paths:
                 $ref: '#/components/schemas/CommunicationConsent'
           description: ''
     post:
-      operationId: notification_preferences_consents_create
+      operationId: api_v1_notification_preferences_consents_create
       description: Grant or withdraw consent.
       tags:
-      - notification-preferences
+      - api
       requestBody:
         content:
           application/json:
@@ -2734,10 +3054,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/quiet-hours/:
     post:
-      operationId: notification_preferences_quiet_hours_create
+      operationId: api_v1_notification_preferences_quiet_hours_create
       description: Set or update quiet hours.
       tags:
-      - notification-preferences
+      - api
       requestBody:
         content:
           application/json:
@@ -2760,10 +3080,10 @@ paths:
                 $ref: '#/components/schemas/QuietHours'
           description: ''
     delete:
-      operationId: notification_preferences_quiet_hours_destroy
+      operationId: api_v1_notification_preferences_quiet_hours_destroy
       description: Delete quiet hours configuration.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2771,10 +3091,10 @@ paths:
           description: No response body
   /api/v1/notification-preferences/reset/:
     post:
-      operationId: notification_preferences_reset_create
+      operationId: api_v1_notification_preferences_reset_create
       description: Reset user preferences to defaults.
       tags:
-      - notification-preferences
+      - api
       requestBody:
         content:
           application/json:
@@ -2797,11 +3117,11 @@ paths:
           description: ''
   /api/v1/onboarding/:
     get:
-      operationId: onboarding_retrieve
+      operationId: api_v1_onboarding_retrieve
       description: Return the current onboarding status and saved preferences.
       summary: Get onboarding status
       tags:
-      - onboarding
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2813,11 +3133,11 @@ paths:
           description: ''
   /api/v1/onboarding/clubs/:
     post:
-      operationId: onboarding_clubs_create
+      operationId: api_v1_onboarding_clubs_create
       description: Select the user's favourite clubs during onboarding.
       summary: Select favourite clubs
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -2841,11 +3161,11 @@ paths:
           description: ''
   /api/v1/onboarding/competitions/:
     post:
-      operationId: onboarding_competitions_create
+      operationId: api_v1_onboarding_competitions_create
       description: Select the user's favourite competitions during onboarding.
       summary: Select favourite competitions
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -2869,11 +3189,11 @@ paths:
           description: ''
   /api/v1/onboarding/complete/:
     post:
-      operationId: onboarding_complete_create
+      operationId: api_v1_onboarding_complete_create
       description: Complete the onboarding flow and return the dashboard configuration.
       summary: Complete onboarding
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -2896,11 +3216,11 @@ paths:
           description: ''
   /api/v1/onboarding/country/:
     post:
-      operationId: onboarding_country_create
+      operationId: api_v1_onboarding_country_create
       description: Select the user's preferred country during onboarding.
       summary: Select preferred country
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -2924,11 +3244,11 @@ paths:
           description: ''
   /api/v1/onboarding/dashboard/:
     get:
-      operationId: onboarding_dashboard_retrieve
+      operationId: api_v1_onboarding_dashboard_retrieve
       description: Return the personalized dashboard configuration.
       summary: Get dashboard configuration
       tags:
-      - onboarding
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2940,11 +3260,11 @@ paths:
           description: ''
   /api/v1/onboarding/skip/:
     post:
-      operationId: onboarding_skip_create
+      operationId: api_v1_onboarding_skip_create
       description: Skip an onboarding step.
       summary: Skip onboarding step
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -2968,11 +3288,11 @@ paths:
           description: ''
   /api/v1/onboarding/sports/:
     post:
-      operationId: onboarding_sports_create
+      operationId: api_v1_onboarding_sports_create
       description: Select the user's favourite sports during onboarding.
       summary: Select favourite sports
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -2996,7 +3316,7 @@ paths:
           description: ''
   /api/v1/participants/:
     get:
-      operationId: participants_list
+      operationId: api_v1_participants_list
       parameters:
       - in: query
         name: kind
@@ -3050,12 +3370,93 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedParticipantPublicList'
           description: ''
+  /api/v1/players/:
+    get:
+      operationId: api_v1_players_list
+      description: Public player list.
+      parameters:
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - created_at
+          - -created_at
+          type: string
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `created_at` - created_at
+          * `-created_at` - -created_at
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+          maxLength: 180
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPlayerList'
+          description: ''
+  /api/v1/players/{player_id}/:
+    get:
+      operationId: api_v1_players_retrieve
+      description: Public player profile detail.
+      parameters:
+      - in: path
+        name: player_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerDetailResponse'
+          description: ''
   /api/v1/preferences/clubs/:
     get:
-      operationId: preferences_clubs_list
+      operationId: api_v1_preferences_clubs_list
       description: List active clubs, optionally filtered by competition.
       tags:
-      - preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3069,10 +3470,10 @@ paths:
           description: ''
   /api/v1/preferences/competitions/:
     get:
-      operationId: preferences_competitions_list
+      operationId: api_v1_preferences_competitions_list
       description: List active competitions, optionally filtered by sport.
       tags:
-      - preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3086,10 +3487,10 @@ paths:
           description: ''
   /api/v1/preferences/countries/:
     get:
-      operationId: preferences_countries_list
+      operationId: api_v1_preferences_countries_list
       description: List all active countries for the preference catalogue.
       tags:
-      - preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3103,10 +3504,10 @@ paths:
           description: ''
   /api/v1/preferences/sports/:
     get:
-      operationId: preferences_sports_list
+      operationId: api_v1_preferences_sports_list
       description: List all active sports for the preference catalogue.
       tags:
-      - preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3120,11 +3521,11 @@ paths:
           description: ''
   /api/v1/profile/:
     get:
-      operationId: profile_retrieve
+      operationId: api_v1_profile_retrieve
       description: Retrieve the authenticated user's profile information.
       summary: Get profile
       tags:
-      - profile
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3135,13 +3536,13 @@ paths:
                 $ref: '#/components/schemas/Profile'
           description: ''
     patch:
-      operationId: profile_partial_update
+      operationId: api_v1_profile_partial_update
       description: 'Update the authenticated user''s profile. Allowed fields: first_name,
         last_name, display_name, date_of_birth, gender, country, city, biography,
         favourite_club, preferred_language, timezone, communication_preferences, notification_preferences.'
       summary: Update profile
       tags:
-      - profile
+      - api
       requestBody:
         content:
           application/json:
@@ -3164,12 +3565,12 @@ paths:
           description: ''
   /api/v1/profile/avatar/:
     get:
-      operationId: profile_avatar_retrieve
+      operationId: api_v1_profile_avatar_retrieve
       description: Retrieve the authenticated user's avatar metadata and URL. Returns
         the avatar URL (or default avatar URL if none set).
       summary: Get avatar info
       tags:
-      - profile
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3180,13 +3581,13 @@ paths:
                 $ref: '#/components/schemas/Avatar'
           description: ''
     post:
-      operationId: profile_avatar_create
+      operationId: api_v1_profile_avatar_create
       description: 'Upload or replace the authenticated user''s profile picture. Accepts
         multipart/form-data with an ''avatar'' image file. Supported formats: JPG,
         PNG, WebP. Max size: 5MB.'
       summary: Upload or replace avatar
       tags:
-      - profile
+      - api
       requestBody:
         content:
           application/json:
@@ -3206,20 +3607,281 @@ paths:
         '400':
           description: Invalid image or validation error
     delete:
-      operationId: profile_avatar_destroy
+      operationId: api_v1_profile_avatar_destroy
       description: Delete the authenticated user's profile picture. After deletion,
         the platform default avatar will be served.
       summary: Delete avatar
       tags:
-      - profile
+      - api
       security:
       - jwtAuth: []
       responses:
         '200':
           description: Avatar deleted successfully
+  /api/v1/profile/following/:
+    get:
+      operationId: api_v1_profile_following_list
+      description: List clubs the authenticated user follows.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFollowList'
+          description: ''
+  /api/v1/results/:
+    get:
+      operationId: api_v1_results_list
+      description: Public results list (completed fixtures).
+      parameters:
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: date_from
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: date_to
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - starts_at
+          - -starts_at
+          - name
+          - -name
+          type: string
+          default: starts_at
+          minLength: 1
+        description: |-
+          * `starts_at` - starts_at
+          * `-starts_at` - -starts_at
+          * `name` - name
+          * `-name` - -name
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: status
+        schema:
+          enum:
+          - DRAFT
+          - SCHEDULED
+          - LIVE
+          - COMPLETED
+          - POSTPONED
+          - CANCELLED
+          - ABANDONED
+          type: string
+          minLength: 1
+        description: |-
+          * `DRAFT` - Draft
+          * `SCHEDULED` - Scheduled
+          * `LIVE` - Live
+          * `COMPLETED` - Completed
+          * `POSTPONED` - Postponed
+          * `CANCELLED` - Cancelled
+          * `ABANDONED` - Abandoned
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFixtureList'
+          description: ''
+  /api/v1/search/:
+    get:
+      operationId: api_v1_search_retrieve
+      description: Enterprise search across clubs, players, competitions, fixtures.
+      parameters:
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: country
+        schema:
+          type: string
+          maxLength: 2
+          minLength: 1
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - relevance
+          - name
+          - -created_at
+          type: string
+          default: relevance
+          minLength: 1
+        description: |-
+          * `relevance` - relevance
+          * `name` - name
+          * `-created_at` - -created_at
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 200
+      - in: query
+        name: season
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+          description: ''
+  /api/v1/search/autocomplete/:
+    get:
+      operationId: api_v1_search_autocomplete_list
+      description: Search autocomplete for clubs, players, competitions, venues.
+      parameters:
+      - in: query
+        name: entity_type
+        schema:
+          enum:
+          - club
+          - player
+          - competition
+          - venue
+          - all
+          type: string
+          default: all
+          minLength: 1
+        description: |-
+          * `club` - club
+          * `player` - player
+          * `competition` - competition
+          * `venue` - venue
+          * `all` - all
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 20
+          minimum: 1
+          default: 10
+      - in: query
+        name: q
+        schema:
+          type: string
+          maxLength: 200
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AutocompleteResult'
+          description: ''
+  /api/v1/search/suggestions/:
+    get:
+      operationId: api_v1_search_suggestions_list
+      description: Database-driven search suggestions.
+      tags:
+      - Discovery
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Suggestion'
+          description: ''
   /api/v1/sporting-events/:
     get:
-      operationId: sporting_events_list
+      operationId: api_v1_sporting_events_list
       parameters:
       - in: query
         name: competition
@@ -3308,7 +3970,7 @@ paths:
           description: ''
   /api/v1/sports/:
     get:
-      operationId: sports_list
+      operationId: api_v1_sports_list
       parameters:
       - name: page
         required: false
@@ -3336,7 +3998,7 @@ paths:
           description: ''
   /api/v1/system/health/:
     get:
-      operationId: system_health_retrieve
+      operationId: api_v1_system_health_retrieve
       summary: Backend health check
       tags:
       - System
@@ -3352,7 +4014,7 @@ paths:
           description: ''
   /api/v1/wallets/:
     get:
-      operationId: wallets_list
+      operationId: api_v1_wallets_list
       parameters:
       - name: page
         required: false
@@ -3381,7 +4043,7 @@ paths:
           description: Authentication credentials are required.
   /api/v1/wallets/{currency}/:
     get:
-      operationId: wallets_retrieve
+      operationId: api_v1_wallets_retrieve
       parameters:
       - in: path
         name: currency
@@ -3407,7 +4069,7 @@ paths:
           description: Wallet not found.
   /api/v1/wallets/{currency}/ledger/:
     get:
-      operationId: wallets_ledger_list
+      operationId: api_v1_wallets_ledger_list
       parameters:
       - in: query
         name: created_from
@@ -3474,14 +4136,14 @@ paths:
           description: Wallet not found.
   /api/v1/widgets/:
     get:
-      operationId: widgets_retrieve
+      operationId: api_v1_widgets_retrieve
       description: |-
         Get enabled widgets for the current user.
 
         Returns:
             List of enabled widgets
       tags:
-      - widgets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3626,6 +4288,23 @@ components:
       - sell_allowed
       - sell_reason_codes
       - utilization
+    AutocompleteResult:
+      type: object
+      description: A single autocomplete result.
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+        entity_type:
+          type: string
+        logo:
+          type: string
+      required:
+      - display_name
+      - entity_type
+      - uuid
     Avatar:
       type: object
       description: Serializer for returning avatar metadata and URL.
@@ -3637,8 +4316,8 @@ components:
         avatar:
           type: string
           format: uri
-          nullable: true
           readOnly: true
+          nullable: true
         avatar_url:
           type: string
           nullable: true
@@ -3746,6 +4425,62 @@ components:
       - id
       - name
       - slug
+    ClubDetailResponse:
+      type: object
+      description: Full club profile response.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          nullable: true
+        founded:
+          type: integer
+          nullable: true
+        profile:
+          allOf:
+          - $ref: '#/components/schemas/ClubProfile'
+          nullable: true
+      required:
+      - id
+      - name
+      - slug
+    ClubProfile:
+      type: object
+      description: Extended club profile data.
+      properties:
+        logo:
+          type: string
+          nullable: true
+        country:
+          type: string
+          format: uuid
+          nullable: true
+        stadium:
+          type: string
+        coach:
+          type: string
+        league:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+        social_links: {}
+        current_season:
+          type: string
+          format: uuid
+          nullable: true
     ClubSelection:
       type: object
       description: |-
@@ -3813,6 +4548,34 @@ components:
       - source
       - user_agent
       - withdrawn_at
+    Competition:
+      type: object
+      description: Public competition serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 180
+        slug:
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
+        country_code:
+          type: string
+          default: UG
+          maxLength: 2
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+      required:
+      - id
+      - name
+      - slug
+      - sport
     CompetitionCatalogue:
       type: object
       description: Serializer for the competition preference catalogue.
@@ -3857,12 +4620,9 @@ components:
           type: string
           maxLength: 180
         slug:
-          oneOf:
-          - type: string
-            maxLength: 200
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
         country_code:
           type: string
           default: UG
@@ -4213,6 +4973,41 @@ components:
       - module_name
       - permission_required
       - title
+    DiscoveryClub:
+      type: object
+      description: Public club serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+        competition:
+          type: string
+          format: uuid
+          readOnly: true
+        founded:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+      required:
+      - competition
+      - id
+      - name
+      - slug
+      - sport
     Duration:
       type: object
       properties:
@@ -4276,8 +5071,9 @@ components:
           $ref: '#/components/schemas/RoleEnum'
         position:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         participant:
           allOf:
           - $ref: '#/components/schemas/ParticipantPublic'
@@ -4285,6 +5081,91 @@ components:
       required:
       - participant
       - position
+    Fixture:
+      type: object
+      description: Public fixture serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        event_type:
+          type: string
+        status:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+          nullable: true
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+        venue:
+          type: string
+        country_code:
+          type: string
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          nullable: true
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/FixtureParticipant'
+      required:
+      - event_type
+      - id
+      - name
+      - status
+    FixtureParticipant:
+      type: object
+      description: A participant in a fixture.
+      properties:
+        role:
+          type: string
+        position:
+          type: integer
+        participant:
+          type: object
+          additionalProperties: {}
+      required:
+      - participant
+      - position
+      - role
+    Follow:
+      type: object
+      description: Serializer for a followed club.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+          readOnly: true
+        club_name:
+          type: string
+          readOnly: true
+        club_slug:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - club
+      - club_name
+      - club_slug
+      - created_at
+      - id
     Gender:
       type: object
       description: Serializer for the Gender lookup table.
@@ -4819,18 +5700,16 @@ components:
           type: string
           maxLength: 120
         slug:
-          oneOf:
-          - type: string
-            maxLength: 140
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 140
+          pattern: ^[-a-zA-Z0-9_]+$
         description:
           type: string
         display_order:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
       required:
       - id
       - name
@@ -5229,8 +6108,9 @@ components:
           $ref: '#/components/schemas/MarketOutcomeSideEnum'
         position:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         label:
           type: string
           maxLength: 120
@@ -6149,12 +7029,9 @@ components:
           type: string
           maxLength: 80
         slug:
-          oneOf:
-          - type: string
-            maxLength: 180
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 180
+          pattern: ^[-a-zA-Z0-9_]+$
         scope_type:
           $ref: '#/components/schemas/MarketScopeEnum'
       required:
@@ -6257,6 +7134,258 @@ components:
       - total_refunded_position_quantity
       - total_released_buy_reservation_amount
       - total_released_sell_reservation_quantity
+    MatchCentre:
+      type: object
+      description: Aggregated match centre response.
+      properties:
+        fixture:
+          $ref: '#/components/schemas/MatchCentreFixture'
+        result:
+          type: string
+        home_score:
+          type: integer
+          nullable: true
+        away_score:
+          type: integer
+          nullable: true
+        attendance:
+          type: integer
+          nullable: true
+        venue:
+          allOf:
+          - $ref: '#/components/schemas/MatchCentreVenue'
+          nullable: true
+        lineups:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentreLineup'
+        player_statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentrePlayerStat'
+        team_statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentreTeamStat'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentreTimeline'
+        officials:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchCentreOfficial'
+        broadcasts:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        data_confidence:
+          type: string
+        feed_status:
+          type: string
+        last_updated:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - fixture
+    MatchCentreFixture:
+      type: object
+      description: Fixture summary within match centre.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+          nullable: true
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - id
+      - name
+      - status
+    MatchCentreLineup:
+      type: object
+      description: Lineup entry serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        side:
+          $ref: '#/components/schemas/MatchCentreLineupSideEnum'
+        position:
+          type: string
+          maxLength: 100
+        shirt_number:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        is_starter:
+          type: boolean
+        player:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+      required:
+      - id
+      - player
+      - side
+    MatchCentreLineupSideEnum:
+      enum:
+      - HOME
+      - AWAY
+      type: string
+      description: |-
+        * `HOME` - Home
+        * `AWAY` - Away
+    MatchCentreOfficial:
+      type: object
+      description: Official serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        role:
+          type: string
+          maxLength: 100
+        name:
+          type: string
+          maxLength: 180
+      required:
+      - id
+      - name
+      - role
+    MatchCentrePlayerStat:
+      type: object
+      description: Player statistic serializer.
+      properties:
+        participant:
+          type: string
+          format: uuid
+          readOnly: true
+        stat_type:
+          type: string
+          maxLength: 100
+        value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - participant
+      - stat_type
+    MatchCentreTeamStat:
+      type: object
+      description: Team statistic serializer.
+      properties:
+        participant:
+          type: string
+          format: uuid
+          readOnly: true
+        stat_type:
+          type: string
+          maxLength: 100
+        value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - participant
+      - stat_type
+    MatchCentreTimeline:
+      type: object
+      description: Timeline event serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        event_type:
+          $ref: '#/components/schemas/MatchCentreTimelineEventTypeEnum'
+        minute:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        participant:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        player:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        description:
+          type: string
+          maxLength: 500
+      required:
+      - event_type
+      - id
+      - minute
+      - participant
+      - player
+    MatchCentreTimelineEventTypeEnum:
+      enum:
+      - GOAL
+      - ASSIST
+      - YELLOW_CARD
+      - RED_CARD
+      - SUBSTITUTION
+      - PENALTY
+      - OWN_GOAL
+      - MATCH_START
+      - MATCH_END
+      - HALF_TIME
+      - OTHER
+      type: string
+      description: |-
+        * `GOAL` - Goal
+        * `ASSIST` - Assist
+        * `YELLOW_CARD` - Yellow card
+        * `RED_CARD` - Red card
+        * `SUBSTITUTION` - Substitution
+        * `PENALTY` - Penalty
+        * `OWN_GOAL` - Own goal
+        * `MATCH_START` - Match start
+        * `MATCH_END` - Match end
+        * `HALF_TIME` - Half time
+        * `OTHER` - Other
+    MatchCentreVenue:
+      type: object
+      description: Venue serializer for match centre.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        city:
+          type: string
+        capacity:
+          type: integer
+          nullable: true
+      required:
+      - id
+      - name
     NavigationMenu:
       type: object
       description: Serializer for navigation menu items.
@@ -6306,6 +7435,58 @@ components:
       - parent
       - permission_required
       - route
+    News:
+      type: object
+      description: Public news serializer (published & verified only).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 300
+        slug:
+          type: string
+          maxLength: 320
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+        body:
+          type: string
+        category:
+          type: string
+          format: uuid
+          readOnly: true
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        club:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        is_featured:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - body
+      - category
+      - club
+      - competition
+      - id
+      - sport
+      - title
     NotificationCategory:
       type: object
       description: |-
@@ -6595,7 +7776,7 @@ components:
       - remaining_order_quantity
       - reserved_buy_amount
       - reserved_sell_quantity
-    PaginatedCompetitionPublicList:
+    PaginatedCompetitionList:
       type: object
       required:
       - count
@@ -6617,7 +7798,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/CompetitionPublic'
+            $ref: '#/components/schemas/Competition'
     PaginatedComplianceReviewList:
       type: object
       required:
@@ -6641,6 +7822,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ComplianceReview'
+    PaginatedDiscoveryClubList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscoveryClub'
+    PaginatedFixtureList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Fixture'
+    PaginatedFollowList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Follow'
     PaginatedLedgerEntryReadList:
       type: object
       required:
@@ -6940,6 +8190,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketPublic'
+    PaginatedNewsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/News'
     PaginatedParticipantOpenOrderList:
       type: object
       required:
@@ -7009,6 +8282,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ParticipantResponsibleEvent'
+    PaginatedPlayerList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Player'
     PaginatedResponsibleEventList:
       type: object
       required:
@@ -7206,12 +8502,9 @@ components:
           type: string
           maxLength: 80
         slug:
-          oneOf:
-          - type: string
-            maxLength: 200
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
         kind:
           allOf:
           - $ref: '#/components/schemas/KindEnum'
@@ -7658,6 +8951,85 @@ components:
           type: string
           format: date-time
           readOnly: true
+    Player:
+      type: object
+      description: Public player serializer.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 180
+        short_name:
+          type: string
+          maxLength: 80
+        slug:
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+        country_code:
+          type: string
+          maxLength: 2
+      required:
+      - id
+      - name
+      - sport
+    PlayerDetailResponse:
+      type: object
+      description: Full player profile response.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        short_name:
+          type: string
+        slug:
+          type: string
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        country_code:
+          type: string
+        profile:
+          allOf:
+          - $ref: '#/components/schemas/PlayerProfile'
+          nullable: true
+      required:
+      - id
+      - name
+      - slug
+    PlayerProfile:
+      type: object
+      description: Extended player profile data.
+      properties:
+        club:
+          type: string
+          format: uuid
+          nullable: true
+        position:
+          type: string
+        shirt_number:
+          type: integer
+          nullable: true
+        nationality:
+          type: string
+          format: uuid
+          nullable: true
+        biography:
+          type: string
+        career_history: {}
+        statistics: {}
+        status:
+          type: string
     PortfolioScope:
       type: object
       properties:
@@ -7824,8 +9196,8 @@ components:
         avatar:
           type: string
           format: uri
-          nullable: true
           readOnly: true
+          nullable: true
         avatar_url:
           type: string
           nullable: true
@@ -8115,6 +9487,60 @@ components:
         * `COMPETITOR` - Competitor
         * `SUBJECT` - Subject
         * `OTHER` - Other
+    SearchResponse:
+      type: object
+      description: Search response envelope.
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+      required:
+      - count
+      - page
+      - page_size
+      - results
+    SearchResult:
+      type: object
+      description: A single search result.
+      properties:
+        id:
+          type: string
+          format: uuid
+        entity_type:
+          type: string
+        display_name:
+          type: string
+        slug:
+          type: string
+        country_code:
+          type: string
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+          nullable: true
+        logo:
+          type: string
+      required:
+      - display_name
+      - entity_type
+      - id
     SelfExclusion:
       type: object
       properties:
@@ -8228,12 +9654,9 @@ components:
           type: string
           maxLength: 30
         slug:
-          oneOf:
-          - type: string
-            maxLength: 120
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 120
+          pattern: ^[-a-zA-Z0-9_]+$
       required:
       - code
       - id
@@ -8361,6 +9784,24 @@ components:
         * `SPORTS` - SPORTS
         * `COMPETITIONS` - COMPETITIONS
         * `CLUBS` - CLUBS
+    Suggestion:
+      type: object
+      description: A single search suggestion.
+      properties:
+        suggestion_type:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+      required:
+      - display_name
+      - entity_id
+      - entity_type
+      - suggestion_type
     Timezone:
       type: object
       description: Serializer for the Timezone lookup table.
@@ -8472,13 +9913,10 @@ components:
           format: email
           maxLength: 254
         phone_number:
+          type: string
           nullable: true
-          oneOf:
-          - type: string
-            pattern: ^\+?1?\d{9,15}$
-            maxLength: 20
-          - type: string
-            maxLength: 0
+          pattern: ^\+?1?\d{9,15}$
+          maxLength: 20
         password:
           type: string
           writeOnly: true
