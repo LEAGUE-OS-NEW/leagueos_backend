@@ -192,7 +192,7 @@ class MarketResultDisputeService:
         cls,
         evidence_items,
     ) -> list[dict]:
-        if not isinstance(evidence_items, (list, tuple)) or not evidence_items:
+        if not isinstance(evidence_items, list | tuple) or not evidence_items:
             raise ValidationError(
                 {"evidence_items": ("At least one dispute evidence item " "is required.")}
             )

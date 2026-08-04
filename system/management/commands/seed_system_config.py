@@ -105,18 +105,12 @@ class Command(BaseCommand):
             code = flag_data["code"]
             defaults = {k: v for k, v in flag_data.items() if k != "code"}
             flag, created = FeatureFlag.objects.get_or_create(code=code, defaults=defaults)
-            self.stdout.write(
-                f"  {'Created' if created else 'Found'} feature flag: {flag.code}"
-            )
+            self.stdout.write(f"  {'Created' if created else 'Found'} feature flag: {flag.code}")
 
         for config_data in SYSTEM_CONFIG:
             key = config_data["key"]
             defaults = {k: v for k, v in config_data.items() if k != "key"}
-            config, created = SystemConfiguration.objects.get_or_create(
-                key=key, defaults=defaults
-            )
-            self.stdout.write(
-                f"  {'Created' if created else 'Found'} config: {config.key}"
-            )
+            config, created = SystemConfiguration.objects.get_or_create(key=key, defaults=defaults)
+            self.stdout.write(f"  {'Created' if created else 'Found'} config: {config.key}")
 
         self.stdout.write(self.style.SUCCESS("System configuration seeded successfully."))

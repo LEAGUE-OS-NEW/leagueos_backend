@@ -42,9 +42,7 @@ class Command(BaseCommand):
             code = provider_data["code"]
             defaults = {k: v for k, v in provider_data.items() if k != "code"}
             defaults["is_active"] = True
-            provider, created = PaymentProvider.objects.get_or_create(
-                code=code, defaults=defaults
-            )
+            provider, created = PaymentProvider.objects.get_or_create(code=code, defaults=defaults)
             self.stdout.write(
                 f"  {'Created' if created else 'Found'} payment provider: {provider.code}"
             )

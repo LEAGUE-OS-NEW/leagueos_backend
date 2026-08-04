@@ -108,7 +108,12 @@ class Migration(migrations.Migration):
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True, db_index=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
-                ("reference", models.CharField(db_index=True, default=uuid.uuid4, max_length=255, unique=True)),
+                (
+                    "reference",
+                    models.CharField(
+                        db_index=True, default=uuid.uuid4, max_length=255, unique=True
+                    ),
+                ),
                 (
                     "transaction_type",
                     models.CharField(
@@ -285,7 +290,10 @@ class Migration(migrations.Migration):
                 ("created_at", models.DateTimeField(auto_now_add=True, db_index=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 ("amount", models.DecimalField(decimal_places=4, max_digits=16)),
-                ("destination", models.JSONField(help_text="Provider-specific destination details")),
+                (
+                    "destination",
+                    models.JSONField(help_text="Provider-specific destination details"),
+                ),
                 (
                     "status",
                     models.CharField(

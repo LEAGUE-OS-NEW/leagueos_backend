@@ -173,7 +173,7 @@ class MarketProvisionalResultService:
 
     @classmethod
     def _validate_evidence_items(cls, evidence_items) -> list[dict]:
-        if not isinstance(evidence_items, (list, tuple)) or not evidence_items:
+        if not isinstance(evidence_items, list | tuple) or not evidence_items:
             raise ValidationError(
                 {"evidence_items": ("At least one approved evidence item is required.")}
             )
