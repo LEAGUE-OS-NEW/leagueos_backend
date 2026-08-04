@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 
-from wallets.models import LedgerEntry, Wallet
+from wallets.models import LedgerEntry, Receipt, Wallet, WalletTransaction
 
 
 class WalletReadService:
@@ -29,15 +29,46 @@ class WalletReadService:
             return None, LedgerEntry.objects.none()
 
         filters = filters or {}
-        queryset = LedgerEntry.objects.filter(wallet=wallet)
-        if filters.get("entry_type"):
-            queryset = queryset.filter(entry_type=filters["entry_type"])
-        for field in ("market_id", "order_id", "fill_id"):
-            if filters.get(field):
-                queryset = queryset.filter(**{field: filters[field]})
+        queryset = LedgerEntry.objects.filter(transaction__wallet=wallet)
+        if filters.get("debit_account"):
+            queryset = queryset.filter(debit_account=filters["debit_account"])
+        if filters.get("credit_account"):
+            queryset = queryset.filter(credit_account=filters["credit_account"])
         if filters.get("created_from"):
             queryset = queryset.filter(created_at__gte=filters["created_from"])
         if filters.get("created_to"):
             queryset = queryset.filter(created_at__lte=filters["created_to"])
 
         return wallet, queryset.order_by("-created_at", "-id")
+
+    @classmethod
+    def list_transactions(cls, *, user, **filters):
+        """List wallet transactions scoped to the user."""
+        queryset = WalletTransaction.objects.filter(wallet__user=user)
+        currency = filters.get("currency")
+        if currency:
+            normalized = cls.normalize_currency(currency)
+            queryset = queryset.filter(wallet__currency=normalized)
+        return queryset.order_by("-created_at")
+
+    @classmethod
+    def get_transaction(cls, *, user, transaction_id):
+        """Get a transaction scoped to the user."""
+        try:
+            return WalletTransaction.objects.get(id=transaction_id, wallet__user=user)
+        except WalletTransaction.DoesNotExist:
+            from django.http import Http404
+
+            raise Http404 from None
+
+    @classmethod
+    def get_receipt_download_url(cls, *, user, transaction_id):
+        """Get the download URL for a receipt scoped to the user."""
+        try:
+            receipt = Receipt.objects.get(
+                transaction_id=transaction_id,
+                transaction__wallet__user=user,
+            )
+        except Receipt.DoesNotExist:
+            return None
+        return receipt.file_url or None
