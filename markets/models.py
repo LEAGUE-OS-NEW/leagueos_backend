@@ -1135,6 +1135,562 @@ class MarketOutcome(TimeStampedUUIDModel):
             raise ValidationError(errors)
 
 
+class ImmutableProvisionalResultQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Provisional result records are immutable.")
+
+    def delete(self):
+        raise ValidationError("Provisional result records are immutable.")
+
+
+class MarketProvisionalResult(TimeStampedUUIDModel):
+    market = models.OneToOneField(
+        Market,
+        on_delete=models.PROTECT,
+        related_name="provisional_result",
+    )
+    winning_outcome = models.ForeignKey(
+        MarketOutcome,
+        on_delete=models.PROTECT,
+        related_name="provisional_results",
+    )
+    notes = models.TextField()
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="published_market_provisional_results",
+    )
+    publisher_email = models.EmailField()
+    published_at = models.DateTimeField(db_index=True)
+    dispute_deadline = models.DateTimeField(db_index=True)
+
+    objects = ImmutableProvisionalResultQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-published_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=["dispute_deadline"],
+                name="mkt_prov_deadline_idx",
+            ),
+            models.Index(
+                fields=["published_by", "-published_at"],
+                name="mkt_prov_publisher_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(dispute_deadline__gt=models.F("published_at")),
+                name="market_provisional_deadline_after_publish",
+            )
+        ]
+
+    def __str__(self):
+        return f"Provisional result for {self.market_id}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Provisional result records are immutable.")
+
+        self.notes = self.notes.strip()
+
+        if self.published_by_id and not self.publisher_email:
+            self.publisher_email = self.published_by.email
+
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Provisional result records cannot be deleted.")
+
+    def clean(self):
+        errors = {}
+
+        if self.winning_outcome_id:
+            if self.market_id and self.winning_outcome.market_id != self.market_id:
+                errors["winning_outcome"] = (
+                    "The provisional winning outcome must belong to the market."
+                )
+
+        if not self.notes.strip():
+            errors["notes"] = "Provisional result notes are required."
+
+        if self.published_at is None:
+            errors["published_at"] = "A publication timestamp is required."
+
+        if self.dispute_deadline is None:
+            errors["dispute_deadline"] = "A dispute deadline is required."
+        elif self.published_at is not None and self.dispute_deadline <= self.published_at:
+            errors["dispute_deadline"] = "The dispute deadline must be after publication."
+
+        if not self.publisher_email:
+            errors["publisher_email"] = "The publisher email snapshot is required."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class MarketProvisionalEvidence(TimeStampedUUIDModel):
+    class EvidenceType(models.TextChoices):
+        OFFICIAL_RESULT = "OFFICIAL_RESULT", "Official result"
+        DOCUMENT_REFERENCE = "DOCUMENT_REFERENCE", "Document reference"
+        OFFICIAL_SOURCE = "OFFICIAL_SOURCE", "Official source"
+        MEDIA_REFERENCE = "MEDIA_REFERENCE", "Media reference"
+
+    provisional_result = models.ForeignKey(
+        MarketProvisionalResult,
+        on_delete=models.PROTECT,
+        related_name="evidence_items",
+    )
+    evidence_type = models.CharField(
+        max_length=30,
+        choices=EvidenceType.choices,
+        db_index=True,
+    )
+    label = models.CharField(max_length=255)
+    reference = models.TextField()
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="recorded_market_provisional_evidence",
+    )
+    recorder_email = models.EmailField()
+    recorded_at = models.DateTimeField(db_index=True)
+
+    objects = ImmutableProvisionalResultQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["recorded_at", "id"]
+        indexes = [
+            models.Index(
+                fields=["provisional_result", "recorded_at"],
+                name="mkt_prov_evidence_idx",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.evidence_type}: {self.label}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Provisional evidence records are immutable.")
+
+        self.label = self.label.strip()
+        self.reference = self.reference.strip()
+
+        if self.recorded_by_id and not self.recorder_email:
+            self.recorder_email = self.recorded_by.email
+
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Provisional evidence records cannot be deleted.")
+
+    def clean(self):
+        errors = {}
+
+        if not self.label.strip():
+            errors["label"] = "An evidence label is required."
+
+        if not self.reference.strip():
+            errors["reference"] = "An evidence reference is required."
+
+        if self.recorded_at is None:
+            errors["recorded_at"] = "An evidence timestamp is required."
+
+        if not self.recorder_email:
+            errors["recorder_email"] = "The recorder email snapshot is required."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class ImmutableResultDisputeQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Market result dispute records are immutable.")
+
+    def delete(self):
+        raise ValidationError("Market result dispute records are immutable.")
+
+
+class MarketResultDispute(TimeStampedUUIDModel):
+    class Category(models.TextChoices):
+        INCORRECT_OUTCOME = (
+            "INCORRECT_OUTCOME",
+            "Incorrect outcome",
+        )
+        INCOMPLETE_EVIDENCE = (
+            "INCOMPLETE_EVIDENCE",
+            "Incomplete evidence",
+        )
+        SOURCE_CONFLICT = (
+            "SOURCE_CONFLICT",
+            "Conflicting official sources",
+        )
+        RULES_APPLICATION = (
+            "RULES_APPLICATION",
+            "Incorrect rules application",
+        )
+        OTHER = "OTHER", "Other"
+
+    provisional_result = models.ForeignKey(
+        MarketProvisionalResult,
+        on_delete=models.PROTECT,
+        related_name="disputes",
+    )
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_result_disputes",
+    )
+    participant_email = models.EmailField()
+    category = models.CharField(
+        max_length=30,
+        choices=Category.choices,
+        db_index=True,
+    )
+    explanation = models.TextField()
+    submitted_at = models.DateTimeField(
+        db_index=True,
+    )
+
+    objects = ImmutableResultDisputeQuerySet.as_manager()
+
+    class Meta:
+        ordering = [
+            "-submitted_at",
+            "-id",
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "provisional_result",
+                    "participant",
+                ],
+                name="uniq_mkt_result_dispute",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "provisional_result",
+                    "submitted_at",
+                ],
+                name="mkt_dispute_result_idx",
+            ),
+            models.Index(
+                fields=[
+                    "participant",
+                    "-submitted_at",
+                ],
+                name="mkt_dispute_part_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Result dispute by {self.participant_id} " f"for {self.provisional_result_id}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Market result dispute records are immutable.")
+
+        self.explanation = self.explanation.strip()
+
+        if self.participant_id and not self.participant_email:
+            self.participant_email = self.participant.email
+
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Market result dispute records cannot be deleted.")
+
+    def clean(self):
+        errors = {}
+
+        if not self.explanation.strip():
+            errors["explanation"] = "A dispute explanation is required."
+
+        if not self.participant_email:
+            errors["participant_email"] = "The participant email snapshot is required."
+
+        if self.submitted_at is None:
+            errors["submitted_at"] = "A dispute submission timestamp is required."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class MarketResultDisputeEvidence(TimeStampedUUIDModel):
+    dispute = models.ForeignKey(
+        MarketResultDispute,
+        on_delete=models.PROTECT,
+        related_name="evidence_items",
+    )
+    label = models.CharField(
+        max_length=255,
+    )
+    reference = models.TextField()
+    recorded_at = models.DateTimeField(
+        db_index=True,
+    )
+
+    objects = ImmutableResultDisputeQuerySet.as_manager()
+
+    class Meta:
+        ordering = [
+            "recorded_at",
+            "id",
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "dispute",
+                    "recorded_at",
+                ],
+                name="mkt_dispute_evid_idx",
+            )
+        ]
+
+    def __str__(self):
+        return f"Dispute evidence: {self.label}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Market result dispute evidence is immutable.")
+
+        self.label = self.label.strip()
+        self.reference = self.reference.strip()
+
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Market result dispute evidence cannot be deleted.")
+
+    def clean(self):
+        errors = {}
+
+        if not self.label.strip():
+            errors["label"] = "A dispute evidence label is required."
+
+        if not self.reference.strip():
+            errors["reference"] = "A dispute evidence reference is required."
+
+        if self.recorded_at is None:
+            errors["recorded_at"] = "An evidence timestamp is required."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class MarketResultDisputeDecision(TimeStampedUUIDModel):
+    class DecisionType(models.TextChoices):
+        CONFIRM = "CONFIRM", "Confirm provisional result"
+        CORRECT = "CORRECT", "Correct provisional result"
+        VOID = "VOID", "Void market"
+        EXTEND_REVIEW = "EXTEND_REVIEW", "Extend review"
+
+    provisional_result = models.ForeignKey(
+        MarketProvisionalResult,
+        on_delete=models.PROTECT,
+        related_name="decisions",
+    )
+    sequence = models.PositiveIntegerField()
+    decision_type = models.CharField(
+        max_length=20,
+        choices=DecisionType.choices,
+        db_index=True,
+    )
+    winning_outcome = models.ForeignKey(
+        MarketOutcome,
+        on_delete=models.PROTECT,
+        related_name="result_dispute_decisions",
+        null=True,
+        blank=True,
+    )
+    review_extended_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    covered_dispute_count = models.PositiveIntegerField()
+    notes = models.TextField()
+    evidence = models.TextField()
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_result_dispute_decisions",
+    )
+    decision_maker_email = models.EmailField()
+    decided_at = models.DateTimeField(
+        db_index=True,
+    )
+
+    objects = ImmutableResultDisputeQuerySet.as_manager()
+
+    class Meta:
+        ordering = [
+            "sequence",
+            "id",
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "provisional_result",
+                    "sequence",
+                ],
+                name="uniq_mkt_dispute_dec_seq",
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "provisional_result",
+                ],
+                condition=Q(
+                    decision_type__in=[
+                        "CONFIRM",
+                        "CORRECT",
+                        "VOID",
+                    ]
+                ),
+                name="uniq_mkt_dispute_final",
+            ),
+            models.CheckConstraint(
+                condition=Q(sequence__gte=1),
+                name="mkt_dispute_dec_seq_gte1",
+            ),
+            models.CheckConstraint(
+                condition=Q(covered_dispute_count__gte=1),
+                name="mkt_dispute_count_gte1",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "provisional_result",
+                    "sequence",
+                ],
+                name="mkt_dispute_dec_seq_idx",
+            ),
+            models.Index(
+                fields=[
+                    "decided_by",
+                    "-decided_at",
+                ],
+                name="mkt_dispute_decider_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Decision {self.sequence} for " f"{self.provisional_result_id}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Market result dispute decisions are immutable.")
+
+        self.notes = self.notes.strip()
+        self.evidence = self.evidence.strip()
+
+        if self.decided_by_id and not self.decision_maker_email:
+            self.decision_maker_email = self.decided_by.email
+
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Market result dispute decisions cannot be deleted.")
+
+    def clean(self):
+        errors = {}
+
+        if not self.notes.strip():
+            errors["notes"] = "Decision notes are required."
+
+        if not self.evidence.strip():
+            errors["evidence"] = "Decision evidence is required."
+
+        if not self.decision_maker_email:
+            errors["decision_maker_email"] = "The decision-maker email snapshot is required."
+
+        if self.decided_at is None:
+            errors["decided_at"] = "A decision timestamp is required."
+
+        if self.sequence is not None and self.sequence < 1:
+            errors["sequence"] = "The decision sequence must be at least one."
+
+        if self.covered_dispute_count is not None and self.covered_dispute_count < 1:
+            errors["covered_dispute_count"] = "A decision must cover at least one dispute."
+
+        provisional_result = None
+
+        if self.provisional_result_id:
+            provisional_result = self.provisional_result
+
+        if self.winning_outcome_id and provisional_result:
+            if self.winning_outcome.market_id != provisional_result.market_id:
+                errors["winning_outcome"] = "The decision outcome must belong to the market."
+
+        if self.decision_type == self.DecisionType.CONFIRM:
+            if not self.winning_outcome_id:
+                errors["winning_outcome"] = (
+                    "A confirmed decision requires the " "provisional winning outcome."
+                )
+            elif (
+                provisional_result
+                and self.winning_outcome_id != provisional_result.winning_outcome_id
+            ):
+                errors["winning_outcome"] = (
+                    "A confirmed decision must use the " "provisional winning outcome."
+                )
+
+            if self.review_extended_until is not None:
+                errors["review_extended_until"] = "A final decision cannot extend review."
+
+        elif self.decision_type == self.DecisionType.CORRECT:
+            if not self.winning_outcome_id:
+                errors["winning_outcome"] = "A corrected decision requires a winning outcome."
+            elif (
+                provisional_result
+                and self.winning_outcome_id == provisional_result.winning_outcome_id
+            ):
+                errors["winning_outcome"] = (
+                    "A corrected decision must differ from the " "provisional winning outcome."
+                )
+
+            if self.review_extended_until is not None:
+                errors["review_extended_until"] = "A final decision cannot extend review."
+
+        elif self.decision_type == self.DecisionType.VOID:
+            if self.winning_outcome_id:
+                errors["winning_outcome"] = "A void decision cannot have a winning outcome."
+
+            if self.review_extended_until is not None:
+                errors["review_extended_until"] = "A void decision cannot extend review."
+
+        elif self.decision_type == self.DecisionType.EXTEND_REVIEW:
+            if self.winning_outcome_id:
+                errors["winning_outcome"] = "A review extension cannot have a winning outcome."
+
+            if self.review_extended_until is None:
+                errors["review_extended_until"] = "A review extension requires an end time."
+            elif self.decided_at is not None and self.review_extended_until <= self.decided_at:
+                errors["review_extended_until"] = (
+                    "The extended review end time must be " "after the decision time."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    @property
+    def is_final(self):
+        return self.decision_type in {
+            self.DecisionType.CONFIRM,
+            self.DecisionType.CORRECT,
+            self.DecisionType.VOID,
+        }
+
+
 class MarketWatchlistEntry(TimeStampedUUIDModel):
     participant = models.ForeignKey(
         settings.AUTH_USER_MODEL,

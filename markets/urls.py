@@ -63,6 +63,10 @@ from markets.proposal_views import (
     MarketProposalListCreateView,
     MarketProposalWithdrawView,
 )
+from markets.provisional_result_views import (
+    MarketProvisionalResultDetailView,
+    MarketProvisionalResultPublishView,
+)
 from markets.resolution_views import (
     MarketResolveView,
     MarketVoidView,
@@ -74,6 +78,18 @@ from markets.responsible_participation_views import (
     ParticipantResponsibleEventListView,
     ResponsibleParticipationView,
     SelfExclusionView,
+)
+from markets.result_dispute_decision_views import (
+    AdminMarketResultDisputeDecisionCreateView,
+    AdminMarketResultDisputeDecisionDetailView,
+    MarketResultDisputeDecisionListView,
+)
+from markets.result_dispute_views import (
+    AdminMarketResultDisputeDetailView,
+    AdminMarketResultDisputeListView,
+    MarketResultDisputeSubmitView,
+    ParticipantMarketResultDisputeDetailView,
+    ParticipantMarketResultDisputeListView,
 )
 from markets.settlement_views import MarketSettlementView
 from markets.views import (
@@ -275,6 +291,26 @@ urlpatterns = [
         name="market-order-create",
     ),
     path(
+        ("market-admin/markets/" "<uuid:market_id>/result-dispute-decisions/"),
+        AdminMarketResultDisputeDecisionCreateView.as_view(),
+        name=("admin-market-result-dispute-decision-create"),
+    ),
+    path(
+        ("market-admin/result-dispute-decisions/" "<uuid:decision_id>/"),
+        AdminMarketResultDisputeDecisionDetailView.as_view(),
+        name=("admin-market-result-dispute-decision-detail"),
+    ),
+    path(
+        "market-admin/result-disputes/",
+        AdminMarketResultDisputeListView.as_view(),
+        name="admin-market-result-dispute-list",
+    ),
+    path(
+        "market-admin/result-disputes/<uuid:dispute_id>/",
+        AdminMarketResultDisputeDetailView.as_view(),
+        name="admin-market-result-dispute-detail",
+    ),
+    path(
         "market-admin/markets/",
         MarketAdminListCreateView.as_view(),
         name="admin-market-list",
@@ -320,6 +356,11 @@ urlpatterns = [
         name="admin-market-close",
     ),
     path(
+        ("market-admin/markets/" "<uuid:market_id>/provisional-result/"),
+        MarketProvisionalResultPublishView.as_view(),
+        name="market-provisional-result-publish",
+    ),
+    path(
         ("market-admin/markets/" "<uuid:market_id>/resolve/"),
         MarketResolveView.as_view(),
         name="admin-market-resolve",
@@ -345,6 +386,21 @@ urlpatterns = [
         name="market-detail",
     ),
     path(
+        "markets/<uuid:market_id>/provisional-result/",
+        MarketProvisionalResultDetailView.as_view(),
+        name="market-provisional-result-detail",
+    ),
+    path(
+        "markets/<uuid:market_id>/result-disputes/",
+        MarketResultDisputeSubmitView.as_view(),
+        name="market-result-dispute-submit",
+    ),
+    path(
+        ("markets/<uuid:market_id>/" "result-dispute-decisions/"),
+        MarketResultDisputeDecisionListView.as_view(),
+        name="market-result-dispute-decision-list",
+    ),
+    path(
         "markets/<uuid:market_id>/settle/",
         MarketSettlementView.as_view(),
         name="market-settle",
@@ -363,6 +419,16 @@ urlpatterns = [
         "markets/<uuid:market_id>/outcomes/<uuid:outcome_id>/price-history/",
         MarketOutcomePriceHistoryView.as_view(),
         name="market-outcome-price-history",
+    ),
+    path(
+        "market-result-disputes/",
+        ParticipantMarketResultDisputeListView.as_view(),
+        name="participant-market-result-dispute-list",
+    ),
+    path(
+        "market-result-disputes/<uuid:dispute_id>/",
+        ParticipantMarketResultDisputeDetailView.as_view(),
+        name="participant-market-result-dispute-detail",
     ),
     path(
         "market-fills/",
