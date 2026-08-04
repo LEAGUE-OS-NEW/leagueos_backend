@@ -92,12 +92,22 @@ class MarketParticipantCompliance(TimeStampedUUIDModel):
 
 
 class MarketComplianceReview(TimeStampedUUIDModel):
+    class Source(models.TextChoices):
+        ADMIN = "ADMIN", "Administrator"
+        PROVIDER = "PROVIDER", "Provider"
+        SYSTEM = "SYSTEM", "System"
+
     participant = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="market_compliance_reviews"
     )
     actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="market_compliance_audits"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="market_compliance_audits",
     )
+    source = models.CharField(max_length=16, choices=Source.choices, default=Source.ADMIN)
     previous_kyc_status = models.CharField(max_length=20)
     new_kyc_status = models.CharField(max_length=20)
     previous_restriction_status = models.CharField(max_length=20)
@@ -121,6 +131,263 @@ class MarketComplianceReview(TimeStampedUUIDModel):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Compliance review records are immutable.")
+
+
+class ImmutableAuditQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Audit records are immutable.")
+
+    def delete(self):
+        raise ValidationError("Audit records are immutable.")
+
+
+class KYCVerificationSession(TimeStampedUUIDModel):
+    class Status(models.TextChoices):
+        CREATED = "CREATED", "Created"
+        PENDING = "PENDING", "Pending"
+        IN_REVIEW = "IN_REVIEW", "In review"
+        VERIFIED = "VERIFIED", "Verified"
+        REJECTED = "REJECTED", "Rejected"
+        EXPIRED = "EXPIRED", "Expired"
+        CANCELLED = "CANCELLED", "Cancelled"
+        ERROR = "ERROR", "Error"
+
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="kyc_sessions"
+    )
+    provider_code = models.CharField(max_length=64, db_index=True)
+    external_reference = models.CharField(max_length=255, null=True, blank=True, unique=True)
+    client_idempotency_key = models.CharField(max_length=128)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.CREATED, db_index=True
+    )
+    provider_status = models.CharField(max_length=100, blank=True)
+    verification_level = models.CharField(max_length=50, default="STANDARD")
+    initiated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="initiated_kyc_sessions",
+    )
+    initiated_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    completed_at = models.DateTimeField(null=True, blank=True)
+    last_event_at = models.DateTimeField(null=True, blank=True)
+    continuation_url = models.URLField(max_length=500, blank=True)
+    failure_code = models.CharField(max_length=100, blank=True)
+    status_message = models.CharField(max_length=500, blank=True)
+    internal_notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-initiated_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["participant", "client_idempotency_key"],
+                name="kyc_participant_idempotency_uniq",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.provider_code} verification for {self.participant_id}"
+
+    @property
+    def is_terminal(self):
+        return self.status in {
+            self.Status.VERIFIED,
+            self.Status.REJECTED,
+            self.Status.EXPIRED,
+            self.Status.CANCELLED,
+            self.Status.ERROR,
+        }
+
+
+class KYCVerificationEvent(TimeStampedUUIDModel):
+    class Source(models.TextChoices):
+        PARTICIPANT = "PARTICIPANT", "Participant"
+        PROVIDER = "PROVIDER", "Provider"
+        ADMIN = "ADMIN", "Administrator"
+        SYSTEM = "SYSTEM", "System"
+
+    session = models.ForeignKey(
+        KYCVerificationSession, on_delete=models.PROTECT, related_name="events"
+    )
+    event_type = models.CharField(max_length=64)
+    previous_status = models.CharField(max_length=16, blank=True)
+    new_status = models.CharField(max_length=16)
+    provider_status = models.CharField(max_length=100, blank=True)
+    external_event_id = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    payload_digest = models.CharField(max_length=64, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    source = models.CharField(max_length=16, choices=Source.choices)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="kyc_events",
+    )
+    occurred_at = models.DateTimeField(default=timezone.now)
+    objects = ImmutableAuditQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["created_at", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "external_event_id"],
+                condition=Q(external_event_id__isnull=False),
+                name="kyc_session_external_event_uniq",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.event_type} for {self.session_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("KYC events are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("KYC events are immutable.")
+
+
+class MarketRiskProfile(TimeStampedUUIDModel):
+    class Band(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+        CRITICAL = "CRITICAL", "Critical"
+
+    participant = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="market_risk_profile"
+    )
+    current_score = models.PositiveSmallIntegerField(default=0)
+    risk_band = models.CharField(
+        max_length=10, choices=Band.choices, default=Band.LOW, db_index=True
+    )
+    restriction_recommendation = models.CharField(max_length=32, default="NONE", db_index=True)
+    reason_codes = models.JSONField(default=list)
+    last_assessed_at = models.DateTimeField(null=True, blank=True)
+    assessment_source = models.CharField(max_length=16, default="SYSTEM")
+    manual_override_state = models.CharField(max_length=16, default="NONE")
+    manual_override_reason = models.TextField(blank=True)
+    override_actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="market_risk_overrides",
+    )
+    override_at = models.DateTimeField(null=True, blank=True)
+    revision = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.risk_band} risk for {self.participant_id}"
+
+
+class MarketRiskAssessment(TimeStampedUUIDModel):
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="market_risk_assessments"
+    )
+    score = models.PositiveSmallIntegerField()
+    band = models.CharField(max_length=10, choices=MarketRiskProfile.Band.choices)
+    reason_codes = models.JSONField(default=list)
+    input_summary = models.JSONField(default=dict)
+    recommended_action = models.CharField(max_length=32)
+    assessment_source = models.CharField(max_length=16, default="SYSTEM")
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="market_risk_assessment_actions",
+    )
+    input_digest = models.CharField(max_length=64)
+    objects = ImmutableAuditQuerySet.as_manager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["participant", "input_digest"], name="risk_participant_input_uniq"
+            )
+        ]
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.band} assessment for {self.participant_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Risk assessments are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Risk assessments are immutable.")
+
+
+class ComplianceDecisionProposal(TimeStampedUUIDModel):
+    class DecisionType(models.TextChoices):
+        CLEAR_CRITICAL_RISK_BLOCK = "CLEAR_CRITICAL_RISK_BLOCK", "Clear critical risk block"
+        REMOVE_SUSPENDED_RESTRICTION = "REMOVE_SUSPENDED_RESTRICTION", "Remove suspension"
+        JURISDICTION_BLOCK_TO_ALLOW = "JURISDICTION_BLOCK_TO_ALLOW", "Allow jurisdiction"
+        APPLY_RISK_OVERRIDE = "APPLY_RISK_OVERRIDE", "Apply risk override"
+        CLEAR_RISK_OVERRIDE = "CLEAR_RISK_OVERRIDE", "Clear risk override"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="compliance_decisions"
+    )
+    decision_type = models.CharField(max_length=40, choices=DecisionType.choices)
+    requested_change = models.JSONField(default=dict)
+    reason = models.TextField()
+    before_snapshot = models.JSONField(default=dict)
+    proposed_after_snapshot = models.JSONField(default=dict)
+    proposer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="proposed_compliance_decisions",
+    )
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="decided_compliance_decisions",
+    )
+    decision_reason = models.TextField(blank=True)
+    proposed_at = models.DateTimeField(default=timezone.now)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    objects = ImmutableAuditQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-proposed_at", "-id"]
+        indexes = [models.Index(fields=["status", "-proposed_at"])]
+
+    def __str__(self):
+        return f"{self.decision_type} proposal for {self.participant_id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            previous = type(self).objects.get(pk=self.pk)
+            allowed = (
+                getattr(self, "_allow_finalize", False)
+                and previous.status == self.Status.PENDING
+                and self.status in {self.Status.APPROVED, self.Status.REJECTED}
+            )
+            if not allowed:
+                raise ValidationError("Compliance decision proposals are immutable.")
+        if not self.reason.strip():
+            raise ValidationError("A proposal reason is required.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Compliance decision proposals are immutable.")
 
 
 class MarketResponsibleParticipation(TimeStampedUUIDModel):

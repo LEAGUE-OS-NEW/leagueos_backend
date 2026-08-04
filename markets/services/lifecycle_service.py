@@ -430,7 +430,7 @@ class MarketLifecycleService:
 
         market.save(update_fields=sorted(update_fields))
 
-        MarketStatusTransition.objects.create(
+        transition = MarketStatusTransition.objects.create(
             market=market,
             action=action,
             from_status=from_status,
@@ -439,5 +439,44 @@ class MarketLifecycleService:
             actor_email=actor.email,
             notes=notes,
         )
+
+        from notifications.services.operational_alert_service import OperationalAlertService
+
+        if to_status == Market.Status.PENDING_APPROVAL:
+            OperationalAlertService.create(
+                permissions=("approve_market",),
+                event_type="MARKET_AWAITING_APPROVAL",
+                title="Market awaiting approval",
+                message="A market requires independent approval.",
+                source_key=f"market-transition:{transition.id}:approval",
+                data={"market_id": str(market.id), "transition_id": str(transition.id)},
+            )
+        if to_status in {Market.Status.SUSPENDED, Market.Status.OPEN} and from_status in {
+            Market.Status.OPEN,
+            Market.Status.SUSPENDED,
+        }:
+            from django.contrib.auth import get_user_model
+
+            from markets.models import MarketOrder, MarketPosition
+            from markets.services.market_notification_service import MarketNotificationService
+
+            ids = set(MarketOrder.objects.filter(market=market).values_list("user_id", flat=True))
+            ids.update(
+                MarketPosition.objects.filter(market=market).values_list("user_id", flat=True)
+            )
+            event = (
+                "MARKET_SUSPENDED" if to_status == Market.Status.SUSPENDED else "MARKET_REOPENED"
+            )
+            for participant in get_user_model().objects.filter(id__in=ids):
+                MarketNotificationService.schedule(
+                    recipient=participant,
+                    category="MARKET_RESULTS",
+                    event_type=event,
+                    title=event.replace("_", " ").title(),
+                    message=f"A market you participated in was {to_status.lower()}.",
+                    key=f"market-transition:{transition.id}:participant:{participant.id}",
+                    market_id=market.id,
+                    data={"transition_id": str(transition.id), "status": to_status},
+                )
 
         return market

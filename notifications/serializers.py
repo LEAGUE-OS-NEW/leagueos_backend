@@ -14,6 +14,7 @@ from rest_framework import serializers
 
 from notifications.models import (
     CommunicationConsent,
+    Notification,
     NotificationCategory,
     NotificationChannel,
     NotificationChannelCapability,
@@ -21,6 +22,43 @@ from notifications.models import (
     QuietHours,
     UserNotificationPreference,
 )
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    category = serializers.CharField(source="category.code", read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = (
+            "id",
+            "category",
+            "event_type",
+            "title",
+            "message",
+            "severity",
+            "data",
+            "deep_link_path",
+            "market_id",
+            "mandatory",
+            "occurred_at",
+            "read_at",
+            "archived_at",
+            "created_at",
+        )
+        read_only_fields = fields
+
+
+class NotificationIdsSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=False, max_length=100)
+
+
+class UnreadCountSerializer(serializers.Serializer):
+    unread_count = serializers.IntegerField()
+
+
+class UpdatedCountSerializer(serializers.Serializer):
+    updated = serializers.IntegerField(min_value=0)
+
 
 User = get_user_model()
 

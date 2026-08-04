@@ -9,9 +9,11 @@ from authentication.services.permission_service import PermissionService
 from markets.models import (
     Market,
     MarketOutcome,
+    MarketPosition,
     MarketProvisionalEvidence,
     MarketProvisionalResult,
 )
+from markets.services.market_notification_service import MarketNotificationService
 
 
 class MarketProvisionalResultService:
@@ -89,6 +91,22 @@ class MarketProvisionalResultService:
                 recorded_by=actor,
                 recorder_email=actor.email,
                 recorded_at=published_at,
+            )
+
+        for participant in (
+            MarketPosition.objects.filter(market=market).values_list("user", flat=True).distinct()
+        ):
+            from django.contrib.auth import get_user_model
+
+            MarketNotificationService.schedule(
+                recipient=get_user_model().objects.get(pk=participant),
+                category="MARKET_RESULTS",
+                event_type="PROVISIONAL_RESULT_PUBLISHED",
+                title="Provisional result published",
+                message="A provisional market result is available for review.",
+                key=f"market-provisional-result:{provisional_result.id}:participant:{participant}",
+                market_id=market.id,
+                data={"provisional_result_id": str(provisional_result.id)},
             )
 
         return (

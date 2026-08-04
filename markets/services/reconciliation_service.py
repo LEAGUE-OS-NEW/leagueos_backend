@@ -80,6 +80,18 @@ class MarketReconciliationService:
                 _service_transition=True,
             )
             raise
+        if run.mismatch_count:
+            from notifications.services.operational_alert_service import OperationalAlertService
+
+            OperationalAlertService.create(
+                permissions=("manage_market", "approve_market"),
+                event_type="RECONCILIATION_MISMATCHES",
+                title="Reconciliation mismatches detected",
+                message=f"A reconciliation run found {run.mismatch_count} mismatches.",
+                source_key=f"market-reconciliation:{run.id}:mismatches",
+                data={"run_id": str(run.id), "mismatch_count": run.mismatch_count},
+                severity="CRITICAL",
+            )
         return run
 
     @classmethod

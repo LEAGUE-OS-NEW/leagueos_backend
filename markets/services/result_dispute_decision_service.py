@@ -428,6 +428,20 @@ class MarketResultDisputeDecisionService:
             decided_at=decided_at,
         )
 
+        from markets.services.market_notification_service import MarketNotificationService
+
+        for dispute in provisional_result.disputes.select_related("participant"):
+            MarketNotificationService.schedule(
+                recipient=dispute.participant,
+                category="MARKET_DISPUTES",
+                event_type="RESULT_DISPUTE_DECIDED",
+                title="Result dispute decided",
+                message="A decision was recorded for your market result dispute.",
+                key=f"market-dispute-decision:{decision.id}:participant:{dispute.participant_id}",
+                market_id=provisional_result.market_id,
+                data={"decision_id": str(decision.id), "dispute_id": str(dispute.id)},
+            )
+
         return MarketResultDisputeDecision.objects.select_related(
             "provisional_result",
             "provisional_result__market",

@@ -17,6 +17,7 @@ from markets.models import (
     MarketVoidRefund,
 )
 from markets.services.fee_service import MarketFeeService
+from markets.services.market_notification_service import MarketNotificationService
 from markets.services.participation_service import MarketParticipationService
 from markets.services.provisional_result_service import (
     MarketProvisionalResultService,
@@ -69,7 +70,7 @@ class MarketVoidRefundService:
         released_sell = Decimal("0.0000")
         for order in orders:
             result = MarketParticipationService.cancel_locked_order(order=order)
-            MarketVoidOrderCancellation.objects.create(
+            cancellation = MarketVoidOrderCancellation.objects.create(
                 market_void_refund=refund,
                 market_order=order,
                 order_side=order.side,
@@ -79,6 +80,22 @@ class MarketVoidRefundService:
                     result["released_position_quantity"]
                 ),
                 wallet_release_ledger_entry=result["wallet_entry"],
+            )
+            MarketNotificationService.schedule(
+                recipient=order.user,
+                category="MARKET_ORDERS",
+                event_type="MARKET_VOID_ORDER_CANCELLED",
+                title="Order cancelled for void market",
+                message=(
+                    f"The remaining quantity {cancellation.remaining_quantity_cancelled} "
+                    "was cancelled."
+                ),
+                key=f"market-void-cancellation:{cancellation.id}",
+                market_id=market.id,
+                data={
+                    "cancellation_id": str(cancellation.id),
+                    "remaining_quantity": str(cancellation.remaining_quantity_cancelled),
+                },
             )
             if order.side == MarketOrder.Side.BUY:
                 buy_count += 1
@@ -128,7 +145,7 @@ class MarketVoidRefundService:
                     schedule=fee_schedule,
                 )
 
-            MarketPositionVoidRefund.objects.create(
+            position_refund = MarketPositionVoidRefund.objects.create(
                 market_void_refund=refund,
                 market_position=position,
                 participant=position.user,
@@ -141,6 +158,7 @@ class MarketVoidRefundService:
                 realized_pnl_delta=Decimal("0.0000"),
                 wallet_credit_ledger_entry=ledger_entry,
             )
+            MarketNotificationService.refund(position_refund)
             position.quantity = Decimal("0.0000")
             position.reserved_quantity = Decimal("0.0000")
             position.total_cost = Decimal("0.0000")

@@ -15,6 +15,7 @@ from markets.models import (
     MarketSettlement,
 )
 from markets.services.fee_service import MarketFeeService
+from markets.services.market_notification_service import MarketNotificationService
 from markets.services.provisional_result_service import (
     MarketProvisionalResultService,
 )
@@ -133,7 +134,7 @@ class MarketSettlementService:
                 schedule=fee_schedule,
             )
 
-        MarketPositionSettlement.objects.create(
+        position_settlement = MarketPositionSettlement.objects.create(
             market_settlement=settlement,
             market_position=position,
             participant=position.user,
@@ -148,6 +149,7 @@ class MarketSettlementService:
             realized_pnl_delta=realized_delta,
             wallet_ledger_entry=ledger_entry,
         )
+        MarketNotificationService.settlement(position_settlement)
 
         position.quantity = Decimal("0.0000")
         position.reserved_quantity = Decimal("0.0000")

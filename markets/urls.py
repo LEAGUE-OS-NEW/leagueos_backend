@@ -4,6 +4,17 @@ from markets.admin_views import (
     MarketAdminDetailView,
     MarketAdminListCreateView,
 )
+from markets.compliance_admin_views import (
+    AdminComplianceDecisionDecideView,
+    AdminComplianceDecisionDetailView,
+    AdminComplianceDecisionListCreateView,
+    AdminKYCSessionDetailView,
+    AdminKYCSessionListView,
+    AdminRiskAssessmentListView,
+    AdminRiskProfileDetailView,
+    AdminRiskProfileListView,
+    AdminRiskReassessView,
+)
 from markets.compliance_views import (
     AdminParticipantComplianceDetailView,
     AdminParticipantComplianceReviewListView,
@@ -44,6 +55,13 @@ from markets.financial_integrity_views import (
     ReconciliationRunDetailView,
     ReconciliationRunListView,
     ReconciliationStartView,
+)
+from markets.kyc_views import (
+    KYCCallbackView,
+    KYCComplianceSummaryView,
+    KYCSessionCancelView,
+    KYCSessionDetailView,
+    KYCSessionListStartView,
 )
 from markets.lifecycle_views import (
     MarketApproveView,
@@ -120,6 +138,66 @@ from markets.void_refund_views import MarketVoidRefundView
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "admin/compliance/kyc-sessions/", AdminKYCSessionListView.as_view(), name="admin-kyc-list"
+    ),
+    path(
+        "admin/compliance/kyc-sessions/<uuid:session_id>/",
+        AdminKYCSessionDetailView.as_view(),
+        name="admin-kyc-detail",
+    ),
+    path(
+        "admin/compliance/risk-profiles/",
+        AdminRiskProfileListView.as_view(),
+        name="admin-risk-list",
+    ),
+    path(
+        "admin/compliance/risk-profiles/<uuid:profile_id>/",
+        AdminRiskProfileDetailView.as_view(),
+        name="admin-risk-detail",
+    ),
+    path(
+        "admin/compliance/risk-assessments/",
+        AdminRiskAssessmentListView.as_view(),
+        name="admin-risk-assessments",
+    ),
+    path(
+        "admin/compliance/risk-reassess/",
+        AdminRiskReassessView.as_view(),
+        name="admin-risk-reassess",
+    ),
+    path(
+        "admin/compliance/decisions/",
+        AdminComplianceDecisionListCreateView.as_view(),
+        name="admin-decision-list",
+    ),
+    path(
+        "admin/compliance/decisions/<uuid:proposal_id>/",
+        AdminComplianceDecisionDetailView.as_view(),
+        name="admin-decision-detail",
+    ),
+    path(
+        "admin/compliance/decisions/<uuid:proposal_id>/decide/",
+        AdminComplianceDecisionDecideView.as_view(),
+        name="admin-decision-decide",
+    ),
+    path("markets/kyc/sessions/", KYCSessionListStartView.as_view(), name="market-kyc-sessions"),
+    path(
+        "markets/kyc/sessions/<uuid:session_id>/",
+        KYCSessionDetailView.as_view(),
+        name="market-kyc-session-detail",
+    ),
+    path(
+        "markets/kyc/sessions/<uuid:session_id>/cancel/",
+        KYCSessionCancelView.as_view(),
+        name="market-kyc-session-cancel",
+    ),
+    path("markets/kyc/summary/", KYCComplianceSummaryView.as_view(), name="market-kyc-summary"),
+    path(
+        "markets/kyc/providers/<str:provider>/callback/",
+        KYCCallbackView.as_view(),
+        name="market-kyc-callback",
+    ),
     path(
         "markets/<uuid:market_id>/orders/fee-preview/",
         FeePreviewView.as_view(),

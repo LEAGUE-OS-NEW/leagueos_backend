@@ -18,6 +18,7 @@ from markets.models import (
     MarketPosition,
 )
 from markets.services.fee_service import MarketFeeService
+from markets.services.market_notification_service import MarketNotificationService
 from wallets.services.wallet_service import (
     WalletService,
 )
@@ -242,6 +243,8 @@ class MarketFillService:
             fill=fill,
             schedule=fee_schedule,
         )
+
+        MarketNotificationService.fill(fill)
 
         return fill
 
