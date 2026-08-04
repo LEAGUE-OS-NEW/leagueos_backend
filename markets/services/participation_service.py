@@ -23,6 +23,7 @@ from markets.models import (
     MarketResponsibleParticipation,
 )
 from markets.services.eligibility_service import MarketEligibilityService
+from markets.services.fee_service import MarketFeeService
 from markets.services.matching_service import (
     MarketMatchingService,
 )
@@ -59,6 +60,8 @@ class MarketParticipationService:
         side: str,
         quantity: Decimal,
         limit_price: Decimal,
+        time_in_force: str = MarketOrder.TimeInForce.GTC,
+        expires_at=None,
     ) -> MarketOrder:
         cls._require_permission(user)
         cls._require_verified_user(user)
@@ -114,6 +117,8 @@ class MarketParticipationService:
                 quantity=quantity,
             )
 
+        fee_schedule, fee_rates = MarketFeeService.rates(market=market)
+
         order = MarketOrder(
             user=user,
             market=market,
@@ -124,6 +129,11 @@ class MarketParticipationService:
             filled_quantity=Decimal("0"),
             average_fill_price=None,
             status=MarketOrder.Status.OPEN,
+            time_in_force=time_in_force,
+            expires_at=expires_at,
+            expired_at=None,
+            fee_schedule=fee_schedule,
+            maximum_fee_bps=max(fee_rates["maker"], fee_rates["taker"]),
         )
 
         order.full_clean()
@@ -153,6 +163,13 @@ class MarketParticipationService:
 
         MarketMatchingService.match_order(order.id)
         order.refresh_from_db()
+        if order.time_in_force in {
+            MarketOrder.TimeInForce.IOC,
+            MarketOrder.TimeInForce.FOK,
+        } and cls.is_order_cancellable(order):
+            order = cls._get_locked_order(order.id)
+            if cls.is_order_cancellable(order):
+                cls.cancel_locked_order(order=order)
         return order
 
     @classmethod
@@ -242,6 +259,7 @@ class MarketParticipationService:
         return calculate_buy_commitment(
             quantity=order.quantity,
             limit_price=order.limit_price,
+            maximum_fee_bps=order.maximum_fee_bps,
         )
 
     @staticmethod
@@ -288,6 +306,7 @@ class MarketParticipationService:
         return calculate_buy_commitment(
             quantity=remaining_quantity,
             limit_price=order.limit_price,
+            maximum_fee_bps=order.maximum_fee_bps,
         )
 
     @classmethod

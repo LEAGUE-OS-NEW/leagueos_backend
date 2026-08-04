@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from markets.models import (
@@ -25,6 +26,29 @@ class MarketOrderCreateSerializer(serializers.Serializer):
         min_value=Decimal("0.00001"),
         max_value=Decimal("0.99999"),
     )
+    time_in_force = serializers.ChoiceField(
+        choices=MarketOrder.TimeInForce.choices,
+        default=MarketOrder.TimeInForce.GTC,
+    )
+    expires_at = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        time_in_force = attrs.get("time_in_force", MarketOrder.TimeInForce.GTC)
+        expires_at = attrs.get("expires_at")
+        if time_in_force == MarketOrder.TimeInForce.GTD:
+            if expires_at is None:
+                raise serializers.ValidationError(
+                    {"expires_at": "GTD orders require an expiry time."}
+                )
+            if expires_at <= timezone.now():
+                raise serializers.ValidationError(
+                    {"expires_at": "The order expiry time must be in the future."}
+                )
+        elif expires_at is not None:
+            raise serializers.ValidationError(
+                {"expires_at": "Only GTD orders may define an expiry time."}
+            )
+        return attrs
 
 
 class MarketOrderReadSerializer(serializers.ModelSerializer):
@@ -57,6 +81,9 @@ class MarketOrderReadSerializer(serializers.ModelSerializer):
             "filled_quantity",
             "average_fill_price",
             "status",
+            "time_in_force",
+            "expires_at",
+            "expired_at",
             "created_at",
             "updated_at",
         ]

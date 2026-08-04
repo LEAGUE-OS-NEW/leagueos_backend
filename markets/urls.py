@@ -27,6 +27,24 @@ from markets.event_views import (
     MarketEventListView,
     MarketEventMarketListView,
 )
+from markets.financial_integrity_views import (
+    AdjustmentApproveView,
+    AdjustmentDetailView,
+    AdjustmentListView,
+    AdjustmentProposeView,
+    AdjustmentRejectView,
+    FeePreviewView,
+    FeeScheduleActivateView,
+    FeeScheduleDetailView,
+    FeeScheduleListCreateView,
+    FeeScheduleRetireView,
+    ReconciliationExportView,
+    ReconciliationMismatchDetailView,
+    ReconciliationMismatchListView,
+    ReconciliationRunDetailView,
+    ReconciliationRunListView,
+    ReconciliationStartView,
+)
 from markets.lifecycle_views import (
     MarketApproveView,
     MarketCloseView,
@@ -102,6 +120,86 @@ from markets.void_refund_views import MarketVoidRefundView
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "markets/<uuid:market_id>/orders/fee-preview/",
+        FeePreviewView.as_view(),
+        name="market-order-fee-preview",
+    ),
+    path(
+        "market-admin/fee-schedules/",
+        FeeScheduleListCreateView.as_view(),
+        name="market-fee-schedule-list-create",
+    ),
+    path(
+        "market-admin/fee-schedules/<uuid:schedule_id>/",
+        FeeScheduleDetailView.as_view(),
+        name="market-fee-schedule-detail",
+    ),
+    path(
+        "market-admin/fee-schedules/<uuid:schedule_id>/activate/",
+        FeeScheduleActivateView.as_view(),
+        name="market-fee-schedule-activate",
+    ),
+    path(
+        "market-admin/fee-schedules/<uuid:schedule_id>/retire/",
+        FeeScheduleRetireView.as_view(),
+        name="market-fee-schedule-retire",
+    ),
+    path(
+        "market-admin/reconciliation/start/",
+        ReconciliationStartView.as_view(),
+        name="market-reconciliation-start",
+    ),
+    path(
+        "market-admin/reconciliation/runs/",
+        ReconciliationRunListView.as_view(),
+        name="market-reconciliation-run-list",
+    ),
+    path(
+        "market-admin/reconciliation/runs/<uuid:run_id>/",
+        ReconciliationRunDetailView.as_view(),
+        name="market-reconciliation-run-detail",
+    ),
+    path(
+        "market-admin/reconciliation/runs/<uuid:run_id>/export/",
+        ReconciliationExportView.as_view(),
+        name="market-reconciliation-export",
+    ),
+    path(
+        "market-admin/reconciliation/mismatches/",
+        ReconciliationMismatchListView.as_view(),
+        name="market-reconciliation-mismatch-list",
+    ),
+    path(
+        "market-admin/reconciliation/mismatches/<uuid:mismatch_id>/",
+        ReconciliationMismatchDetailView.as_view(),
+        name="market-reconciliation-mismatch-detail",
+    ),
+    path(
+        "market-admin/financial-adjustments/",
+        AdjustmentListView.as_view(),
+        name="market-adjustment-list",
+    ),
+    path(
+        "market-admin/financial-adjustments/propose/",
+        AdjustmentProposeView.as_view(),
+        name="market-adjustment-propose",
+    ),
+    path(
+        "market-admin/financial-adjustments/<uuid:adjustment_id>/",
+        AdjustmentDetailView.as_view(),
+        name="market-adjustment-detail",
+    ),
+    path(
+        "market-admin/financial-adjustments/<uuid:adjustment_id>/approve/",
+        AdjustmentApproveView.as_view(),
+        name="market-adjustment-approve",
+    ),
+    path(
+        "market-admin/financial-adjustments/<uuid:adjustment_id>/reject/",
+        AdjustmentRejectView.as_view(),
+        name="market-adjustment-reject",
+    ),
     path("markets/watchlist/", MarketWatchlistView.as_view(), name="market-watchlist"),
     path(
         "markets/watchlist/<uuid:market_id>/",
