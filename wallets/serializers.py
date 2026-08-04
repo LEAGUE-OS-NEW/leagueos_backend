@@ -34,34 +34,24 @@ class WalletReadSerializer(serializers.ModelSerializer):
 
 
 class LedgerEntryReadSerializer(serializers.ModelSerializer):
-    market_id = serializers.UUIDField(read_only=True, allow_null=True)
-    order_id = serializers.UUIDField(read_only=True, allow_null=True)
-    fill_id = serializers.UUIDField(read_only=True, allow_null=True)
-
     class Meta:
         model = LedgerEntry
         fields = (
             "id",
-            "entry_type",
+            "debit_account",
+            "credit_account",
             "amount",
-            "available_balance_before",
-            "available_balance_after",
-            "reserved_balance_before",
-            "reserved_balance_after",
-            "idempotency_reference",
-            "market_id",
-            "order_id",
-            "fill_id",
+            "currency",
             "created_at",
         )
         read_only_fields = fields
 
 
 class LedgerEntryFilterSerializer(serializers.Serializer):
-    entry_type = serializers.ChoiceField(choices=LedgerEntry.EntryType.choices, required=False)
-    market_id = serializers.UUIDField(required=False)
-    order_id = serializers.UUIDField(required=False)
-    fill_id = serializers.UUIDField(required=False)
+    debit_account = serializers.ChoiceField(choices=LedgerEntry.AccountType.choices, required=False)
+    credit_account = serializers.ChoiceField(
+        choices=LedgerEntry.AccountType.choices, required=False
+    )
     created_from = serializers.DateTimeField(required=False)
     created_to = serializers.DateTimeField(required=False)
 
@@ -73,3 +63,29 @@ class LedgerEntryFilterSerializer(serializers.Serializer):
                 {"created_from": "Must be earlier than or equal to created_to."}
             )
         return attrs
+
+
+class DepositIntentSerializer(serializers.Serializer):
+    provider_code = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=16, decimal_places=4, min_value=Decimal("0.01"))
+    currency = serializers.CharField(max_length=3)
+
+
+class DepositIntentReadSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    amount = serializers.DecimalField(max_digits=16, decimal_places=4)
+    currency = serializers.CharField(max_length=3)
+    status = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    expires_at = serializers.DateTimeField()
+    payment_url = serializers.CharField(required=False)
+
+
+class WithdrawalRequestSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=16, decimal_places=4, min_value=Decimal("0.01"))
+    currency = serializers.CharField(max_length=3)
+    destination = serializers.JSONField()
+
+
+class DepositCallbackSerializer(serializers.Serializer):
+    """Provider callback payload - intentionally permissive."""

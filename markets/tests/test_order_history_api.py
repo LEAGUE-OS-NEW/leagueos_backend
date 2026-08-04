@@ -243,7 +243,6 @@ class MarketOrderHistoryAPITests(
     MarketOrderHistoryFixtureMixin,
     APITestCase,
 ):
-
     def test_order_list_requires_authentication(
         self,
     ):

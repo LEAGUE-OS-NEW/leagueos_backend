@@ -100,7 +100,6 @@ class PostgresFullTextSearchProvider(SearchProvider):
         page: int = 1,
         page_size: int = DEFAULT_PAGE_SIZE,
     ) -> dict[str, Any]:
-
         filters = filters or {}
         results: list[dict[str, Any]] = []
         total = 0
