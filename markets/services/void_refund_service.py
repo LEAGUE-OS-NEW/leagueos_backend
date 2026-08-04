@@ -8,6 +8,7 @@ from rest_framework.exceptions import PermissionDenied
 from authentication.services.permission_service import PermissionService
 from markets.models import (
     Market,
+    MarketFeeLedgerEntry,
     MarketOrder,
     MarketPosition,
     MarketPositionVoidRefund,
@@ -15,6 +16,7 @@ from markets.models import (
     MarketVoidOrderCancellation,
     MarketVoidRefund,
 )
+from markets.services.fee_service import MarketFeeService
 from markets.services.participation_service import MarketParticipationService
 from markets.services.provisional_result_service import (
     MarketProvisionalResultService,
@@ -97,12 +99,15 @@ class MarketVoidRefundService:
         for position in positive_positions:
             quantity = cls._quantity(position.quantity)
             cost_basis = cls._money(position.total_cost)
+            fee_schedule, fee_rates = MarketFeeService.rates(market=market)
+            refund_fee = MarketFeeService.calculate_fee(cost_basis, fee_rates["refund"])
+            net_refund = cost_basis - refund_fee
             ledger_entry = None
-            if cost_basis > Decimal("0.0000"):
+            if net_refund > Decimal("0.0000"):
                 ledger_entry = WalletService.credit(
                     user=position.user,
                     currency=cls.MARKET_CURRENCY,
-                    amount=cost_basis,
+                    amount=net_refund,
                     idempotency_reference=cls.position_refund_idempotency_reference(
                         market_id=market.id,
                         position_id=position.id,
@@ -112,6 +117,17 @@ class MarketVoidRefundService:
                     ),
                     market=market,
                 )
+            if cost_basis > Decimal("0.0000"):
+                MarketFeeService.record_fee(
+                    parent_id=position.id,
+                    market=market,
+                    participant=position.user,
+                    fee_type=MarketFeeLedgerEntry.FeeType.REFUND,
+                    rate_bps=fee_rates["refund"],
+                    gross=cost_basis,
+                    schedule=fee_schedule,
+                )
+
             MarketPositionVoidRefund.objects.create(
                 market_void_refund=refund,
                 market_position=position,
@@ -120,6 +136,8 @@ class MarketVoidRefundService:
                 refunded_quantity=quantity,
                 cost_basis=cost_basis,
                 refund_amount=cost_basis,
+                refund_fee_amount=refund_fee,
+                net_refund_amount=net_refund,
                 realized_pnl_delta=Decimal("0.0000"),
                 wallet_credit_ledger_entry=ledger_entry,
             )

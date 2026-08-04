@@ -12,10 +12,12 @@ from django.db import (
 )
 
 from markets.models import (
+    MarketFeeLedgerEntry,
     MarketFill,
     MarketOrder,
     MarketPosition,
 )
+from markets.services.fee_service import MarketFeeService
 from wallets.services.wallet_service import (
     WalletService,
 )
@@ -117,6 +119,12 @@ class MarketFillService:
             taker_order_id=taker_order_id,
         )
 
+        fee_schedule, fee_rates = MarketFeeService.rates(market=buy_order.market)
+        buy_role = "maker" if maker_order.id == buy_order.id else "taker"
+        sell_role = "maker" if maker_order.id == sell_order.id else "taker"
+        gross_notional = cls._quantize_money(quantity * price)
+        buyer_fee = MarketFeeService.calculate_fee(gross_notional, fee_rates[buy_role])
+        seller_fee = MarketFeeService.calculate_fee(gross_notional, fee_rates[sell_role])
         buyer_position, seller_position = cls._get_locked_positions(
             buy_order=buy_order,
             sell_order=sell_order,
@@ -147,6 +155,7 @@ class MarketFillService:
             buy_order=buy_order,
             quantity=quantity,
             price=price,
+            actual_fee=buyer_fee,
         )
 
         cls._apply_fill_to_order(
@@ -201,7 +210,37 @@ class MarketFillService:
         cls._credit_seller_wallet(
             fill=fill,
             sell_order=sell_order,
-            proceeds=cls._quantize_money(quantity * price),
+            proceeds=gross_notional - seller_fee,
+        )
+        MarketFeeService.record_fee(
+            parent_id=fill.id,
+            market=fill.market,
+            participant=buy_order.user,
+            fee_type=(
+                MarketFeeLedgerEntry.FeeType.MAKER
+                if buy_role == "maker"
+                else MarketFeeLedgerEntry.FeeType.TAKER
+            ),
+            rate_bps=fee_rates[buy_role],
+            gross=gross_notional,
+            order=buy_order,
+            fill=fill,
+            schedule=fee_schedule,
+        )
+        MarketFeeService.record_fee(
+            parent_id=fill.id,
+            market=fill.market,
+            participant=sell_order.user,
+            fee_type=(
+                MarketFeeLedgerEntry.FeeType.MAKER
+                if sell_role == "maker"
+                else MarketFeeLedgerEntry.FeeType.TAKER
+            ),
+            rate_bps=fee_rates[sell_role],
+            gross=gross_notional,
+            order=sell_order,
+            fill=fill,
+            schedule=fee_schedule,
         )
 
         return fill
@@ -213,6 +252,7 @@ class MarketFillService:
         buy_order: MarketOrder,
         quantity: Decimal,
         price: Decimal,
+        actual_fee: Decimal = Decimal("0.0000"),
     ) -> tuple[
         Decimal,
         Decimal,
@@ -221,11 +261,16 @@ class MarketFillService:
         remaining_before = buy_order.quantity - buy_order.filled_quantity
         remaining_after = remaining_before - quantity
 
-        reservation_before = cls._quantize_reservation(remaining_before * buy_order.limit_price)
-        reservation_after = cls._quantize_reservation(remaining_after * buy_order.limit_price)
+        multiplier = Decimal("1") + Decimal(buy_order.maximum_fee_bps) / Decimal("10000")
+        reservation_before = cls._quantize_reservation(
+            remaining_before * buy_order.limit_price * multiplier
+        )
+        reservation_after = cls._quantize_reservation(
+            remaining_after * buy_order.limit_price * multiplier
+        )
 
         reservation_reduction = reservation_before - reservation_after
-        actual_cost = cls._quantize_money(quantity * price)
+        actual_cost = cls._quantize_money(quantity * price) + actual_fee
 
         reconciliation = reservation_reduction - actual_cost
 
