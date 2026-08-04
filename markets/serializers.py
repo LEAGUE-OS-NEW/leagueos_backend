@@ -78,6 +78,7 @@ class MarketEventSummarySerializer(serializers.ModelSerializer):
 
 
 class MarketPublicSerializer(serializers.ModelSerializer):
+    is_watchlisted = serializers.BooleanField(read_only=True, default=False)
     event_group = MarketEventSummarySerializer(read_only=True)
     sport = SportPublicSerializer(
         read_only=True,
@@ -135,6 +136,7 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "winning_outcome",
             "created_at",
             "updated_at",
+            "is_watchlisted",
         ]
 
     @extend_schema_field(MarketSubjectSerializer)
