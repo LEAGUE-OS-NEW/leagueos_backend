@@ -26,6 +26,10 @@ ALLOWED_HOSTS = env.list(
     default=["localhost", "127.0.0.1", "0.0.0.0"],
 )
 
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default="").strip()
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
 
 DJANGO_APPS = [
     "django.contrib.admin",
