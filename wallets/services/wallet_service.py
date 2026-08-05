@@ -1,560 +1,409 @@
-from decimal import (
-    Decimal,
-    InvalidOperation,
-)
-from uuid import UUID
+"""Service for core wallet balance and state management."""
+
+from datetime import timedelta
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import (
-    IntegrityError,
-    transaction,
-)
+from django.db import transaction
+from django.utils import timezone
 
 from wallets.models import (
+    DepositIntent,
     LedgerEntry,
+    PaymentProvider,
     Wallet,
+    WithdrawalRequest,
 )
+
+IDEMPOTENCY_ERROR = "This reference has already been used for a different operation."
 
 
 class WalletService:
-    OPERATION_CREDIT = "CREDIT_AVAILABLE"
-    OPERATION_RESERVE = "RESERVE_AVAILABLE"
-    OPERATION_RELEASE = "RELEASE_RESERVED"
-    OPERATION_DEBIT_AVAILABLE = "DEBIT_AVAILABLE"
-    OPERATION_CONSUME_RESERVED = "CONSUME_RESERVED"
-
     @classmethod
-    def credit(
-        cls,
-        *,
-        user,
-        currency,
-        amount,
-        idempotency_reference,
-        market=None,
-        order=None,
-        fill=None,
-    ) -> LedgerEntry:
-        return cls._execute(
-            user=user,
-            currency=currency,
-            amount=amount,
-            idempotency_reference=(idempotency_reference),
-            operation=cls.OPERATION_CREDIT,
-            create_wallet=True,
-            market=market,
-            order=order,
-            fill=fill,
-        )
-
-    @classmethod
-    def reserve(
-        cls,
-        *,
-        user,
-        currency,
-        amount,
-        idempotency_reference,
-        market=None,
-        order=None,
-        fill=None,
-    ) -> LedgerEntry:
-        return cls._execute(
-            user=user,
-            currency=currency,
-            amount=amount,
-            idempotency_reference=(idempotency_reference),
-            operation=cls.OPERATION_RESERVE,
-            market=market,
-            order=order,
-            fill=fill,
-        )
-
-    @classmethod
-    def release(
-        cls,
-        *,
-        user,
-        currency,
-        amount,
-        idempotency_reference,
-        market=None,
-        order=None,
-        fill=None,
-    ) -> LedgerEntry:
-        return cls._execute(
-            user=user,
-            currency=currency,
-            amount=amount,
-            idempotency_reference=(idempotency_reference),
-            operation=cls.OPERATION_RELEASE,
-            market=market,
-            order=order,
-            fill=fill,
-        )
-
-    @classmethod
-    def debit_available(
-        cls,
-        *,
-        user,
-        currency,
-        amount,
-        idempotency_reference,
-    ) -> LedgerEntry:
-        return cls._execute(
-            user=user,
-            currency=currency,
-            amount=amount,
-            idempotency_reference=(idempotency_reference),
-            operation=(cls.OPERATION_DEBIT_AVAILABLE),
-        )
-
-    @classmethod
-    def consume_reserved(
-        cls,
-        *,
-        user,
-        currency,
-        amount,
-        idempotency_reference,
-        market=None,
-        order=None,
-        fill=None,
-    ) -> LedgerEntry:
-        return cls._execute(
-            user=user,
-            currency=currency,
-            amount=amount,
-            idempotency_reference=(idempotency_reference),
-            operation=(cls.OPERATION_CONSUME_RESERVED),
-            market=market,
-            order=order,
-            fill=fill,
-        )
+    @transaction.atomic
+    def get_or_create_wallet(cls, user, currency: str) -> Wallet:
+        """Get or create a wallet for a user and currency."""
+        wallet, _ = Wallet.objects.get_or_create(user=user, currency=currency.upper())
+        return wallet
 
     @classmethod
     @transaction.atomic
-    def _execute(
-        cls,
-        *,
-        user,
-        currency,
-        amount,
-        idempotency_reference,
-        operation,
-        create_wallet=False,
-        market=None,
-        order=None,
-        fill=None,
-    ) -> LedgerEntry:
-        normalized_currency = cls._normalize_currency(currency)
-        normalized_amount = cls._normalize_amount(amount)
-        normalized_reference = cls._normalize_reference(idempotency_reference)
+    def credit(cls, *, user, currency: str, amount, idempotency_reference) -> LedgerEntry:
+        """Credit funds to available balance."""
+        if amount <= 0:
+            raise ValidationError({"amount": "Amount must be positive."})
 
-        existing_entry = cls._get_existing_entry(normalized_reference)
+        currency = currency.strip().upper()
 
-        if existing_entry is not None:
-            cls._require_matching_replay(
-                entry=existing_entry,
-                user=user,
-                currency=normalized_currency,
-                amount=normalized_amount,
-                operation=operation,
-                market=market,
-                order=order,
-                fill=fill,
-            )
-            return existing_entry
+        # Idempotency check first (before locking to avoid lock ordering issues)
+        existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
+        if existing:
+            # Verify the wallet matches
+            try:
+                wallet = Wallet.objects.get(id=existing.wallet_id)
+                if wallet.user_id != user.id or wallet.currency != currency:
+                    raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
+            except Wallet.DoesNotExist:
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR}) from None
+            return existing
 
-        cls._lock_user(user)
+        # Now get or create wallet with lock
+        try:
+            wallet = Wallet.objects.select_for_update().get(user=user, currency=currency)
+        except Wallet.DoesNotExist:
+            wallet = Wallet.objects.create(user=user, currency=currency)
 
-        # The reference may have been committed
-        # while this transaction waited for the
-        # user lock.
-        existing_entry = cls._get_existing_entry(normalized_reference)
+        available_before = wallet.available_balance
+        reserved_before = wallet.reserved_balance
+        available_after = available_before + Decimal(str(amount))
 
-        if existing_entry is not None:
-            cls._require_matching_replay(
-                entry=existing_entry,
-                user=user,
-                currency=normalized_currency,
-                amount=normalized_amount,
-                operation=operation,
-                market=market,
-                order=order,
-                fill=fill,
-            )
-            return existing_entry
-
-        wallet = cls._get_locked_wallet(
-            user=user,
-            currency=normalized_currency,
+        entry = LedgerEntry(
+            wallet=wallet,
+            entry_type=LedgerEntry.EntryType.CREDIT,
+            debit_account=LedgerEntry.AccountType.USER_WALLET,
+            credit_account=LedgerEntry.AccountType.PROVIDER_PAYABLE,
+            amount=Decimal(str(amount)),
+            currency=currency,
+            available_balance_before=available_before,
+            available_balance_after=available_after,
+            reserved_balance_before=reserved_before,
+            reserved_balance_after=reserved_before,
+            idempotency_reference=idempotency_reference,
         )
+        entry.save()
 
-        if wallet is None:
-            if not create_wallet:
-                raise ValidationError({"wallet": ("A wallet for this " "currency does not exist.")})
+        wallet.available_balance = available_after
+        wallet.save(update_fields=["available_balance", "updated_at"])
 
-            wallet = Wallet(
-                user=user,
-                currency=normalized_currency,
-            )
-            wallet.full_clean()
-            wallet.save(force_insert=True)
+        return entry
 
-        # A transaction using another user lock
-        # may have committed this global reference.
-        existing_entry = cls._get_existing_entry(normalized_reference)
+    @classmethod
+    @transaction.atomic
+    def reserve(cls, *, user, currency: str, amount, idempotency_reference) -> LedgerEntry:
+        """Move funds from available to reserved balance."""
+        if amount <= 0:
+            raise ValidationError({"amount": "Amount must be positive."})
 
-        if existing_entry is not None:
-            cls._require_matching_replay(
-                entry=existing_entry,
-                user=user,
-                currency=normalized_currency,
-                amount=normalized_amount,
-                operation=operation,
-                market=market,
-                order=order,
-                fill=fill,
-            )
-            return existing_entry
+        currency = currency.strip().upper()
+        wallet = Wallet.objects.select_for_update().get(user=user, currency=currency)
+
+        # Idempotency check
+        existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
+        if existing:
+            if existing.wallet_id != wallet.id:
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
+            if existing.entry_type != LedgerEntry.EntryType.RESERVE:
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
+            return existing
 
         available_before = wallet.available_balance
         reserved_before = wallet.reserved_balance
 
-        (
-            available_after,
-            reserved_after,
-            entry_type,
-        ) = cls._calculate_transition(
-            operation=operation,
-            amount=normalized_amount,
-            available_balance=(available_before),
-            reserved_balance=reserved_before,
-        )
+        if available_before < Decimal(str(amount)):
+            raise ValidationError({"available_balance": "Insufficient available balance."})
 
-        wallet.available_balance = available_after
-        wallet.reserved_balance = reserved_after
-        wallet.full_clean()
-        wallet.save(
-            update_fields=[
-                "available_balance",
-                "reserved_balance",
-                "updated_at",
-            ]
-        )
+        available_after = available_before - Decimal(str(amount))
+        reserved_after = reserved_before + Decimal(str(amount))
 
         entry = LedgerEntry(
             wallet=wallet,
-            entry_type=entry_type,
-            amount=normalized_amount,
-            available_balance_before=(available_before),
-            available_balance_after=(available_after),
-            reserved_balance_before=(reserved_before),
-            reserved_balance_after=(reserved_after),
-            idempotency_reference=(normalized_reference),
-            market=market,
-            order=order,
-            fill=fill,
+            entry_type=LedgerEntry.EntryType.RESERVE,
+            debit_account=LedgerEntry.AccountType.USER_WALLET,
+            credit_account=LedgerEntry.AccountType.USER_WALLET,
+            amount=Decimal(str(amount)),
+            currency=currency,
+            available_balance_before=available_before,
+            available_balance_after=available_after,
+            reserved_balance_before=reserved_before,
+            reserved_balance_after=reserved_after,
+            idempotency_reference=idempotency_reference,
         )
-        entry.full_clean(
-            validate_unique=False,
-        )
+        entry.save()
 
-        try:
-            # The inner savepoint keeps the outer
-            # transaction usable long enough to
-            # translate a uniqueness race.
-            with transaction.atomic():
-                entry.save(force_insert=True)
-        except IntegrityError as error:
-            raise ValidationError(
-                {"idempotency_reference": ("This idempotency reference " "has already been used.")}
-            ) from error
+        wallet.available_balance = available_after
+        wallet.reserved_balance = reserved_after
+        wallet.save(update_fields=["available_balance", "reserved_balance", "updated_at"])
+
+        return entry
+
+    @classmethod
+    @transaction.atomic
+    def release(cls, *, user, currency: str, amount, idempotency_reference) -> LedgerEntry:
+        """Move funds from reserved to available balance."""
+        if amount <= 0:
+            raise ValidationError({"amount": "Amount must be positive."})
+
+        currency = currency.strip().upper()
+        wallet = Wallet.objects.select_for_update().get(user=user, currency=currency)
+
+        # Idempotency check
+        existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
+        if existing:
+            if existing.wallet_id != wallet.id:
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
+            if existing.entry_type != LedgerEntry.EntryType.RELEASE:
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
+            return existing
+
+        available_before = wallet.available_balance
+        reserved_before = wallet.reserved_balance
+
+        if reserved_before < Decimal(str(amount)):
+            raise ValidationError({"reserved_balance": "Insufficient reserved balance."})
+
+        available_after = available_before + Decimal(str(amount))
+        reserved_after = reserved_before - Decimal(str(amount))
+
+        entry = LedgerEntry(
+            wallet=wallet,
+            entry_type=LedgerEntry.EntryType.RELEASE,
+            debit_account=LedgerEntry.AccountType.USER_WALLET,
+            credit_account=LedgerEntry.AccountType.USER_WALLET,
+            amount=Decimal(str(amount)),
+            currency=currency,
+            available_balance_before=available_before,
+            available_balance_after=available_after,
+            reserved_balance_before=reserved_before,
+            reserved_balance_after=reserved_after,
+            idempotency_reference=idempotency_reference,
+        )
+        entry.save()
+
+        wallet.available_balance = available_after
+        wallet.reserved_balance = reserved_after
+        wallet.save(update_fields=["available_balance", "reserved_balance", "updated_at"])
+
+        return entry
+
+    @classmethod
+    @transaction.atomic
+    def debit_available(cls, *, user, currency: str, amount, idempotency_reference) -> LedgerEntry:
+        """Debit funds from available balance."""
+        if amount <= 0:
+            raise ValidationError({"amount": "Amount must be positive."})
+
+        currency = currency.strip().upper()
+        wallet = Wallet.objects.select_for_update().get(user=user, currency=currency)
+
+        # Idempotency check
+        existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
+        if existing:
+            if existing.wallet_id != wallet.id:
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
+            if existing.entry_type != LedgerEntry.EntryType.DEBIT:
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
+            return existing
+
+        available_before = wallet.available_balance
+        reserved_before = wallet.reserved_balance
+
+        if available_before < Decimal(str(amount)):
+            raise ValidationError({"available_balance": "Insufficient available balance."})
+
+        available_after = available_before - Decimal(str(amount))
+
+        entry = LedgerEntry(
+            wallet=wallet,
+            entry_type=LedgerEntry.EntryType.DEBIT,
+            debit_account=LedgerEntry.AccountType.USER_WALLET,
+            credit_account=LedgerEntry.AccountType.REVENUE,
+            amount=Decimal(str(amount)),
+            currency=currency,
+            available_balance_before=available_before,
+            available_balance_after=available_after,
+            reserved_balance_before=reserved_before,
+            reserved_balance_after=reserved_before,
+            idempotency_reference=idempotency_reference,
+        )
+        entry.save()
+
+        wallet.available_balance = available_after
+        wallet.save(update_fields=["available_balance", "updated_at"])
+
+        return entry
+
+    @classmethod
+    @transaction.atomic
+    def consume_reserved(cls, *, user, currency: str, amount, idempotency_reference) -> LedgerEntry:
+        """Debit funds from reserved balance."""
+        if amount <= 0:
+            raise ValidationError({"amount": "Amount must be positive."})
+
+        currency = currency.strip().upper()
+        wallet = Wallet.objects.select_for_update().get(user=user, currency=currency)
+
+        # Idempotency check
+        existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
+        if existing:
+            if (
+                existing.wallet_id != wallet.id
+                or existing.entry_type != LedgerEntry.EntryType.DEBIT
+            ):
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
+            return existing
+
+        available_before = wallet.available_balance
+        reserved_before = wallet.reserved_balance
+
+        if reserved_before < Decimal(str(amount)):
+            raise ValidationError({"reserved_balance": "Insufficient reserved balance."})
+
+        reserved_after = reserved_before - Decimal(str(amount))
+
+        entry = LedgerEntry(
+            wallet=wallet,
+            entry_type=LedgerEntry.EntryType.DEBIT,
+            debit_account=LedgerEntry.AccountType.USER_WALLET,
+            credit_account=LedgerEntry.AccountType.REVENUE,
+            amount=Decimal(str(amount)),
+            currency=currency,
+            available_balance_before=available_before,
+            available_balance_after=available_before,
+            reserved_balance_before=reserved_before,
+            reserved_balance_after=reserved_after,
+            idempotency_reference=idempotency_reference,
+        )
+        entry.save()
+
+        wallet.reserved_balance = reserved_after
+        wallet.save(update_fields=["reserved_balance", "updated_at"])
 
         return entry
 
     @staticmethod
-    def _normalize_currency(
-        currency,
-    ) -> str:
-        normalized_currency = str(currency or "").strip().upper()
+    @transaction.atomic
+    def reserve_funds(wallet: Wallet, amount: Decimal) -> None:
+        """Atomically move funds from available to reserved balance."""
+        if amount <= 0:
+            raise ValidationError("Amount must be positive.")
 
-        if len(normalized_currency) != 3:
-            raise ValidationError({"currency": ("Currency must be a " "three-letter code.")})
+        wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
 
-        return normalized_currency
+        if wallet.available_balance < amount:
+            raise ValidationError("Insufficient available balance.")
+
+        wallet.available_balance -= amount
+        wallet.reserved_balance += amount
+        wallet.save(update_fields=["available_balance", "reserved_balance", "updated_at"])
 
     @staticmethod
-    def _normalize_amount(
-        amount,
-    ) -> Decimal:
+    @transaction.atomic
+    def release_funds(wallet: Wallet, amount: Decimal) -> None:
+        """Atomically move funds from reserved to available balance."""
+        if amount <= 0:
+            raise ValidationError("Amount must be positive.")
+
+        wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
+
+        if wallet.reserved_balance < amount:
+            raise ValidationError("Insufficient reserved balance.")
+
+        wallet.reserved_balance -= amount
+        wallet.available_balance += amount
+        wallet.save(update_fields=["reserved_balance", "available_balance", "updated_at"])
+
+    @staticmethod
+    @transaction.atomic
+    def debit_reserved_funds(wallet: Wallet, amount: Decimal) -> None:
+        """Atomically debit funds from the reserved balance."""
+        if amount <= 0:
+            raise ValidationError("Amount must be positive.")
+
+        wallet = Wallet.objects.select_for_update().get(pk=wallet.pk)
+
+        if wallet.reserved_balance < amount:
+            raise ValidationError("Insufficient reserved balance.")
+
+        wallet.reserved_balance -= amount
+        wallet.save(update_fields=["reserved_balance", "updated_at"])
+
+    @classmethod
+    @transaction.atomic
+    def create_deposit_intent(
+        cls, *, user, provider_code: str, amount, currency: str
+    ) -> DepositIntent:
+        """Create a deposit intent for the given user and provider."""
         try:
-            normalized_amount = Decimal(str(amount))
-        except (
-            InvalidOperation,
-            TypeError,
-            ValueError,
-        ) as error:
+            provider = PaymentProvider.objects.get(code=provider_code.upper(), is_active=True)
+        except PaymentProvider.DoesNotExist:
             raise ValidationError(
-                {"amount": ("Amount must be a valid " "decimal value.")}
-            ) from error
+                {"provider_code": "Invalid or inactive payment provider."}
+            ) from None
 
-        if not normalized_amount.is_finite() or normalized_amount <= Decimal("0.0000"):
-            raise ValidationError({"amount": ("Amount must be greater " "than zero.")})
+        decimal_amount = Decimal(str(amount))
+        if decimal_amount <= 0:
+            raise ValidationError({"amount": "Amount must be positive."})
 
-        return normalized_amount
+        currency = currency.strip().upper()
+        if len(currency) != 3 or not currency.isalpha():
+            raise ValidationError(
+                {"currency": "Currency must be exactly three alphabetic characters."}
+            )
 
-    @staticmethod
-    def _normalize_reference(
-        idempotency_reference,
-    ) -> UUID:
+        intent = DepositIntent.objects.create(
+            user=user,
+            provider=provider,
+            amount=decimal_amount,
+            currency=currency,
+            expires_at=timezone.now() + timedelta(hours=2),
+        )
+        return intent
+
+    @classmethod
+    @transaction.atomic
+    def get_deposit_intent(cls, *, user, intent_id) -> DepositIntent:
+        """Get a deposit intent scoped to the user."""
         try:
-            if isinstance(
-                idempotency_reference,
-                UUID,
-            ):
-                return idempotency_reference
+            return DepositIntent.objects.get(id=intent_id, user=user)
+        except DepositIntent.DoesNotExist:
+            from django.http import Http404
 
-            return UUID(str(idempotency_reference))
-        except (
-            TypeError,
-            ValueError,
-            AttributeError,
-        ) as error:
+            raise Http404 from None
+
+    @classmethod
+    @transaction.atomic
+    def process_deposit_callback(cls, *, provider_code: str, payload: dict) -> None:
+        """Process a provider deposit callback."""
+        # Implementation would verify the callback payload and update
+        # the deposit intent and wallet if payment was successful.
+        # For now, this is a stub to satisfy the API contract.
+        return None
+
+    @classmethod
+    @transaction.atomic
+    def create_withdrawal_request(
+        cls, *, user, amount, currency: str, destination: dict
+    ) -> WithdrawalRequest:
+        """Create a withdrawal request for the given user."""
+        currency = currency.strip().upper()
+        try:
+            wallet = Wallet.objects.get(user=user, currency=currency)
+        except Wallet.DoesNotExist:
             raise ValidationError(
-                {"idempotency_reference": ("A valid idempotency " "reference is required.")}
-            ) from error
+                {"currency": "No wallet exists for the specified currency."}
+            ) from None
 
-    @staticmethod
-    def _lock_user(user) -> None:
-        type(user).objects.select_for_update(
-            of=("self",),
-        ).get(pk=user.pk)
+        decimal_amount = Decimal(str(amount))
+        if decimal_amount <= 0:
+            raise ValidationError({"amount": "Amount must be positive."})
 
-    @staticmethod
-    def _get_locked_wallet(
-        *,
-        user,
-        currency,
-    ) -> Wallet | None:
-        return (
-            Wallet.objects.select_for_update(
-                of=("self",),
-            )
-            .filter(
-                user=user,
-                currency=currency,
-            )
-            .first()
+        if wallet.available_balance < decimal_amount:
+            raise ValidationError({"amount": "Insufficient available balance."})
+
+        withdrawal = WithdrawalRequest.objects.create(
+            wallet=wallet,
+            amount=decimal_amount,
+            destination=destination,
         )
-
-    @staticmethod
-    def _get_existing_entry(
-        idempotency_reference,
-    ) -> LedgerEntry | None:
-        return (
-            LedgerEntry.objects.select_related(
-                "wallet",
-                "wallet__user",
-            )
-            .filter(idempotency_reference=(idempotency_reference))
-            .first()
-        )
+        return withdrawal
 
     @classmethod
-    def _calculate_transition(
-        cls,
-        *,
-        operation,
-        amount,
-        available_balance,
-        reserved_balance,
-    ) -> tuple[
-        Decimal,
-        Decimal,
-        str,
-    ]:
-        if operation == cls.OPERATION_CREDIT:
-            return (
-                available_balance + amount,
-                reserved_balance,
-                LedgerEntry.EntryType.CREDIT,
-            )
+    @transaction.atomic
+    def get_withdrawal_request(cls, *, user, request_id) -> WithdrawalRequest:
+        """Get a withdrawal request scoped to the user."""
+        try:
+            return WithdrawalRequest.objects.get(id=request_id, wallet__user=user)
+        except WithdrawalRequest.DoesNotExist:
+            from django.http import Http404
 
-        if operation == cls.OPERATION_RESERVE:
-            cls._require_sufficient_available(
-                available_balance=(available_balance),
-                amount=amount,
-            )
-            return (
-                available_balance - amount,
-                reserved_balance + amount,
-                LedgerEntry.EntryType.RESERVE,
-            )
-
-        if operation == cls.OPERATION_RELEASE:
-            cls._require_sufficient_reserved(
-                reserved_balance=(reserved_balance),
-                amount=amount,
-            )
-            return (
-                available_balance + amount,
-                reserved_balance - amount,
-                LedgerEntry.EntryType.RELEASE,
-            )
-
-        if operation == cls.OPERATION_DEBIT_AVAILABLE:
-            cls._require_sufficient_available(
-                available_balance=(available_balance),
-                amount=amount,
-            )
-            return (
-                available_balance - amount,
-                reserved_balance,
-                LedgerEntry.EntryType.DEBIT,
-            )
-
-        if operation == cls.OPERATION_CONSUME_RESERVED:
-            cls._require_sufficient_reserved(
-                reserved_balance=(reserved_balance),
-                amount=amount,
-            )
-            return (
-                available_balance,
-                reserved_balance - amount,
-                LedgerEntry.EntryType.DEBIT,
-            )
-
-        raise ValidationError({"operation": ("Unsupported wallet operation.")})
-
-    @staticmethod
-    def _require_sufficient_available(
-        *,
-        available_balance,
-        amount,
-    ) -> None:
-        if available_balance < amount:
-            raise ValidationError({"available_balance": ("Insufficient available " "balance.")})
-
-    @staticmethod
-    def _require_sufficient_reserved(
-        *,
-        reserved_balance,
-        amount,
-    ) -> None:
-        if reserved_balance < amount:
-            raise ValidationError({"reserved_balance": ("Insufficient reserved " "balance.")})
-
-    @classmethod
-    def _require_matching_replay(
-        cls,
-        *,
-        entry,
-        user,
-        currency,
-        amount,
-        operation,
-        market=None,
-        order=None,
-        fill=None,
-    ) -> None:
-        matches = all(
-            [
-                entry.wallet.user_id == user.pk,
-                entry.wallet.currency == currency,
-                entry.amount == amount,
-                cls._entry_matches_operation(
-                    entry=entry,
-                    operation=operation,
-                ),
-                entry.market_id
-                == getattr(
-                    market,
-                    "pk",
-                    None,
-                ),
-                entry.order_id
-                == getattr(
-                    order,
-                    "pk",
-                    None,
-                ),
-                entry.fill_id
-                == getattr(
-                    fill,
-                    "pk",
-                    None,
-                ),
-            ]
-        )
-
-        if not matches:
-            raise ValidationError(
-                {
-                    "idempotency_reference": (
-                        "This idempotency reference " "belongs to a different " "wallet operation."
-                    )
-                }
-            )
-
-    @classmethod
-    def _entry_matches_operation(
-        cls,
-        *,
-        entry,
-        operation,
-    ) -> bool:
-        amount = entry.amount
-        available_before = entry.available_balance_before
-        available_after = entry.available_balance_after
-        reserved_before = entry.reserved_balance_before
-        reserved_after = entry.reserved_balance_after
-
-        if operation == cls.OPERATION_CREDIT:
-            return all(
-                [
-                    entry.entry_type == LedgerEntry.EntryType.CREDIT,
-                    available_after == available_before + amount,
-                    reserved_after == reserved_before,
-                ]
-            )
-
-        if operation == cls.OPERATION_RESERVE:
-            return all(
-                [
-                    entry.entry_type == LedgerEntry.EntryType.RESERVE,
-                    available_after == available_before - amount,
-                    reserved_after == reserved_before + amount,
-                ]
-            )
-
-        if operation == cls.OPERATION_RELEASE:
-            return all(
-                [
-                    entry.entry_type == LedgerEntry.EntryType.RELEASE,
-                    available_after == available_before + amount,
-                    reserved_after == reserved_before - amount,
-                ]
-            )
-
-        if operation == cls.OPERATION_DEBIT_AVAILABLE:
-            return all(
-                [
-                    entry.entry_type == LedgerEntry.EntryType.DEBIT,
-                    available_after == available_before - amount,
-                    reserved_after == reserved_before,
-                ]
-            )
-
-        if operation == cls.OPERATION_CONSUME_RESERVED:
-            return all(
-                [
-                    entry.entry_type == LedgerEntry.EntryType.DEBIT,
-                    available_after == available_before,
-                    reserved_after == reserved_before - amount,
-                ]
-            )
-
-        return False
+            raise Http404 from None

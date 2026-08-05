@@ -351,6 +351,16 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
+SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"].update(
+    {
+        "LedgerAccountTypeEnum": [
+            ("USER_WALLET", "User Wallet"),
+            ("PROVIDER_PAYABLE", "Provider Payable"),
+            ("REVENUE", "Revenue"),
+        ],
+    }
+)
+
 
 # Email Configuration
 if DEBUG:
