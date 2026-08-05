@@ -29,7 +29,12 @@ class WalletReadService:
             return None, LedgerEntry.objects.none()
 
         filters = filters or {}
-        queryset = LedgerEntry.objects.filter(transaction__wallet=wallet)
+        queryset = LedgerEntry.objects.filter(wallet=wallet)
+        if filters.get("entry_type"):
+            queryset = queryset.filter(entry_type=filters["entry_type"])
+        for field in ("market_id", "order_id", "fill_id"):
+            if filters.get(field):
+                queryset = queryset.filter(**{field: filters[field]})
         if filters.get("debit_account"):
             queryset = queryset.filter(debit_account=filters["debit_account"])
         if filters.get("credit_account"):

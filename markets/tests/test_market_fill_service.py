@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -1338,6 +1339,28 @@ class MarketFillServiceTests(TestCase):
         self.assertEqual(credit_entry.available_balance_after, Decimal("1000002.2000"))
         self.assertEqual(credit_entry.reserved_balance_before, Decimal("0.0000"))
         self.assertEqual(credit_entry.reserved_balance_after, Decimal("0.0000"))
+
+        replay = WalletService.credit(
+            user=self.seller,
+            currency="UGX",
+            amount=Decimal("2.2000"),
+            idempotency_reference=credit_entry.idempotency_reference,
+            market=self.market,
+            order=self.sell_order,
+            fill=fill,
+        )
+        self.assertEqual(replay.id, credit_entry.id)
+
+        with self.assertRaises(ValidationError):
+            WalletService.credit(
+                user=self.seller,
+                currency="UGX",
+                amount=Decimal("2.2000"),
+                idempotency_reference=credit_entry.idempotency_reference,
+                market=SimpleNamespace(pk=uuid4()),
+                order=self.sell_order,
+                fill=fill,
+            )
 
     def test_full_fill_credits_full_seller_proceeds(self):
         fill = self.execute_fill(
