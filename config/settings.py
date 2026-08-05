@@ -26,6 +26,10 @@ ALLOWED_HOSTS = env.list(
     default=["localhost", "127.0.0.1", "0.0.0.0"],
 )
 
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default="").strip()
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
 
 DJANGO_APPS = [
     "django.contrib.admin",
@@ -126,6 +130,11 @@ USE_TZ = True
 
 MARKET_MINIMUM_AGE = env.int("MARKET_MINIMUM_AGE", default=18)
 MARKET_ALLOWED_COUNTRY_CODES = env.list("MARKET_ALLOWED_COUNTRY_CODES", default=[])
+MARKET_KYC_PROVIDER = env("MARKET_KYC_PROVIDER", default="manual")
+MARKET_KYC_WEBHOOK_SECRET = env("MARKET_KYC_WEBHOOK_SECRET", default="")
+MARKET_KYC_WEBHOOK_TOLERANCE_SECONDS = env.int("MARKET_KYC_WEBHOOK_TOLERANCE_SECONDS", default=300)
+MARKET_KYC_MAX_CALLBACK_BYTES = env.int("MARKET_KYC_MAX_CALLBACK_BYTES", default=65536)
+MARKET_KYC_SESSION_HOURS = env.int("MARKET_KYC_SESSION_HOURS", default=24)
 MARKET_BLOCKED_COUNTRY_CODES = env.list("MARKET_BLOCKED_COUNTRY_CODES", default=[])
 
 
@@ -210,6 +219,40 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
+        "KYCVerificationStatusEnum": [
+            ("CREATED", "Created"),
+            ("PENDING", "Pending"),
+            ("IN_REVIEW", "In review"),
+            ("VERIFIED", "Verified"),
+            ("REJECTED", "Rejected"),
+            ("EXPIRED", "Expired"),
+            ("CANCELLED", "Cancelled"),
+            ("ERROR", "Error"),
+        ],
+        "ComplianceDecisionStatusEnum": [
+            ("PENDING", "Pending"),
+            ("APPROVED", "Approved"),
+            ("REJECTED", "Rejected"),
+        ],
+        "ComplianceDecisionTypeEnum": [
+            ("CLEAR_CRITICAL_RISK_BLOCK", "Clear critical risk block"),
+            ("REMOVE_SUSPENDED_RESTRICTION", "Remove suspension"),
+            ("JURISDICTION_BLOCK_TO_ALLOW", "Allow jurisdiction"),
+            ("APPLY_RISK_OVERRIDE", "Apply risk override"),
+            ("CLEAR_RISK_OVERRIDE", "Clear risk override"),
+        ],
+        "MarketDisputeDecisionTypeEnum": [
+            ("CONFIRM", "Confirm provisional result"),
+            ("CORRECT", "Correct provisional result"),
+            ("VOID", "Void market"),
+            ("EXTEND_REVIEW", "Extend review"),
+        ],
+        "RiskBandEnum": [
+            ("LOW", "Low"),
+            ("MEDIUM", "Medium"),
+            ("HIGH", "High"),
+            ("CRITICAL", "Critical"),
+        ],
         "ResponsibleParticipationEventTypeEnum": [
             ("LIMITS_SET", "Limits set"),
             ("LIMITS_TIGHTENED", "Limits tightened"),
@@ -307,6 +350,16 @@ SPECTACULAR_SETTINGS = {
         ],
     },
 }
+
+SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"].update(
+    {
+        "LedgerAccountTypeEnum": [
+            ("USER_WALLET", "User Wallet"),
+            ("PROVIDER_PAYABLE", "Provider Payable"),
+            ("REVENUE", "Revenue"),
+        ],
+    }
+)
 
 
 # Email Configuration

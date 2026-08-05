@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 
 from markets.models import (
     MarketPosition,
@@ -9,6 +10,7 @@ from markets.models import (
     MarketResultDisputeDecision,
     MarketResultDisputeEvidence,
 )
+from markets.services.market_notification_service import MarketNotificationService
 
 
 class MarketResultDisputeService:
@@ -61,6 +63,26 @@ class MarketResultDisputeService:
                 reference=item["reference"],
                 recorded_at=submitted_at,
             )
+        MarketNotificationService.schedule(
+            recipient=actor,
+            category="MARKET_DISPUTES",
+            event_type="RESULT_DISPUTE_SUBMITTED",
+            title="Result dispute submitted",
+            message="Your result dispute was submitted.",
+            key=f"market-dispute:{dispute.id}:submitted",
+            market_id=market_id,
+            data={"dispute_id": str(dispute.id)},
+        )
+        from notifications.services.operational_alert_service import OperationalAlertService
+
+        OperationalAlertService.create(
+            permissions=("manage_market", "approve_market"),
+            event_type="RESULT_DISPUTE_SUBMITTED",
+            title="Result dispute submitted",
+            message="A market result dispute requires review.",
+            source_key=f"market-dispute:{dispute.id}:admin",
+            data={"dispute_id": str(dispute.id), "market_id": str(market_id)},
+        )
 
         return (
             MarketResultDispute.objects.select_related(
@@ -150,12 +172,10 @@ class MarketResultDisputeService:
         ).exists()
 
         if not participated:
-            raise ValidationError(
-                {
-                    "participant": (
-                        "Only a participant in this market may " "submit a result dispute."
-                    )
-                }
+            raise PermissionDenied(
+                "Only a participant in this market may "
+                "submit a result dispute.",
+                code="not_market_participant",
             )
 
     @staticmethod
@@ -192,7 +212,7 @@ class MarketResultDisputeService:
         cls,
         evidence_items,
     ) -> list[dict]:
-        if not isinstance(evidence_items, (list, tuple)) or not evidence_items:
+        if not isinstance(evidence_items, list | tuple) or not evidence_items:
             raise ValidationError(
                 {"evidence_items": ("At least one dispute evidence item " "is required.")}
             )

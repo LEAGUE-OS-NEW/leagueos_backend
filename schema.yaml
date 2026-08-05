@@ -4400,6 +4400,195 @@ paths:
           description: Authentication credentials are required.
         '404':
           description: Wallet not found.
+  /api/v1/wallets/deposits/:
+    post:
+      operationId: api_v1_wallets_deposits_create
+      tags:
+      - Wallets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepositIntent'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DepositIntent'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DepositIntent'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepositIntent'
+          description: ''
+        '400':
+          description: Invalid request data.
+        '401':
+          description: Authentication credentials are required.
+  /api/v1/wallets/deposits/{intent_id}/:
+    get:
+      operationId: api_v1_wallets_deposits_retrieve
+      parameters:
+      - in: path
+        name: intent_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletRead'
+          description: ''
+  /api/v1/wallets/deposits/callback/{provider_code}/:
+    post:
+      operationId: api_v1_wallets_deposits_callback_create
+      parameters:
+      - in: path
+        name: provider_code
+        schema:
+          type: string
+        required: true
+      tags:
+      - Wallets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Callback processed.
+        '400':
+          description: Invalid callback payload.
+        '404':
+          description: Provider not found.
+  /api/v1/wallets/transactions/:
+    get:
+      operationId: api_v1_wallets_transactions_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLedgerEntryReadList'
+          description: ''
+  /api/v1/wallets/transactions/{tx_id}/:
+    get:
+      operationId: api_v1_wallets_transactions_retrieve
+      parameters:
+      - in: path
+        name: tx_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerEntryRead'
+          description: ''
+  /api/v1/wallets/transactions/{tx_id}/receipt/:
+    get:
+      operationId: api_v1_wallets_transactions_receipt_retrieve
+      parameters:
+      - in: path
+        name: tx_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Wallets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Receipt file download.
+        '404':
+          description: Receipt not found.
+  /api/v1/wallets/withdrawals/:
+    post:
+      operationId: api_v1_wallets_withdrawals_create
+      tags:
+      - Wallets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawalRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WithdrawalRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/WithdrawalRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WithdrawalRequest'
+          description: ''
+        '400':
+          description: Invalid request data.
+        '401':
+          description: Authentication credentials are required.
+  /api/v1/wallets/withdrawals/{request_id}/:
+    get:
+      operationId: api_v1_wallets_withdrawals_retrieve
+      parameters:
+      - in: path
+        name: request_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletRead'
+          description: ''
   /api/v1/widgets/:
     get:
       operationId: widgets_retrieve
@@ -5243,6 +5432,22 @@ components:
       - module_name
       - permission_required
       - title
+    DepositIntent:
+      type: object
+      properties:
+        provider_code:
+          type: string
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,4})?$
+        currency:
+          type: string
+          maxLength: 3
+      required:
+      - amount
+      - currency
+      - provider_code
     DiscoveryClub:
       type: object
       description: Public club serializer.
@@ -5321,18 +5526,6 @@ components:
       - next_actions
       - reason_codes
       - requirements
-    EntryTypeEnum:
-      enum:
-      - CREDIT
-      - DEBIT
-      - RESERVE
-      - RELEASE
-      type: string
-      description: |-
-        * `CREDIT` - Credit
-        * `DEBIT` - Debit
-        * `RESERVE` - Reserve
-        * `RELEASE` - Release
     EventParticipantPublic:
       type: object
       properties:
@@ -5573,6 +5766,16 @@ components:
       - id
       - is_active
       - name
+    LedgerAccountTypeEnum:
+      enum:
+      - USER_WALLET
+      - PROVIDER_PAYABLE
+      - REVENUE
+      type: string
+      description: |-
+        * `USER_WALLET` - User Wallet
+        * `PROVIDER_PAYABLE` - Provider Payable
+        * `REVENUE` - Revenue
     LedgerEntryRead:
       type: object
       properties:
@@ -5580,71 +5783,33 @@ components:
           type: string
           format: uuid
           readOnly: true
-        entry_type:
+        debit_account:
           allOf:
-          - $ref: '#/components/schemas/EntryTypeEnum'
+          - $ref: '#/components/schemas/LedgerAccountTypeEnum'
+          readOnly: true
+        credit_account:
+          allOf:
+          - $ref: '#/components/schemas/LedgerAccountTypeEnum'
           readOnly: true
         amount:
           type: string
           format: decimal
-          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          pattern: ^-?\d{0,12}(?:\.\d{0,4})?$
           readOnly: true
-        available_balance_before:
+        currency:
           type: string
-          format: decimal
-          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
           readOnly: true
-        available_balance_after:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
-          readOnly: true
-        reserved_balance_before:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
-          readOnly: true
-        reserved_balance_after:
-          type: string
-          format: decimal
-          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
-          readOnly: true
-        idempotency_reference:
-          type: string
-          format: uuid
-          readOnly: true
-        market_id:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        order_id:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        fill_id:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
         created_at:
           type: string
           format: date-time
           readOnly: true
       required:
       - amount
-      - available_balance_after
-      - available_balance_before
       - created_at
-      - entry_type
-      - fill_id
+      - credit_account
+      - currency
+      - debit_account
       - id
-      - idempotency_reference
-      - market_id
-      - order_id
-      - reserved_balance_after
-      - reserved_balance_before
     Limits:
       type: object
       properties:
@@ -10523,12 +10688,12 @@ components:
         available_balance:
           type: string
           format: decimal
-          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          pattern: ^-?\d{0,12}(?:\.\d{0,4})?$
           readOnly: true
         reserved_balance:
           type: string
           format: decimal
-          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          pattern: ^-?\d{0,12}(?:\.\d{0,4})?$
           readOnly: true
         total_balance:
           type: string
@@ -10551,6 +10716,21 @@ components:
       - reserved_balance
       - total_balance
       - updated_at
+    WithdrawalRequest:
+      type: object
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,12}(?:\.\d{0,4})?$
+        currency:
+          type: string
+          maxLength: 3
+        destination: {}
+      required:
+      - amount
+      - currency
+      - destination
     _User:
       type: object
       description: Minimal user serializer for nested profile representation.

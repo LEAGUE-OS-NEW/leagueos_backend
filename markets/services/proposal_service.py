@@ -149,6 +149,16 @@ class MarketProposalService:
                 "updated_at",
             ]
         )
+        from notifications.services.operational_alert_service import OperationalAlertService
+
+        OperationalAlertService.create(
+            permissions=("manage_market",),
+            event_type="MARKET_PROPOSAL_AWAITING_REVIEW",
+            title="Market proposal awaiting review",
+            message="A market proposal requires review.",
+            source_key=f"market-proposal:{proposal.id}:submitted",
+            data={"proposal_id": str(proposal.id)},
+        )
         return proposal
 
     @classmethod

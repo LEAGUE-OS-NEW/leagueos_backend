@@ -310,6 +310,74 @@ class Command(BaseCommand):
             },
         ]
 
+        categories_data.extend(
+            [
+                {
+                    "code": "MARKET_ORDERS",
+                    "name": "Market Orders",
+                    "description": "Order status updates",
+                    "mandatory": False,
+                    "default_enabled": True,
+                    "priority": 200,
+                    "display_order": 20,
+                },
+                {
+                    "code": "MARKET_TRADES",
+                    "name": "Market Trades",
+                    "description": "Trade execution updates",
+                    "mandatory": False,
+                    "default_enabled": True,
+                    "priority": 210,
+                    "display_order": 21,
+                },
+                {
+                    "code": "MARKET_RESULTS",
+                    "name": "Market Results",
+                    "description": "Result and dispute updates",
+                    "mandatory": False,
+                    "default_enabled": True,
+                    "priority": 220,
+                    "display_order": 22,
+                },
+                {
+                    "code": "MARKET_SETTLEMENTS",
+                    "name": "Market Settlements",
+                    "description": "Settlement and refund updates",
+                    "mandatory": True,
+                    "default_enabled": True,
+                    "priority": 1100,
+                    "display_order": 110,
+                },
+                {
+                    "code": "MARKET_DISPUTES",
+                    "name": "Market Disputes",
+                    "description": "Market dispute updates",
+                    "mandatory": True,
+                    "default_enabled": True,
+                    "priority": 1110,
+                    "display_order": 111,
+                },
+                {
+                    "code": "MARKET_COMPLIANCE",
+                    "name": "Market Compliance",
+                    "description": "Verification and participation compliance",
+                    "mandatory": True,
+                    "default_enabled": True,
+                    "priority": 1120,
+                    "display_order": 112,
+                },
+                {
+                    "code": "MARKET_OPERATIONAL_ALERTS",
+                    "name": "Market Operational Alerts",
+                    "description": "Permission-scoped operational alerts",
+                    "mandatory": True,
+                    "default_enabled": True,
+                    "priority": 1130,
+                    "display_order": 113,
+                },
+            ]
+        )
+
         for category_data in categories_data:
             category, created = NotificationCategory.objects.get_or_create(
                 code=category_data["code"],

@@ -4,7 +4,7 @@ from datetime import date
 from django.conf import settings
 from django.utils import timezone
 
-from markets.models import MarketParticipantCompliance
+from markets.models import MarketParticipantCompliance, MarketRiskProfile
 from profiles.models import Profile
 
 _UNSET = object()
@@ -85,10 +85,11 @@ class MarketEligibilityService:
             country_code = profile.country.iso_code.upper()
         country_valid = bool(country_code and len(country_code) == 2 and country_code.isalpha())
         if compliance is _UNSET:
-            try:
-                compliance = participant.market_compliance
-            except MarketParticipantCompliance.DoesNotExist:
-                compliance = None
+            compliance = (
+                MarketParticipantCompliance.objects.filter(participant=participant)
+                .select_related("participant__market_risk_profile")
+                .first()
+            )
         kyc = (
             compliance.kyc_status
             if compliance
@@ -132,6 +133,25 @@ class MarketEligibilityService:
             reasons.append(f"KYC_{kyc}")
         if not restriction_clear:
             reasons.append(f"COMPLIANCE_{restriction}")
+        risk_band = MarketRiskProfile.Band.LOW
+        override_state = "NONE"
+        if compliance:
+            try:
+                risk_profile = compliance.participant.market_risk_profile
+                risk_band = risk_profile.risk_band
+                override_state = risk_profile.manual_override_state
+            except MarketRiskProfile.DoesNotExist:
+                pass
+        if override_state == "BLOCK":
+            reasons.append("RISK_CRITICAL")
+        elif override_state == "REVIEW":
+            reasons.append("RISK_REVIEW_REQUIRED")
+        elif override_state == "CLEAR":
+            pass
+        elif risk_band == MarketRiskProfile.Band.CRITICAL:
+            reasons.append("RISK_CRITICAL")
+        elif risk_band == MarketRiskProfile.Band.HIGH:
+            reasons.append("RISK_REVIEW_REQUIRED")
         actions = []
         if any(
             code in reasons
@@ -151,6 +171,8 @@ class MarketEligibilityService:
                 "KYC_EXPIRED",
                 "COMPLIANCE_RESTRICTED",
                 "COMPLIANCE_SUSPENDED",
+                "RISK_CRITICAL",
+                "RISK_REVIEW_REQUIRED",
             )
         ):
             actions.append("CONTACT_SUPPORT")
