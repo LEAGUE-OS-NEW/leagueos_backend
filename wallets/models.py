@@ -60,12 +60,12 @@ class Wallet(TimeStampedUUIDModel):
             ),
         ]
 
+    def __str__(self) -> str:
+        return f"{self.user}'s {self.currency} Wallet"
+
     def save(self, *args, **kwargs):
         self.currency = self.currency.upper()
         super().save(*args, **kwargs)
-
-    def __str__(self) -> str:
-        return f"{self.user}'s {self.currency} Wallet"
 
     @property
     def total_balance(self) -> models.Decimal:
@@ -161,9 +161,18 @@ class LedgerEntry(TimeStampedUUIDModel):
         Wallet, on_delete=models.PROTECT, related_name="ledger_entries", null=True, blank=True
     )
     transaction = models.ForeignKey(
-        WalletTransaction, on_delete=models.PROTECT, related_name="ledger_entries", null=True, blank=True
+        WalletTransaction,
+        on_delete=models.PROTECT,
+        related_name="ledger_entries",
+        null=True,
+        blank=True,
     )
-    entry_type = models.CharField(max_length=20, choices=EntryType.choices, db_index=True, default=EntryType.CREDIT)
+    entry_type = models.CharField(
+        max_length=20,
+        choices=EntryType.choices,
+        db_index=True,
+        default=EntryType.CREDIT,
+    )
     debit_account = models.CharField(max_length=50, choices=AccountType.choices)
     credit_account = models.CharField(max_length=50, choices=AccountType.choices)
     amount = models.DecimalField(max_digits=16, decimal_places=4)
@@ -232,9 +241,14 @@ class LedgerEntry(TimeStampedUUIDModel):
         return f"Ledger {self.id}: {self.debit_account} -> {self.credit_account} ({self.amount})"
 
     def clean(self):
-        # Allow same debit/credit account for internal wallet operations (RESERVE/RELEASE)
-        if self.debit_account == self.credit_account and self.entry_type not in (LedgerEntry.EntryType.RESERVE, LedgerEntry.EntryType.RELEASE):
-            raise ValidationError("Debit and credit accounts cannot be the same for this entry type.")
+        # Allow same debit/credit account for internal wallet operations
+        if self.debit_account == self.credit_account and self.entry_type not in (
+            LedgerEntry.EntryType.RESERVE,
+            LedgerEntry.EntryType.RELEASE,
+        ):
+            raise ValidationError(
+                "Debit and credit accounts cannot be the same for this entry type."
+            )
         if self.amount <= 0:
             raise ValidationError("Amount must be positive.")
         if self.available_balance_before < 0 or self.available_balance_after < 0:
@@ -255,7 +269,11 @@ class DepositIntent(TimeStampedUUIDModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="deposit_intents"
     )
-    provider = models.ForeignKey(PaymentProvider, on_delete=models.PROTECT, related_name="deposit_intents")
+    provider = models.ForeignKey(
+        PaymentProvider,
+        on_delete=models.PROTECT,
+        related_name="deposit_intents",
+    )
     amount = models.DecimalField(max_digits=16, decimal_places=4)
     currency = models.CharField(max_length=3)
     status = models.CharField(

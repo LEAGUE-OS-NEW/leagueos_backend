@@ -15,6 +15,8 @@ from wallets.models import (
     WithdrawalRequest,
 )
 
+IDEMPOTENCY_ERROR = "This reference has already been used for a different operation."
+
 
 class WalletService:
     @classmethod
@@ -40,9 +42,9 @@ class WalletService:
             try:
                 wallet = Wallet.objects.get(id=existing.wallet_id)
                 if wallet.user_id != user.id or wallet.currency != currency:
-                    raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+                    raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
             except Wallet.DoesNotExist:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR}) from None
             return existing
         
         # Now get or create wallet with lock
@@ -89,9 +91,9 @@ class WalletService:
         existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
         if existing:
             if existing.wallet_id != wallet.id:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
             if existing.entry_type != LedgerEntry.EntryType.RESERVE:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
             return existing
 
         available_before = wallet.available_balance
@@ -138,9 +140,9 @@ class WalletService:
         existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
         if existing:
             if existing.wallet_id != wallet.id:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
             if existing.entry_type != LedgerEntry.EntryType.RELEASE:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
             return existing
 
         available_before = wallet.available_balance
@@ -187,9 +189,9 @@ class WalletService:
         existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
         if existing:
             if existing.wallet_id != wallet.id:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
             if existing.entry_type != LedgerEntry.EntryType.DEBIT:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
             return existing
 
         available_before = wallet.available_balance
@@ -233,10 +235,13 @@ class WalletService:
         # Idempotency check
         existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
         if existing:
-            if existing.wallet_id != wallet.id:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
-            if existing.entry_type != LedgerEntry.EntryType.DEBIT:
-                raise ValidationError({"idempotency_reference": "This reference has already been used for a different operation."})
+            if (
+                existing.wallet_id != wallet.id
+                or existing.entry_type != LedgerEntry.EntryType.DEBIT
+            ):
+                raise ValidationError(
+                    {"idempotency_reference": IDEMPOTENCY_ERROR}
+                )
             return existing
 
         available_before = wallet.available_balance

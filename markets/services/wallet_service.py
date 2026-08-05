@@ -4,13 +4,9 @@ import logging
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import F
 
 from accounts.models import User
 from wallets.exceptions import (
-    InconsistentAmountError,
-    InconsistentOperationError,
-    InconsistentWalletError,
     InsufficientFundsError,
     WalletOperationError,
 )
