@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
@@ -656,6 +657,33 @@ class MarketParticipationServiceTests(TestCase):
             entry.amount,
             Decimal("5.5000"),
         )
+
+        replay = WalletService.reserve(
+            user=self.participant,
+            currency="UGX",
+            amount=Decimal("5.5000"),
+            idempotency_reference=order.id,
+            market=market,
+            order=order,
+        )
+        self.assertEqual(replay.id, entry.id)
+
+        conflicting_contexts = (
+            {"market": SimpleNamespace(pk=self.create_market(question="Other").pk), "order": order},
+            {
+                "market": market,
+                "order": SimpleNamespace(pk=self.create_market(question="Order").pk),
+            },
+        )
+        for context in conflicting_contexts:
+            with self.subTest(context=context), self.assertRaises(ValidationError):
+                WalletService.reserve(
+                    user=self.participant,
+                    currency="UGX",
+                    amount=Decimal("5.5000"),
+                    idempotency_reference=order.id,
+                    **context,
+                )
         self.assertEqual(
             entry.available_balance_before,
             Decimal("100.0000"),
