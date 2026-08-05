@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 
 from markets.models import (
     MarketPosition,
@@ -150,12 +151,10 @@ class MarketResultDisputeService:
         ).exists()
 
         if not participated:
-            raise ValidationError(
-                {
-                    "participant": (
-                        "Only a participant in this market may " "submit a result dispute."
-                    )
-                }
+            raise PermissionDenied(
+                "Only a participant in this market may "
+                "submit a result dispute.",
+                code="not_market_participant",
             )
 
     @staticmethod

@@ -34,7 +34,7 @@ class Wallet(TimeStampedUUIDModel):
         on_delete=models.PROTECT,
         related_name="wallets",
     )
-    currency = models.CharField(max_length=3, db_index=True)
+    currency = models.CharField(max_length=3, default="UGX", db_index=True)
     available_balance = models.DecimalField(max_digits=16, decimal_places=4, default=0)
     reserved_balance = models.DecimalField(max_digits=16, decimal_places=4, default=0)
     status = models.CharField(
@@ -59,6 +59,10 @@ class Wallet(TimeStampedUUIDModel):
                 name="reserved_balance_not_negative",
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        self.currency = self.currency.upper()
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.user}'s {self.currency} Wallet"
@@ -141,30 +145,102 @@ class WalletTransaction(TimeStampedUUIDModel):
 class LedgerEntry(TimeStampedUUIDModel):
     """A single entry in the double-entry bookkeeping ledger."""
 
+    class EntryType(models.TextChoices):
+        CREDIT = "CREDIT", _("Credit")
+        DEBIT = "DEBIT", _("Debit")
+        RESERVE = "RESERVE", _("Reserve")
+        RELEASE = "RELEASE", _("Release")
+
     class AccountType(models.TextChoices):
         USER_WALLET = "USER_WALLET", _("User Wallet")
         PROVIDER_PAYABLE = "PROVIDER_PAYABLE", _("Provider Payable")
         REVENUE = "REVENUE", _("Revenue")
         # Add other internal accounts as needed
 
-    transaction = models.ForeignKey(
-        WalletTransaction, on_delete=models.PROTECT, related_name="ledger_entries"
+    wallet = models.ForeignKey(
+        Wallet, on_delete=models.PROTECT, related_name="ledger_entries", null=True, blank=True
     )
+    transaction = models.ForeignKey(
+        WalletTransaction, on_delete=models.PROTECT, related_name="ledger_entries", null=True, blank=True
+    )
+    entry_type = models.CharField(max_length=20, choices=EntryType.choices, db_index=True, default=EntryType.CREDIT)
     debit_account = models.CharField(max_length=50, choices=AccountType.choices)
     credit_account = models.CharField(max_length=50, choices=AccountType.choices)
     amount = models.DecimalField(max_digits=16, decimal_places=4)
     currency = models.CharField(max_length=3)
+    available_balance_before = models.DecimalField(max_digits=16, decimal_places=4, default=0)
+    available_balance_after = models.DecimalField(max_digits=16, decimal_places=4, default=0)
+    reserved_balance_before = models.DecimalField(max_digits=16, decimal_places=4, default=0)
+    reserved_balance_after = models.DecimalField(max_digits=16, decimal_places=4, default=0)
+    idempotency_reference = models.UUIDField(null=True, blank=True, db_index=True)
+    
+    # Optional references for market operations
+    market = models.ForeignKey(
+        "markets.Market",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ledger_entries",
+    )
+    order = models.ForeignKey(
+        "markets.MarketOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ledger_entries",
+    )
+    fill = models.ForeignKey(
+        "markets.MarketFill",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ledger_entries",
+    )
 
     class Meta:
         ordering = ["-created_at"]
         verbose_name_plural = "Ledger entries"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["idempotency_reference"],
+                name="unique_idempotency_reference",
+                condition=models.Q(idempotency_reference__isnull=False),
+            ),
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0),
+                name="ledger_amount_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(available_balance_before__gte=0),
+                name="ledger_available_before_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(available_balance_after__gte=0),
+                name="ledger_available_after_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(reserved_balance_before__gte=0),
+                name="ledger_reserved_before_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(reserved_balance_after__gte=0),
+                name="ledger_reserved_after_non_negative",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Ledger {self.id}: {self.debit_account} -> {self.credit_account} ({self.amount})"
 
     def clean(self):
-        if self.debit_account == self.credit_account:
-            raise ValidationError("Debit and credit accounts cannot be the same.")
+        # Allow same debit/credit account for internal wallet operations (RESERVE/RELEASE)
+        if self.debit_account == self.credit_account and self.entry_type not in (LedgerEntry.EntryType.RESERVE, LedgerEntry.EntryType.RELEASE):
+            raise ValidationError("Debit and credit accounts cannot be the same for this entry type.")
+        if self.amount <= 0:
+            raise ValidationError("Amount must be positive.")
+        if self.available_balance_before < 0 or self.available_balance_after < 0:
+            raise ValidationError("Balance snapshots cannot be negative.")
+        if self.reserved_balance_before < 0 or self.reserved_balance_after < 0:
+            raise ValidationError("Balance snapshots cannot be negative.")
 
 
 class DepositIntent(TimeStampedUUIDModel):
@@ -179,9 +255,7 @@ class DepositIntent(TimeStampedUUIDModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="deposit_intents"
     )
-    provider = models.ForeignKey(
-        PaymentProvider, on_delete=models.PROTECT, related_name="deposit_intents"
-    )
+    provider = models.ForeignKey(PaymentProvider, on_delete=models.PROTECT, related_name="deposit_intents")
     amount = models.DecimalField(max_digits=16, decimal_places=4)
     currency = models.CharField(max_length=3)
     status = models.CharField(
