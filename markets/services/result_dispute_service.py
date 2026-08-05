@@ -173,8 +173,7 @@ class MarketResultDisputeService:
 
         if not participated:
             raise PermissionDenied(
-                "Only a participant in this market may "
-                "submit a result dispute.",
+                "Only a participant in this market may " "submit a result dispute.",
                 code="not_market_participant",
             )
 
