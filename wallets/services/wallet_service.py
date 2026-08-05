@@ -34,7 +34,7 @@ class WalletService:
             raise ValidationError({"amount": "Amount must be positive."})
 
         currency = currency.strip().upper()
-        
+
         # Idempotency check first (before locking to avoid lock ordering issues)
         existing = LedgerEntry.objects.filter(idempotency_reference=idempotency_reference).first()
         if existing:
@@ -46,7 +46,7 @@ class WalletService:
             except Wallet.DoesNotExist:
                 raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR}) from None
             return existing
-        
+
         # Now get or create wallet with lock
         try:
             wallet = Wallet.objects.select_for_update().get(user=user, currency=currency)
@@ -71,10 +71,10 @@ class WalletService:
             idempotency_reference=idempotency_reference,
         )
         entry.save()
-        
+
         wallet.available_balance = available_after
         wallet.save(update_fields=["available_balance", "updated_at"])
-        
+
         return entry
 
     @classmethod
@@ -239,9 +239,7 @@ class WalletService:
                 existing.wallet_id != wallet.id
                 or existing.entry_type != LedgerEntry.EntryType.DEBIT
             ):
-                raise ValidationError(
-                    {"idempotency_reference": IDEMPOTENCY_ERROR}
-                )
+                raise ValidationError({"idempotency_reference": IDEMPOTENCY_ERROR})
             return existing
 
         available_before = wallet.available_balance

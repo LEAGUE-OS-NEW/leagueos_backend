@@ -182,7 +182,7 @@ class LedgerEntry(TimeStampedUUIDModel):
     reserved_balance_before = models.DecimalField(max_digits=16, decimal_places=4, default=0)
     reserved_balance_after = models.DecimalField(max_digits=16, decimal_places=4, default=0)
     idempotency_reference = models.UUIDField(null=True, blank=True, db_index=True)
-    
+
     # Optional references for market operations
     market = models.ForeignKey(
         "markets.Market",
