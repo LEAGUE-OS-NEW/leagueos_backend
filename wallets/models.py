@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -66,6 +67,16 @@ class Wallet(TimeStampedUUIDModel):
     def save(self, *args, **kwargs):
         self.currency = self.currency.upper()
         super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.available_balance is None or self.available_balance < Decimal("0.0000"):
+            errors["available_balance"] = "Available balance cannot be negative."
+        if self.reserved_balance is None or self.reserved_balance < Decimal("0.0000"):
+            errors["reserved_balance"] = "Reserved balance cannot be negative."
+        if errors:
+            raise ValidationError(errors)
 
     @property
     def total_balance(self) -> models.Decimal:
@@ -240,21 +251,46 @@ class LedgerEntry(TimeStampedUUIDModel):
     def __str__(self) -> str:
         return f"Ledger {self.id}: {self.debit_account} -> {self.credit_account} ({self.amount})"
 
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Ledger entries are immutable and cannot be updated.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Ledger entries are immutable and cannot be deleted.")
+
     def clean(self):
+        super().clean()
+        errors = {}
         # Allow same debit/credit account for internal wallet operations
         if self.debit_account == self.credit_account and self.entry_type not in (
             LedgerEntry.EntryType.RESERVE,
             LedgerEntry.EntryType.RELEASE,
         ):
-            raise ValidationError(
+            errors["credit_account"] = (
                 "Debit and credit accounts cannot be the same for this entry type."
             )
-        if self.amount <= 0:
-            raise ValidationError("Amount must be positive.")
-        if self.available_balance_before < 0 or self.available_balance_after < 0:
-            raise ValidationError("Balance snapshots cannot be negative.")
-        if self.reserved_balance_before < 0 or self.reserved_balance_after < 0:
-            raise ValidationError("Balance snapshots cannot be negative.")
+        if self.amount is None or self.amount <= Decimal("0.0000"):
+            errors["amount"] = "Amount must be positive."
+        for field_name in (
+            "available_balance_before",
+            "available_balance_after",
+            "reserved_balance_before",
+            "reserved_balance_after",
+        ):
+            value = getattr(self, field_name)
+            if value is None or value < Decimal("0.0000"):
+                errors[field_name] = "Balance snapshots cannot be negative."
+        if (
+            self.idempotency_reference is not None
+            and type(self)
+            .objects.exclude(pk=self.pk)
+            .filter(idempotency_reference=self.idempotency_reference)
+            .exists()
+        ):
+            errors["idempotency_reference"] = "This idempotency reference has already been used."
+        if errors:
+            raise ValidationError(errors)
 
 
 class DepositIntent(TimeStampedUUIDModel):

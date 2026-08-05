@@ -753,3 +753,15 @@ class WalletServiceTests(TestCase):
                 currency=" usd ",
             ).exists()
         )
+
+    def test_mutations_reject_unsupported_context_keywords(self):
+        self.create_wallet()
+
+        with self.assertRaises(TypeError):
+            self.service.reserve(
+                user=self.user,
+                currency="UGX",
+                amount=Decimal("1.0000"),
+                idempotency_reference=uuid4(),
+                unsupported_context="discarding this would be unsafe",
+            )
