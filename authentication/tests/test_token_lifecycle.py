@@ -1,6 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
+
+from django.db import connection
+from django.test import skipUnlessDBFeature
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase, APITransactionTestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from authentication.models import UserSession
 from authentication.tests.factories import UserFactory
@@ -76,6 +81,28 @@ class TokenLifecycleTests(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
             reused_response.data,
         )
+
+    def test_refresh_updates_session_jti_and_last_activity(self):
+        tokens = self.login()
+        session = UserSession.objects.get(user=self.user)
+        old_activity = session.last_activity
+        response = self.client.post(
+            reverse("authentication:token-refresh"), {"refresh": tokens["refresh"]}, format="json"
+        )
+        session.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            session.refresh_token_jti,
+            str(RefreshToken(response.data["data"]["refresh"])["jti"]),
+        )
+        self.assertGreater(session.last_activity, old_activity)
+
+    def test_predeployment_token_without_session_requires_reauthentication(self):
+        refresh = str(RefreshToken.for_user(self.user))
+        response = self.client.post(
+            reverse("authentication:token-refresh"), {"refresh": refresh}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_logout_blacklists_refresh_token_and_terminates_session(self):
         tokens = self.login()
@@ -205,3 +232,29 @@ class TokenLifecycleTests(APITestCase):
                     status.HTTP_401_UNAUTHORIZED,
                     refresh_response.data,
                 )
+
+
+class ConcurrentRefreshTests(APITransactionTestCase):
+    reset_sequences = True
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_concurrent_refresh_has_exactly_one_winner(self):
+        user = UserFactory(password="StrongPass123!", is_active=True, is_verified=True)
+        login = APIClient().post(
+            reverse("authentication:login"),
+            {"identifier": user.email, "password": "StrongPass123!"},
+            format="json",
+        )
+        refresh = login.data["data"]["refresh"]
+
+        def rotate():
+            return (
+                APIClient()
+                .post(reverse("authentication:token-refresh"), {"refresh": refresh}, format="json")
+                .status_code
+            )
+
+        self.assertEqual(connection.vendor, "postgresql")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            statuses = sorted(pool.map(lambda _index: rotate(), range(2)))
+        self.assertEqual(statuses, [status.HTTP_200_OK, status.HTTP_401_UNAUTHORIZED])

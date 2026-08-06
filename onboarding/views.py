@@ -12,15 +12,22 @@ from rest_framework.views import APIView
 from onboarding.permissions import IsOnboardingOwner
 from onboarding.serializers import (
     ClubCatalogueSerializer,
+    ClubSelectionResponseSerializer,
     ClubSelectionSerializer,
     CompetitionCatalogueSerializer,
+    CompetitionSelectionResponseSerializer,
     CompetitionSelectionSerializer,
     CountryCatalogueSerializer,
+    CountrySelectionResponseSerializer,
     CountrySelectionSerializer,
     DashboardConfigurationSerializer,
+    DashboardEnvelopeResponseSerializer,
     OnboardingSerializer,
+    OnboardingStatusResponseSerializer,
+    SkipStepResponseSerializer,
     SkipStepSerializer,
     SportCatalogueSerializer,
+    SportSelectionResponseSerializer,
     SportSelectionSerializer,
 )
 from onboarding.services.catalogue_service import CatalogueService
@@ -131,7 +138,7 @@ class OnboardingStatusView(APIView):
 
     @extend_schema(
         summary="Get onboarding status",
-        responses=OnboardingSerializer,
+        responses=OnboardingStatusResponseSerializer,
     )
     def get(self, request: Request) -> Response:
         onboarding = OnboardingService.get_onboarding_status(request.user)
@@ -160,7 +167,7 @@ class CountrySelectionView(APIView):
     @extend_schema(
         summary="Select preferred country",
         request=CountrySelectionSerializer,
-        responses=CountrySelectionSerializer,
+        responses=CountrySelectionResponseSerializer,
     )
     def post(self, request: Request) -> Response:
         serializer = CountrySelectionSerializer(data=request.data)
@@ -171,13 +178,17 @@ class CountrySelectionView(APIView):
         onboarding = OnboardingService.get_or_create_onboarding(
             request.user, ip_address=get_client_ip(request)
         )
-        OnboardingService.advance_step(onboarding)
+        OnboardingService.advance_step(onboarding, onboarding.Step.COUNTRY)
 
         return Response(
             {
                 "success": True,
                 "message": "Country selected successfully.",
-                "data": {"country": CountryCatalogueSerializer(country).data},
+                "data": {
+                    "country": CountryCatalogueSerializer(country).data,
+                    "current_step": onboarding.current_step,
+                    "completed": onboarding.completed,
+                },
             },
             status=status.HTTP_200_OK,
         )
@@ -192,7 +203,7 @@ class SportSelectionView(APIView):
     @extend_schema(
         summary="Select favourite sports",
         request=SportSelectionSerializer,
-        responses=SportSelectionSerializer,
+        responses=SportSelectionResponseSerializer,
     )
     def post(self, request: Request) -> Response:
         serializer = SportSelectionSerializer(data=request.data)
@@ -203,13 +214,17 @@ class SportSelectionView(APIView):
         onboarding = OnboardingService.get_or_create_onboarding(
             request.user, ip_address=get_client_ip(request)
         )
-        OnboardingService.advance_step(onboarding)
+        OnboardingService.advance_step(onboarding, onboarding.Step.SPORTS)
 
         return Response(
             {
                 "success": True,
                 "message": "Favourite sports selected successfully.",
-                "data": {"sports": SportCatalogueSerializer(sports, many=True).data},
+                "data": {
+                    "sports": SportCatalogueSerializer(sports, many=True).data,
+                    "current_step": onboarding.current_step,
+                    "completed": onboarding.completed,
+                },
             },
             status=status.HTTP_200_OK,
         )
@@ -224,7 +239,7 @@ class CompetitionSelectionView(APIView):
     @extend_schema(
         summary="Select favourite competitions",
         request=CompetitionSelectionSerializer,
-        responses=CompetitionSelectionSerializer,
+        responses=CompetitionSelectionResponseSerializer,
     )
     def post(self, request: Request) -> Response:
         serializer = CompetitionSelectionSerializer(data=request.data, context={"request": request})
@@ -237,14 +252,16 @@ class CompetitionSelectionView(APIView):
         onboarding = OnboardingService.get_or_create_onboarding(
             request.user, ip_address=get_client_ip(request)
         )
-        OnboardingService.advance_step(onboarding)
+        OnboardingService.advance_step(onboarding, onboarding.Step.COMPETITIONS)
 
         return Response(
             {
                 "success": True,
                 "message": "Favourite competitions selected successfully.",
                 "data": {
-                    "competitions": CompetitionCatalogueSerializer(competitions, many=True).data
+                    "competitions": CompetitionCatalogueSerializer(competitions, many=True).data,
+                    "current_step": onboarding.current_step,
+                    "completed": onboarding.completed,
                 },
             },
             status=status.HTTP_200_OK,
@@ -260,7 +277,7 @@ class ClubSelectionView(APIView):
     @extend_schema(
         summary="Select favourite clubs",
         request=ClubSelectionSerializer,
-        responses=ClubSelectionSerializer,
+        responses=ClubSelectionResponseSerializer,
     )
     def post(self, request: Request) -> Response:
         serializer = ClubSelectionSerializer(data=request.data, context={"request": request})
@@ -271,13 +288,17 @@ class ClubSelectionView(APIView):
         onboarding = OnboardingService.get_or_create_onboarding(
             request.user, ip_address=get_client_ip(request)
         )
-        OnboardingService.advance_step(onboarding)
+        OnboardingService.advance_step(onboarding, onboarding.Step.CLUBS)
 
         return Response(
             {
                 "success": True,
                 "message": "Favourite clubs selected successfully.",
-                "data": {"clubs": ClubCatalogueSerializer(clubs, many=True).data},
+                "data": {
+                    "clubs": ClubCatalogueSerializer(clubs, many=True).data,
+                    "current_step": onboarding.current_step,
+                    "completed": onboarding.completed,
+                },
             },
             status=status.HTTP_200_OK,
         )
@@ -292,7 +313,7 @@ class SkipStepView(APIView):
     @extend_schema(
         summary="Skip onboarding step",
         request=SkipStepSerializer,
-        responses=SkipStepSerializer,
+        responses=SkipStepResponseSerializer,
     )
     def post(self, request: Request) -> Response:
         serializer = SkipStepSerializer(data=request.data)
@@ -307,7 +328,11 @@ class SkipStepView(APIView):
             {
                 "success": True,
                 "message": f"Step '{step}' skipped.",
-                "data": {"current_step": onboarding.current_step},
+                "data": {
+                    "current_step": onboarding.current_step,
+                    "completed": onboarding.completed,
+                    "skipped_steps": onboarding.skipped_steps,
+                },
             },
             status=status.HTTP_200_OK,
         )
@@ -321,10 +346,12 @@ class CompleteOnboardingView(APIView):
 
     @extend_schema(
         summary="Complete onboarding",
-        responses=DashboardConfigurationSerializer,
+        responses=DashboardEnvelopeResponseSerializer,
     )
     def post(self, request: Request) -> Response:
-        OnboardingService.complete_onboarding(request.user, ip_address=get_client_ip(request))
+        onboarding = OnboardingService.complete_onboarding(
+            request.user, ip_address=get_client_ip(request)
+        )
         configuration = DashboardConfigurationService.generate_dashboard_configuration(
             request.user, ip_address=get_client_ip(request)
         )
@@ -334,7 +361,11 @@ class CompleteOnboardingView(APIView):
             {
                 "success": True,
                 "message": "Onboarding completed successfully.",
-                "data": serializer.data,
+                "data": {
+                    "configuration": serializer.data,
+                    "current_step": onboarding.current_step,
+                    "completed": onboarding.completed,
+                },
             },
             status=status.HTTP_200_OK,
         )
@@ -348,19 +379,24 @@ class DashboardConfigurationView(APIView):
 
     @extend_schema(
         summary="Get dashboard configuration",
-        responses=DashboardConfigurationSerializer,
+        responses=DashboardEnvelopeResponseSerializer,
     )
     def get(self, request: Request) -> Response:
         configuration = DashboardConfigurationService.generate_dashboard_configuration(
             request.user, ip_address=get_client_ip(request)
         )
         serializer = DashboardConfigurationSerializer(configuration)
+        onboarding = OnboardingService.get_onboarding_status(request.user)
 
         return Response(
             {
                 "success": True,
                 "message": "Dashboard configuration generated.",
-                "data": serializer.data,
+                "data": {
+                    "configuration": serializer.data,
+                    "current_step": onboarding.current_step,
+                    "completed": onboarding.completed,
+                },
             },
             status=status.HTTP_200_OK,
         )

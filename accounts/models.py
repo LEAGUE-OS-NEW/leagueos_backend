@@ -2,8 +2,8 @@ import uuid
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
@@ -19,12 +19,6 @@ class User(AbstractUser):
         blank=True,
         null=True,
         unique=True,
-        validators=[
-            RegexValidator(
-                regex=r"^\+?1?\d{9,15}$",
-                message="Enter a valid phone number.",
-            )
-        ],
     )
     is_verified = models.BooleanField(default=False)
     verification_channel = models.CharField(
@@ -45,6 +39,10 @@ class User(AbstractUser):
     class Meta:
         indexes = [
             models.Index(fields=["email"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(Lower("email"), name="accounts_user_email_ci_unique"),
+            models.UniqueConstraint(Lower("username"), name="accounts_user_username_ci_unique"),
         ]
 
     def __str__(self) -> str:

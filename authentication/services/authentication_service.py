@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 
 from accounts.models import User
@@ -13,10 +14,17 @@ logger = logging.getLogger(__name__)
 
 class AuthenticationService:
     @staticmethod
-    def authenticate(email: str, password: str, ip_address=None, user_agent=None) -> User | None:
-        user = User.objects.filter(email__iexact=email).first()
+    def find_user(identifier: str) -> User | None:
+        return User.objects.filter(
+            Q(email__iexact=identifier) | Q(username__iexact=identifier)
+        ).first()
+
+    @staticmethod
+    def authenticate(
+        identifier: str, password: str, ip_address=None, user_agent=None
+    ) -> User | None:
+        user = AuthenticationService.find_user(identifier)
         if not user:
-            logger.info("Login failed: user not found for email=%s", email)
             LoginHistoryService.record_login(
                 user=None,
                 ip_address=ip_address,
@@ -27,16 +35,13 @@ class AuthenticationService:
             return None
 
         if not user.check_password(password):
-            logger.info("Login failed: invalid password for email=%s", email)
             AuthenticationService.record_failed_attempt(user, ip_address, user_agent)
             return None
 
         if not user.is_active:
-            logger.info("Login failed: inactive account for email=%s", email)
             return None
 
         if not user.is_verified:
-            logger.info("Login failed: unverified account for email=%s", email)
             return None
 
         AuthenticationService.reset_failed_attempts(user)
