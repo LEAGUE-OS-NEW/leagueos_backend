@@ -51,7 +51,7 @@ class ClubWorkspaceViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
-        serializer.save(club=club)
+        serializer.save(club=club, user=self.request.user)
 
 
 class ClubProfileVersionViewSet(viewsets.ModelViewSet):
