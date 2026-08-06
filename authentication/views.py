@@ -1,5 +1,8 @@
 import logging
 
+from django.db import transaction
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,19 +13,22 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from accounts.models import AuditLog, User
 from authentication.models import UserSession
 from authentication.serializers import (
+    AuthTokenResponseSerializer,
     EmptySerializer,
     LoginSerializer,
     LogoutSerializer,
+    MeResponseSerializer,
+    MessageResponseSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     PasswordResetVerifySerializer,
     SessionSerializer,
     UserProfileSerializer,
 )
+from authentication.services.auth_context_service import AuthContextService
 from authentication.services.authentication_service import AuthenticationService
 from authentication.services.login_history_service import LoginHistoryService
 from authentication.services.password_reset_service import PasswordResetService
-from authentication.services.role_service import RoleService
 from authentication.services.session_service import SessionService
 from authentication.services.token_service import TokenService
 
@@ -50,17 +56,18 @@ class LoginView(APIView):
     serializer_class = LoginSerializer
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(request=LoginSerializer, responses={200: AuthTokenResponseSerializer})
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data["email"]
+        identifier = serializer.validated_data["identifier"]
         password = serializer.validated_data["password"]
         ip_address = get_client_ip(request)
         user_agent = request.META.get("HTTP_USER_AGENT", "")
 
         # First check if the account is locked before attempting authentication
-        user = User.objects.filter(email__iexact=email).first()
+        user = AuthenticationService.find_user(identifier)
         if user and AuthenticationService.is_account_locked(user):
             log_audit(
                 user,
@@ -74,10 +81,28 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        user = AuthenticationService.authenticate(email, password, ip_address, user_agent)
+        user = AuthenticationService.authenticate(identifier, password, ip_address, user_agent)
         if not user:
+            if user is None:
+                matched = AuthenticationService.find_user(identifier)
+                if (
+                    matched
+                    and matched.check_password(password)
+                    and (not matched.is_active or not matched.is_verified)
+                ):
+                    return Response(
+                        build_response(
+                            success=False,
+                            message="Account verification is required.",
+                            data={
+                                "verification_required": True,
+                                "verification_channel": "EMAIL",
+                            },
+                        ),
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
             return Response(
-                build_response(success=False, message="Invalid email or password."),
+                build_response(success=False, message="Invalid credentials."),
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -93,20 +118,11 @@ class LoginView(APIView):
             metadata={"session_id": str(session.id)},
         )
 
-        profile = UserProfileSerializer(user).data
-        highest_role = RoleService.get_highest_priority_role(user)
-        dashboard_url = highest_role.dashboard_url if highest_role else ""
-
         return Response(
             build_response(
                 success=True,
                 message="Login successful.",
-                data={
-                    "access": access,
-                    "refresh": refresh,
-                    "dashboard_url": dashboard_url,
-                    "user": profile,
-                },
+                data=AuthContextService.authenticated_data(user, access, refresh),
             ),
             status=status.HTTP_200_OK,
         )
@@ -117,13 +133,35 @@ class TokenRefreshView(APIView):
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(request=TokenRefreshSerializer, responses={200: AuthTokenResponseSerializer})
     def post(self, request):
-        serializer = TokenRefreshSerializer(
-            data=request.data,
-        )
-
+        raw_refresh = request.data.get("refresh", "")
         try:
-            serializer.is_valid(raise_exception=True)
+            old_token = RefreshToken(raw_refresh)
+            old_jti = str(old_token["jti"])
+            user_id = old_token["user_id"]
+        except (TokenError, KeyError):
+            return Response(
+                build_response(False, "Invalid, expired or revoked refresh token."),
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        try:
+            with transaction.atomic():
+                session = (
+                    UserSession.objects.select_for_update()
+                    .filter(refresh_token_jti=old_jti, user_id=user_id, is_active=True)
+                    .first()
+                )
+                if session is None:
+                    raise TokenError("session is inactive or token was rotated")
+                serializer = TokenRefreshSerializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                refreshed = dict(serializer.validated_data)
+                new_refresh = refreshed.get("refresh")
+                if new_refresh:
+                    session.refresh_token_jti = str(RefreshToken(new_refresh)["jti"])
+                session.last_activity = timezone.now()
+                session.save(update_fields=["refresh_token_jti", "last_activity", "updated_at"])
         except TokenError:
             return Response(
                 build_response(
@@ -133,11 +171,13 @@ class TokenRefreshView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        user = User.objects.get(pk=user_id)
+        refreshed.update(AuthContextService.authenticated_data(user))
         return Response(
             build_response(
                 success=True,
                 message="Token refreshed successfully.",
-                data=dict(serializer.validated_data),
+                data=refreshed,
             ),
             status=status.HTTP_200_OK,
         )
@@ -147,6 +187,7 @@ class LogoutView(APIView):
     serializer_class = LogoutSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=LogoutSerializer, responses={200: MessageResponseSerializer})
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -248,10 +289,14 @@ class MeView(APIView):
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses={200: MeResponseSerializer})
     def get(self, request):
-        serializer = UserProfileSerializer(request.user)
         return Response(
-            build_response(success=True, message="Current user.", data={"user": serializer.data}),
+            build_response(
+                success=True,
+                message="Current user.",
+                data=AuthContextService.authenticated_data(request.user),
+            ),
             status=status.HTTP_200_OK,
         )
 

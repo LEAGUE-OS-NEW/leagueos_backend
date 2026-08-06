@@ -10,11 +10,76 @@ User = get_user_model()
 
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    identifier = serializers.CharField(required=False, allow_blank=False)
+    email = serializers.CharField(required=False, allow_blank=False)
     password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        identifier = attrs.get("identifier") or attrs.get("email")
+        if not identifier:
+            raise serializers.ValidationError({"identifier": "Email or username is required."})
+        attrs["identifier"] = identifier.strip()
+        return attrs
 
     def validate_email(self, value):
         return value.lower().strip()
+
+
+class DashboardEntitlementSerializer(serializers.Serializer):
+    role = serializers.CharField()
+    dashboard_url = serializers.CharField()
+
+
+class DashboardAccessSerializer(serializers.Serializer):
+    entitlements = DashboardEntitlementSerializer(many=True)
+    default_entitlement = serializers.CharField(allow_null=True)
+    default_route = serializers.CharField()
+
+
+class OnboardingAuthContextSerializer(serializers.Serializer):
+    completed = serializers.BooleanField()
+    current_step = serializers.CharField(allow_null=True)
+
+
+class AuthUserContextSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    phone_number = serializers.CharField(allow_null=True)
+    is_verified = serializers.BooleanField()
+    roles = serializers.ListField(child=serializers.CharField())
+    permissions = serializers.ListField(child=serializers.CharField())
+    dashboard_access = DashboardAccessSerializer()
+    onboarding = OnboardingAuthContextSerializer()
+
+
+class AuthTokenDataSerializer(serializers.Serializer):
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+    user = AuthUserContextSerializer()
+
+
+class AuthTokenResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = AuthTokenDataSerializer()
+
+
+class MeDataSerializer(serializers.Serializer):
+    user = AuthUserContextSerializer()
+
+
+class MeResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = MeDataSerializer()
+
+
+class MessageResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
 
 
 class LogoutSerializer(serializers.Serializer):
@@ -29,9 +94,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id",
+            "username",
             "email",
             "first_name",
             "last_name",
+            "phone_number",
             "is_verified",
             "roles",
             "permissions",
