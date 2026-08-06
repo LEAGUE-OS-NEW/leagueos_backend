@@ -241,3 +241,81 @@ class DashboardConfigurationSerializer(serializers.Serializer):
     favourite_competitions = CompetitionCatalogueSerializer(many=True, read_only=True)
     favourite_clubs = ClubCatalogueSerializer(many=True, read_only=True)
     onboarding_completed = serializers.BooleanField(read_only=True)
+
+
+class OnboardingStatusResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = OnboardingSerializer()
+
+
+class CountrySelectionDataSerializer(serializers.Serializer):
+    country = CountryCatalogueSerializer()
+    current_step = serializers.CharField()
+    completed = serializers.BooleanField()
+
+
+class SportSelectionDataSerializer(serializers.Serializer):
+    sports = SportCatalogueSerializer(many=True)
+    current_step = serializers.CharField()
+    completed = serializers.BooleanField()
+
+
+class CompetitionSelectionDataSerializer(serializers.Serializer):
+    competitions = CompetitionCatalogueSerializer(many=True)
+    current_step = serializers.CharField()
+    completed = serializers.BooleanField()
+
+
+class ClubSelectionDataSerializer(serializers.Serializer):
+    clubs = ClubCatalogueSerializer(many=True)
+    current_step = serializers.CharField()
+    completed = serializers.BooleanField()
+
+
+class SkipStepDataSerializer(serializers.Serializer):
+    current_step = serializers.CharField()
+    completed = serializers.BooleanField()
+    skipped_steps = serializers.ListField(child=serializers.CharField())
+
+
+class DashboardEnvelopeDataSerializer(serializers.Serializer):
+    configuration = DashboardConfigurationSerializer()
+    current_step = serializers.CharField()
+    completed = serializers.BooleanField()
+
+
+class CountrySelectionResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = CountrySelectionDataSerializer()
+
+
+class SportSelectionResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = SportSelectionDataSerializer()
+
+
+class CompetitionSelectionResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = CompetitionSelectionDataSerializer()
+
+
+class ClubSelectionResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = ClubSelectionDataSerializer()
+
+
+class SkipStepResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = SkipStepDataSerializer()
+
+
+class DashboardEnvelopeResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = DashboardEnvelopeDataSerializer()

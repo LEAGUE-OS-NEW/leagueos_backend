@@ -7,6 +7,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import AuditLog, OTPVerification, User
+from authentication.models import UserRole, UserSession
+from onboarding.models import UserOnboarding
+from profiles.models import Profile
 
 
 class RegistrationTests(APITestCase):
@@ -135,6 +138,50 @@ class OTPVerificationTests(APITestCase):
         response = self.client.post(url, {"email": "verify@example.com", "otp": self.otp_code})
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
+    def test_attempt_lock_expires_after_configured_window(self):
+        from accounts.models import VerificationAttempt
+
+        attempt = VerificationAttempt.objects.create(
+            user=self.user, ip_address="127.0.0.1", attempts=5
+        )
+        VerificationAttempt.objects.filter(pk=attempt.pk).update(
+            last_attempt_at=timezone.now() - timedelta(hours=1)
+        )
+        response = self.client.post(
+            reverse("accounts:verify-otp"),
+            {"email": self.user.email, "otp": self.otp_code},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch(
+        "authentication.services.session_service.SessionService.create_session",
+        side_effect=RuntimeError("database failure"),
+    )
+    def test_successful_verification_is_atomic(self, _session):
+        with self.assertRaises(RuntimeError):
+            self.client.post(
+                reverse("accounts:verify-otp"),
+                {"email": self.user.email, "otp": self.otp_code},
+            )
+        self.user.refresh_from_db()
+        self.otp_obj.refresh_from_db()
+        self.assertFalse(self.user.is_verified)
+        self.assertFalse(self.otp_obj.is_used)
+        self.assertFalse(Profile.objects.filter(user=self.user).exists())
+        self.assertFalse(UserOnboarding.objects.filter(user=self.user).exists())
+        self.assertFalse(UserRole.objects.filter(user=self.user).exists())
+
+    def test_initialization_is_idempotent(self):
+        response = self.client.post(
+            reverse("accounts:verify-otp"),
+            {"email": self.user.email, "otp": self.otp_code},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Profile.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(UserOnboarding.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(UserRole.objects.filter(user=self.user, role__name="Fan").count(), 1)
+        self.assertEqual(UserSession.objects.filter(user=self.user).count(), 1)
+
 
 class ResendOTPTests(APITestCase):
     def test_resend_success(self):
@@ -204,6 +251,43 @@ class ResendOTPTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("expires_in", response.data["data"])
+
+    def test_resend_is_email_even_when_phone_exists_and_supersedes_old_code(self):
+        from accounts.services.otp_service import OTPService
+
+        user = User.objects.create_user(
+            username="phonefan",
+            email="phonefan@example.com",
+            phone_number="+256772123456",
+            is_active=False,
+        )
+        old_otp, old_code = OTPService.create_otp_record(user, "REGISTER", "EMAIL")
+        OTPVerification.objects.filter(pk=old_otp.pk).update(
+            created_at=timezone.now() - timedelta(minutes=10)
+        )
+        with patch("accounts.services.email_service.EmailService.send_verification_email") as send:
+            response = self.client.post(reverse("accounts:resend-otp"), {"email": user.email})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        send.assert_called_once()
+        self.assertEqual(response.data["data"]["verification_channel"], "EMAIL")
+        with self.assertRaisesRegex(ValueError, "Invalid verification code"):
+            OTPService.verify_otp(user, old_code, "REGISTER")
+
+    def test_daily_resend_limit_is_enforced(self):
+        from django.conf import settings
+
+        from accounts.services.otp_service import OTPService
+
+        user = User.objects.create_user(username="daily", email="daily@example.com")
+        for _ in range(settings.OTP_MAX_DAILY_RESENDS):
+            otp, _ = OTPService.create_otp_record(user, "REGISTER", "EMAIL")
+            OTPVerification.objects.filter(pk=otp.pk).update(
+                created_at=timezone.now() - timedelta(minutes=10)
+            )
+        with patch("accounts.services.email_service.EmailService.send_verification_email") as send:
+            response = self.client.post(reverse("accounts:resend-otp"), {"email": user.email})
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        send.assert_not_called()
 
 
 class LoginTests(APITestCase):

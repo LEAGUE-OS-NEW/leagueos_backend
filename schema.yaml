@@ -22,6 +22,365 @@ paths:
               schema:
                 $ref: '#/components/schemas/Dashboard'
           description: ''
+  /api/v1/admin/alerts/:
+    get:
+      operationId: admin_alerts_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+  /api/v1/admin/alerts/{alert_id}/:
+    get:
+      operationId: admin_alerts_retrieve
+      parameters:
+      - in: path
+        name: alert_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/admin/alerts/{alert_id}/archive/:
+    post:
+      operationId: admin_alert_archive
+      parameters:
+      - in: path
+        name: alert_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/admin/alerts/{alert_id}/read/:
+    post:
+      operationId: admin_alert_mark_read
+      parameters:
+      - in: path
+        name: alert_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/admin/alerts/unread-count/:
+    get:
+      operationId: admin_alert_unread_count
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCount'
+          description: ''
+  /api/v1/admin/compliance/decisions/:
+    get:
+      operationId: admin_compliance_decisions_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedComplianceDecisionList'
+          description: ''
+    post:
+      operationId: admin_compliance_decision_propose
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionProposalRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DecisionProposalRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DecisionProposalRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceDecision'
+          description: ''
+  /api/v1/admin/compliance/decisions/{proposal_id}/:
+    get:
+      operationId: admin_compliance_decisions_retrieve
+      parameters:
+      - in: path
+        name: proposal_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceDecision'
+          description: ''
+  /api/v1/admin/compliance/decisions/{proposal_id}/decide/:
+    post:
+      operationId: admin_compliance_decision_decide
+      parameters:
+      - in: path
+        name: proposal_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DecisionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceDecision'
+          description: ''
+  /api/v1/admin/compliance/kyc-sessions/:
+    get:
+      operationId: admin_compliance_kyc_sessions_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdminKYCSessionList'
+          description: ''
+  /api/v1/admin/compliance/kyc-sessions/{session_id}/:
+    get:
+      operationId: admin_compliance_kyc_sessions_retrieve
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminKYCSessionDetail'
+          description: ''
+  /api/v1/admin/compliance/risk-assessments/:
+    get:
+      operationId: admin_compliance_risk_assessments_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRiskAssessmentList'
+          description: ''
+  /api/v1/admin/compliance/risk-profiles/:
+    get:
+      operationId: admin_compliance_risk_profiles_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRiskProfileList'
+          description: ''
+  /api/v1/admin/compliance/risk-profiles/{profile_id}/:
+    get:
+      operationId: admin_compliance_risk_profiles_retrieve
+      parameters:
+      - in: path
+        name: profile_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskProfile'
+          description: ''
+  /api/v1/admin/compliance/risk-reassess/:
+    post:
+      operationId: admin_market_risk_reassess
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReassessmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReassessmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReassessmentRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskAssessment'
+          description: ''
   /api/v1/analytics/:
     post:
       operationId: analytics_create
@@ -84,7 +443,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Login'
+                $ref: '#/components/schemas/AuthTokenResponse'
           description: ''
   /api/v1/auth/logout/:
     post:
@@ -110,7 +469,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Logout'
+                $ref: '#/components/schemas/MessageResponse'
           description: ''
   /api/v1/auth/logout-all/:
     post:
@@ -134,7 +493,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfile'
+                $ref: '#/components/schemas/MeResponse'
           description: ''
   /api/v1/auth/password-reset/confirm/:
     post:
@@ -252,11 +611,17 @@ paths:
       - jwtAuth: []
       - {}
       responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationDeliveryResponse'
+          description: ''
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRegistration'
+                $ref: '#/components/schemas/VerificationDeliveryResponse'
           description: ''
   /api/v1/auth/registration-status/:
     get:
@@ -298,7 +663,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResendOTP'
+                $ref: '#/components/schemas/VerificationDeliveryResponse'
           description: ''
   /api/v1/auth/resend-verification/:
     post:
@@ -325,7 +690,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResendOTP'
+                $ref: '#/components/schemas/VerificationDeliveryResponse'
           description: ''
   /api/v1/auth/sessions/:
     get:
@@ -365,7 +730,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenRefresh'
+                $ref: '#/components/schemas/AuthTokenResponse'
           description: ''
   /api/v1/auth/verify-otp/:
     post:
@@ -392,7 +757,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerifyOTP'
+                $ref: '#/components/schemas/AuthTokenResponse'
           description: ''
   /api/v1/clubs/:
     get:
@@ -1025,6 +1390,248 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketEventError'
           description: ''
+  /api/v1/market-admin/fee-schedules/:
+    get:
+      operationId: market_admin_fee_schedules_list
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeeSchedule'
+          description: ''
+    post:
+      operationId: market_admin_fee_schedules_create
+      tags:
+      - Market Financial Integrity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeeSchedule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FeeSchedule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FeeSchedule'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeeSchedule'
+          description: ''
+  /api/v1/market-admin/fee-schedules/{schedule_id}/:
+    get:
+      operationId: market_admin_fee_schedules_retrieve
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeeSchedule'
+          description: ''
+  /api/v1/market-admin/fee-schedules/{schedule_id}/activate/:
+    post:
+      operationId: market_admin_fee_schedules_activate
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeeSchedule'
+          description: ''
+  /api/v1/market-admin/fee-schedules/{schedule_id}/retire/:
+    post:
+      operationId: market_admin_fee_schedules_retire
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeeSchedule'
+          description: ''
+  /api/v1/market-admin/financial-adjustments/:
+    get:
+      operationId: market_admin_financial_adjustments_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdjustmentList'
+          description: ''
+  /api/v1/market-admin/financial-adjustments/{adjustment_id}/:
+    get:
+      operationId: market_admin_financial_adjustments_retrieve
+      parameters:
+      - in: path
+        name: adjustment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adjustment'
+          description: ''
+  /api/v1/market-admin/financial-adjustments/{adjustment_id}/approve/:
+    post:
+      operationId: market_admin_financial_adjustments_approve
+      parameters:
+      - in: path
+        name: adjustment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjustmentDecision'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdjustmentDecision'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdjustmentDecision'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adjustment'
+          description: ''
+  /api/v1/market-admin/financial-adjustments/{adjustment_id}/reject/:
+    post:
+      operationId: market_admin_financial_adjustments_reject
+      parameters:
+      - in: path
+        name: adjustment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjustmentDecision'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdjustmentDecision'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdjustmentDecision'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adjustment'
+          description: ''
+  /api/v1/market-admin/financial-adjustments/propose/:
+    post:
+      operationId: market_admin_financial_adjustments_propose
+      tags:
+      - Market Financial Integrity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjustmentProposal'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdjustmentProposal'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdjustmentProposal'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adjustment'
+          description: ''
   /api/v1/market-admin/markets/:
     get:
       operationId: market_admin_markets_list
@@ -1284,6 +1891,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketAdminRead'
           description: ''
+  /api/v1/market-admin/markets/{market_id}/provisional-result/:
+    post:
+      operationId: market_admin_markets_provisional_result_create
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Administration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketProvisionalResultPublish'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketProvisionalResultPublish'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketProvisionalResultPublish'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProvisionalResultRead'
+          description: ''
   /api/v1/market-admin/markets/{market_id}/reject/:
     post:
       operationId: market_admin_markets_reject_create
@@ -1382,6 +2022,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MarketAdminRead'
+          description: ''
+  /api/v1/market-admin/markets/{market_id}/result-dispute-decisions/:
+    post:
+      operationId: market_admin_markets_result_dispute_decisions_create
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Administration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketResultDisputeDecisionCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketResultDisputeDecisionCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketResultDisputeDecisionCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResultDisputeDecisionAdmin'
           description: ''
   /api/v1/market-admin/markets/{market_id}/submit/:
     post:
@@ -1790,6 +2463,218 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedMarketProposalReviewList'
           description: ''
+  /api/v1/market-admin/reconciliation/mismatches/:
+    get:
+      operationId: market_admin_reconciliation_mismatches_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReconciliationMismatchList'
+          description: ''
+  /api/v1/market-admin/reconciliation/mismatches/{mismatch_id}/:
+    get:
+      operationId: market_admin_reconciliation_mismatches_retrieve
+      parameters:
+      - in: path
+        name: mismatch_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationMismatch'
+          description: ''
+  /api/v1/market-admin/reconciliation/runs/:
+    get:
+      operationId: market_admin_reconciliation_runs_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReconciliationRunList'
+          description: ''
+  /api/v1/market-admin/reconciliation/runs/{run_id}/:
+    get:
+      operationId: market_admin_reconciliation_runs_retrieve
+      parameters:
+      - in: path
+        name: run_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationRun'
+          description: ''
+  /api/v1/market-admin/reconciliation/runs/{run_id}/export/:
+    get:
+      operationId: market_admin_reconciliation_export
+      parameters:
+      - in: path
+        name: run_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          description: ''
+  /api/v1/market-admin/reconciliation/start/:
+    post:
+      operationId: market_admin_reconciliation_start
+      tags:
+      - Market Financial Integrity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReconciliationStart'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReconciliationStart'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReconciliationStart'
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationRun'
+          description: ''
+  /api/v1/market-admin/result-dispute-decisions/{decision_id}/:
+    get:
+      operationId: market_admin_result_dispute_decisions_retrieve
+      parameters:
+      - in: path
+        name: decision_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResultDisputeDecisionAdmin'
+          description: ''
+  /api/v1/market-admin/result-disputes/:
+    get:
+      operationId: market_admin_result_disputes_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketResultDisputeAdminList'
+          description: ''
+  /api/v1/market-admin/result-disputes/{dispute_id}/:
+    get:
+      operationId: market_admin_result_disputes_retrieve
+      parameters:
+      - in: path
+        name: dispute_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResultDisputeAdmin'
+          description: ''
   /api/v1/market-events/:
     get:
       operationId: market_events_list
@@ -2039,6 +2924,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketPositionRead'
           description: ''
+  /api/v1/market-result-disputes/:
+    get:
+      operationId: market_result_disputes_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - market-result-disputes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketResultDisputeParticipantList'
+          description: ''
+  /api/v1/market-result-disputes/{dispute_id}/:
+    get:
+      operationId: market_result_disputes_retrieve
+      parameters:
+      - in: path
+        name: dispute_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - market-result-disputes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResultDisputeParticipant'
+          description: ''
   /api/v1/markets/:
     get:
       operationId: markets_list
@@ -2191,6 +3124,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/MarketOrderForbiddenResponse'
           description: ''
+  /api/v1/markets/{market_id}/orders/fee-preview/:
+    post:
+      operationId: market_fee_preview
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Financial Integrity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeePreview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FeePreview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FeePreview'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeePreviewResponse'
+          description: ''
   /api/v1/markets/{market_id}/outcomes/{outcome_id}/order-book/:
     get:
       operationId: markets_outcomes_order_book_retrieve
@@ -2309,6 +3275,95 @@ paths:
               schema:
                 $ref: '#/components/schemas/PriceHistoryError'
           description: ''
+  /api/v1/markets/{market_id}/provisional-result/:
+    get:
+      operationId: markets_provisional_result_retrieve
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Markets
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketProvisionalResultRead'
+          description: ''
+  /api/v1/markets/{market_id}/result-dispute-decisions/:
+    get:
+      operationId: markets_result_dispute_decisions_list
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMarketResultDisputeDecisionPublicList'
+          description: ''
+  /api/v1/markets/{market_id}/result-disputes/:
+    post:
+      operationId: markets_result_disputes_create
+      parameters:
+      - in: path
+        name: market_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Market Result Disputes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketResultDisputeSubmit'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MarketResultDisputeSubmit'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MarketResultDisputeSubmit'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketResultDisputeParticipant'
+          description: ''
   /api/v1/markets/{market_id}/settle/:
     post:
       operationId: markets_settle_create
@@ -2414,6 +3469,128 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EligibilityResponse'
+          description: ''
+  /api/v1/markets/kyc/providers/{provider}/callback/:
+    post:
+      operationId: market_kyc_provider_callback
+      parameters:
+      - in: path
+        name: provider
+        schema:
+          type: string
+        required: true
+      tags:
+      - markets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KYCCallbackResponse'
+          description: ''
+  /api/v1/markets/kyc/sessions/:
+    get:
+      operationId: market_kyc_list
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KYCSession'
+          description: ''
+    post:
+      operationId: market_kyc_start
+      tags:
+      - markets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KYCStart'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/KYCStart'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/KYCStart'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KYCSession'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KYCSession'
+          description: ''
+  /api/v1/markets/kyc/sessions/{session_id}/:
+    get:
+      operationId: markets_kyc_sessions_retrieve
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KYCSession'
+          description: ''
+  /api/v1/markets/kyc/sessions/{session_id}/cancel/:
+    post:
+      operationId: market_kyc_cancel
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KYCSession'
+          description: ''
+  /api/v1/markets/kyc/summary/:
+    get:
+      operationId: market_kyc_compliance_summary
+      tags:
+      - markets
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /api/v1/markets/orders/open/:
     get:
@@ -3381,6 +4558,150 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserNotificationPreference'
           description: ''
+  /api/v1/notifications/:
+    get:
+      operationId: notifications_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationList'
+          description: ''
+  /api/v1/notifications/{notification_id}/:
+    get:
+      operationId: notifications_retrieve
+      parameters:
+      - in: path
+        name: notification_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/notifications/{notification_id}/archive/:
+    post:
+      operationId: notification_inbox_archive
+      parameters:
+      - in: path
+        name: notification_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/notifications/{notification_id}/read/:
+    post:
+      operationId: notification_inbox_mark_read
+      parameters:
+      - in: path
+        name: notification_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/v1/notifications/mark-all-read/:
+    post:
+      operationId: notification_inbox_mark_all_read
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatedCount'
+          description: ''
+  /api/v1/notifications/mark-read/:
+    post:
+      operationId: notification_inbox_mark_multiple_read
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationIds'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationIds'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationIds'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatedCount'
+          description: ''
+  /api/v1/notifications/unread-count/:
+    get:
+      operationId: notification_inbox_unread_count
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCount'
+          description: ''
   /api/v1/onboarding/:
     get:
       operationId: onboarding_retrieve
@@ -3395,7 +4716,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Onboarding'
+                $ref: '#/components/schemas/OnboardingStatusResponse'
           description: ''
   /api/v1/onboarding/clubs/:
     post:
@@ -3423,7 +4744,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ClubSelection'
+                $ref: '#/components/schemas/ClubSelectionResponse'
           description: ''
   /api/v1/onboarding/competitions/:
     post:
@@ -3451,7 +4772,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CompetitionSelection'
+                $ref: '#/components/schemas/CompetitionSelectionResponse'
           description: ''
   /api/v1/onboarding/complete/:
     post:
@@ -3478,7 +4799,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardConfiguration'
+                $ref: '#/components/schemas/DashboardEnvelopeResponse'
           description: ''
   /api/v1/onboarding/country/:
     post:
@@ -3506,7 +4827,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CountrySelection'
+                $ref: '#/components/schemas/CountrySelectionResponse'
           description: ''
   /api/v1/onboarding/dashboard/:
     get:
@@ -3522,7 +4843,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardConfiguration'
+                $ref: '#/components/schemas/DashboardEnvelopeResponse'
           description: ''
   /api/v1/onboarding/skip/:
     post:
@@ -3550,7 +4871,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SkipStep'
+                $ref: '#/components/schemas/SkipStepResponse'
           description: ''
   /api/v1/onboarding/sports/:
     post:
@@ -3578,7 +4899,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SportSelection'
+                $ref: '#/components/schemas/SportSelectionResponse'
           description: ''
   /api/v1/participants/:
     get:
@@ -4402,7 +5723,7 @@ paths:
           description: Wallet not found.
   /api/v1/wallets/deposits/:
     post:
-      operationId: api_v1_wallets_deposits_create
+      operationId: wallets_deposits_create
       tags:
       - Wallets
       requestBody:
@@ -4432,7 +5753,7 @@ paths:
           description: Authentication credentials are required.
   /api/v1/wallets/deposits/{intent_id}/:
     get:
-      operationId: api_v1_wallets_deposits_retrieve
+      operationId: wallets_deposits_retrieve
       parameters:
       - in: path
         name: intent_id
@@ -4441,7 +5762,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - api
+      - wallets
       security:
       - jwtAuth: []
       responses:
@@ -4453,7 +5774,7 @@ paths:
           description: ''
   /api/v1/wallets/deposits/callback/{provider_code}/:
     post:
-      operationId: api_v1_wallets_deposits_callback_create
+      operationId: wallets_deposits_callback_create
       parameters:
       - in: path
         name: provider_code
@@ -4473,7 +5794,7 @@ paths:
           description: Provider not found.
   /api/v1/wallets/transactions/:
     get:
-      operationId: api_v1_wallets_transactions_list
+      operationId: wallets_transactions_list
       parameters:
       - name: page
         required: false
@@ -4488,7 +5809,7 @@ paths:
         schema:
           type: integer
       tags:
-      - api
+      - wallets
       security:
       - jwtAuth: []
       responses:
@@ -4500,7 +5821,7 @@ paths:
           description: ''
   /api/v1/wallets/transactions/{tx_id}/:
     get:
-      operationId: api_v1_wallets_transactions_retrieve
+      operationId: wallets_transactions_retrieve
       parameters:
       - in: path
         name: tx_id
@@ -4509,7 +5830,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - api
+      - wallets
       security:
       - jwtAuth: []
       responses:
@@ -4521,7 +5842,7 @@ paths:
           description: ''
   /api/v1/wallets/transactions/{tx_id}/receipt/:
     get:
-      operationId: api_v1_wallets_transactions_receipt_retrieve
+      operationId: wallets_transactions_receipt_retrieve
       parameters:
       - in: path
         name: tx_id
@@ -4540,7 +5861,7 @@ paths:
           description: Receipt not found.
   /api/v1/wallets/withdrawals/:
     post:
-      operationId: api_v1_wallets_withdrawals_create
+      operationId: wallets_withdrawals_create
       tags:
       - Wallets
       requestBody:
@@ -4570,7 +5891,7 @@ paths:
           description: Authentication credentials are required.
   /api/v1/wallets/withdrawals/{request_id}/:
     get:
-      operationId: api_v1_wallets_withdrawals_retrieve
+      operationId: wallets_withdrawals_retrieve
       parameters:
       - in: path
         name: request_id
@@ -4579,7 +5900,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - api
+      - wallets
       security:
       - jwtAuth: []
       responses:
@@ -4610,6 +5931,143 @@ paths:
           description: ''
 components:
   schemas:
+    Adjustment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        reason:
+          type: string
+          readOnly: true
+        evidence_reference:
+          type: string
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+        market:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        mismatch:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        proposed_by:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ComplianceDecisionStatusEnum'
+          readOnly: true
+        executed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdjustmentLine'
+          readOnly: true
+      required:
+      - created_at
+      - currency
+      - evidence_reference
+      - executed_at
+      - id
+      - lines
+      - market
+      - mismatch
+      - proposed_by
+      - reason
+      - status
+    AdjustmentDecision:
+      type: object
+      properties:
+        notes:
+          type: string
+    AdjustmentLine:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        wallet:
+          type: string
+          format: uuid
+        direction:
+          $ref: '#/components/schemas/DirectionEnum'
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+        idempotency_reference:
+          type: string
+          format: uuid
+        wallet_ledger_entry:
+          type: string
+          format: uuid
+          nullable: true
+      required:
+      - amount
+      - direction
+      - id
+      - idempotency_reference
+      - wallet
+    AdjustmentLineInput:
+      type: object
+      properties:
+        wallet_id:
+          type: string
+          format: uuid
+        direction:
+          $ref: '#/components/schemas/DirectionEnum'
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+      required:
+      - amount
+      - direction
+      - wallet_id
+    AdjustmentProposal:
+      type: object
+      properties:
+        reason:
+          type: string
+        evidence_reference:
+          type: string
+        currency:
+          type: string
+          default: UGX
+          maxLength: 3
+        market:
+          type: string
+          format: uuid
+          nullable: true
+        mismatch:
+          type: string
+          format: uuid
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdjustmentLineInput'
+      required:
+      - evidence_reference
+      - lines
+      - reason
     AdminComplianceDetail:
       type: object
       properties:
@@ -4660,6 +6118,94 @@ components:
       - requirements
       - reviewed_at
       - reviewed_by
+    AdminKYCSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant_id:
+          type: string
+          format: uuid
+          readOnly: true
+        provider_code:
+          type: string
+          maxLength: 64
+        status:
+          $ref: '#/components/schemas/KYCVerificationStatusEnum'
+        verification_level:
+          type: string
+          maxLength: 50
+        initiated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_event_at:
+          type: string
+          format: date-time
+          nullable: true
+        failure_code:
+          type: string
+          maxLength: 100
+      required:
+      - expires_at
+      - id
+      - participant_id
+      - provider_code
+    AdminKYCSessionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant_id:
+          type: string
+          format: uuid
+          readOnly: true
+        provider_code:
+          type: string
+          maxLength: 64
+        status:
+          $ref: '#/components/schemas/KYCVerificationStatusEnum'
+        verification_level:
+          type: string
+          maxLength: 50
+        initiated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_event_at:
+          type: string
+          format: date-time
+          nullable: true
+        failure_code:
+          type: string
+          maxLength: 100
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SafeKYCEvent'
+          readOnly: true
+      required:
+      - events
+      - expires_at
+      - id
+      - participant_id
+      - provider_code
     AdminResponsibleStatus:
       type: object
       properties:
@@ -4743,6 +6289,76 @@ components:
       - sell_allowed
       - sell_reason_codes
       - utilization
+    AuthTokenData:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUserContext'
+      required:
+      - access
+      - refresh
+      - user
+    AuthTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/AuthTokenData'
+      required:
+      - data
+      - message
+      - success
+    AuthUserContext:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone_number:
+          type: string
+          nullable: true
+        is_verified:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        dashboard_access:
+          $ref: '#/components/schemas/DashboardAccess'
+        onboarding:
+          $ref: '#/components/schemas/OnboardingAuthContext'
+      required:
+      - dashboard_access
+      - email
+      - first_name
+      - id
+      - is_verified
+      - last_name
+      - onboarding
+      - permissions
+      - phone_number
+      - roles
+      - username
     AutocompleteResult:
       type: object
       description: A single autocomplete result.
@@ -4797,6 +6413,20 @@ components:
         * `MANUAL` - MANUAL
         * `MARKET_CLOSE` - MARKET_CLOSE
         * `MARKET_VOID` - MARKET_VOID
+    CategoryEnum:
+      enum:
+      - INCORRECT_OUTCOME
+      - INCOMPLETE_EVIDENCE
+      - SOURCE_CONFLICT
+      - RULES_APPLICATION
+      - OTHER
+      type: string
+      description: |-
+        * `INCORRECT_OUTCOME` - Incorrect outcome
+        * `INCOMPLETE_EVIDENCE` - Incomplete evidence
+        * `SOURCE_CONFLICT` - Conflicting official sources
+        * `RULES_APPLICATION` - Incorrect rules application
+        * `OTHER` - Other
     ChannelCapability:
       type: object
       description: Serializer for channel capabilities.
@@ -4951,6 +6581,34 @@ components:
             format: uuid
       required:
       - club_ids
+    ClubSelectionData:
+      type: object
+      properties:
+        clubs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClubCatalogue'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - clubs
+      - completed
+      - current_step
+    ClubSelectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ClubSelectionData'
+      required:
+      - data
+      - message
+      - success
     CommunicationConsent:
       type: object
       description: |-
@@ -4980,7 +6638,7 @@ components:
           nullable: true
         source:
           allOf:
-          - $ref: '#/components/schemas/SourceEnum'
+          - $ref: '#/components/schemas/CommunicationConsentSourceEnum'
           readOnly: true
         ip_address:
           type: string
@@ -5003,6 +6661,18 @@ components:
       - source
       - user_agent
       - withdrawn_at
+    CommunicationConsentSourceEnum:
+      enum:
+      - WEB
+      - MOBILE
+      - API
+      - ADMIN
+      type: string
+      description: |-
+        * `WEB` - Web
+        * `MOBILE` - Mobile
+        * `API` - API
+        * `ADMIN` - Admin
     Competition:
       type: object
       description: Public competition serializer.
@@ -5110,6 +6780,102 @@ components:
             format: uuid
       required:
       - competition_ids
+    CompetitionSelectionData:
+      type: object
+      properties:
+        competitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetitionCatalogue'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - competitions
+      - completed
+      - current_step
+    CompetitionSelectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/CompetitionSelectionData'
+      required:
+      - data
+      - message
+      - success
+    ComplianceDecision:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant_id:
+          type: string
+          format: uuid
+          readOnly: true
+        decision_type:
+          $ref: '#/components/schemas/ComplianceDecisionTypeEnum'
+        requested_change: {}
+        reason:
+          type: string
+        before_snapshot: {}
+        proposed_after_snapshot: {}
+        proposer_id:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/ComplianceDecisionStatusEnum'
+        decided_by_id:
+          type: string
+          format: uuid
+          readOnly: true
+        decision_reason:
+          type: string
+        proposed_at:
+          type: string
+          format: date-time
+        decided_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - decided_by_id
+      - decision_type
+      - id
+      - participant_id
+      - proposer_id
+      - reason
+    ComplianceDecisionStatusEnum:
+      enum:
+      - PENDING
+      - APPROVED
+      - REJECTED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `APPROVED` - Approved
+        * `REJECTED` - Rejected
+    ComplianceDecisionTypeEnum:
+      enum:
+      - CLEAR_CRITICAL_RISK_BLOCK
+      - REMOVE_SUSPENDED_RESTRICTION
+      - JURISDICTION_BLOCK_TO_ALLOW
+      - APPLY_RISK_OVERRIDE
+      - CLEAR_RISK_OVERRIDE
+      type: string
+      description: |-
+        * `CLEAR_CRITICAL_RISK_BLOCK` - Clear critical risk block
+        * `REMOVE_SUSPENDED_RESTRICTION` - Remove suspension
+        * `JURISDICTION_BLOCK_TO_ALLOW` - Allow jurisdiction
+        * `APPLY_RISK_OVERRIDE` - Apply risk override
+        * `CLEAR_RISK_OVERRIDE` - Clear risk override
     ComplianceReview:
       type: object
       properties:
@@ -5235,6 +7001,32 @@ components:
           format: uuid
       required:
       - country_id
+    CountrySelectionData:
+      type: object
+      properties:
+        country:
+          $ref: '#/components/schemas/CountryCatalogue'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - completed
+      - country
+      - current_step
+    CountrySelectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/CountrySelectionData'
+      required:
+      - data
+      - message
+      - success
     CurrentStepEnum:
       enum:
       - COUNTRY
@@ -5282,6 +7074,22 @@ components:
       - recommendations
       - user_summary
       - widgets
+    DashboardAccess:
+      type: object
+      properties:
+        entitlements:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardEntitlement'
+        default_entitlement:
+          type: string
+          nullable: true
+        default_route:
+          type: string
+      required:
+      - default_entitlement
+      - default_route
+      - entitlements
     DashboardAnalyticsCreate:
       type: object
       description: Serializer for creating analytics events.
@@ -5332,6 +7140,42 @@ components:
       - favourite_sports
       - onboarding_completed
       - preferred_country
+    DashboardEntitlement:
+      type: object
+      properties:
+        role:
+          type: string
+        dashboard_url:
+          type: string
+      required:
+      - dashboard_url
+      - role
+    DashboardEnvelopeData:
+      type: object
+      properties:
+        configuration:
+          $ref: '#/components/schemas/DashboardConfiguration'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - completed
+      - configuration
+      - current_step
+    DashboardEnvelopeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/DashboardEnvelopeData'
+      required:
+      - data
+      - message
+      - success
     DashboardModule:
       type: object
       description: Serializer for dashboard modules.
@@ -5432,6 +7276,31 @@ components:
       - module_name
       - permission_required
       - title
+    DecisionProposalRequest:
+      type: object
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+        decision_type:
+          $ref: '#/components/schemas/ComplianceDecisionTypeEnum'
+        requested_change: {}
+        reason:
+          type: string
+      required:
+      - decision_type
+      - participant_id
+      - reason
+    DecisionRequest:
+      type: object
+      properties:
+        approve:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - approve
+      - reason
     DepositIntent:
       type: object
       properties:
@@ -5448,6 +7317,14 @@ components:
       - amount
       - currency
       - provider_code
+    DirectionEnum:
+      enum:
+      - DEBIT
+      - CREDIT
+      type: string
+      description: |-
+        * `DEBIT` - Debit
+        * `CREDIT` - Credit
     DiscoveryClub:
       type: object
       description: Public club serializer.
@@ -5473,8 +7350,9 @@ components:
           readOnly: true
         founded:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
           nullable: true
       required:
       - competition
@@ -5533,8 +7411,9 @@ components:
           $ref: '#/components/schemas/RoleEnum'
         position:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         participant:
           allOf:
           - $ref: '#/components/schemas/ParticipantPublic'
@@ -5542,6 +7421,175 @@ components:
       required:
       - participant
       - position
+    EvidenceTypeEnum:
+      enum:
+      - OFFICIAL_RESULT
+      - DOCUMENT_REFERENCE
+      - OFFICIAL_SOURCE
+      - MEDIA_REFERENCE
+      type: string
+      description: |-
+        * `OFFICIAL_RESULT` - Official result
+        * `DOCUMENT_REFERENCE` - Document reference
+        * `OFFICIAL_SOURCE` - Official source
+        * `MEDIA_REFERENCE` - Media reference
+    FeePreview:
+      type: object
+      properties:
+        outcome_id:
+          type: string
+          format: uuid
+        side:
+          $ref: '#/components/schemas/MarketOrderSideEnum'
+        quantity:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,4})?$
+        limit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+        time_in_force:
+          allOf:
+          - $ref: '#/components/schemas/TimeInForceEnum'
+          default: GTC
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - limit_price
+      - outcome_id
+      - quantity
+      - side
+    FeePreviewResponse:
+      type: object
+      properties:
+        estimated_order_notional:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+        estimated_maximum_buyer_reservation:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+        estimated_maker_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+        estimated_taker_fee:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+        schedule_id:
+          type: string
+          format: uuid
+          nullable: true
+        schedule_version:
+          type: integer
+        currency:
+          type: string
+        role_statement:
+          type: string
+      required:
+      - currency
+      - estimated_maker_fee
+      - estimated_maximum_buyer_reservation
+      - estimated_order_notional
+      - estimated_taker_fee
+      - role_statement
+      - schedule_id
+      - schedule_version
+    FeeSchedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/FeeScheduleStatusEnum'
+          readOnly: true
+        maker_fee_bps:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        taker_fee_bps:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        settlement_fee_bps:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        refund_fee_bps:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        effective_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+        activated_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        activated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        retired_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        retired_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - activated_at
+      - activated_by
+      - created_at
+      - created_by
+      - effective_at
+      - id
+      - retired_at
+      - retired_by
+      - status
+      - version
+    FeeScheduleStatusEnum:
+      enum:
+      - DRAFT
+      - ACTIVE
+      - RETIRED
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `ACTIVE` - Active
+        * `RETIRED` - Retired
     Fixture:
       type: object
       description: Public fixture serializer.
@@ -5716,6 +7764,122 @@ components:
         * `NONE` - None
         * `ALLOW` - Allow
         * `BLOCK` - Block
+    KYCCallbackResponse:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+        duplicate:
+          type: boolean
+        status:
+          type: string
+      required:
+      - accepted
+      - duplicate
+      - status
+    KYCSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        provider_code:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/KYCVerificationStatusEnum'
+          readOnly: true
+        provider_status:
+          type: string
+          readOnly: true
+        verification_level:
+          type: string
+          readOnly: true
+        initiated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_event_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        continuation_url:
+          type: string
+          format: uri
+          readOnly: true
+        failure_code:
+          type: string
+          readOnly: true
+        status_message:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - completed_at
+      - continuation_url
+      - created_at
+      - expires_at
+      - failure_code
+      - id
+      - initiated_at
+      - last_event_at
+      - provider_code
+      - provider_status
+      - status
+      - status_message
+      - updated_at
+      - verification_level
+    KYCStart:
+      type: object
+      properties:
+        idempotency_key:
+          type: string
+          maxLength: 128
+        verification_level:
+          type: string
+          default: STANDARD
+          maxLength: 50
+      required:
+      - idempotency_key
+    KYCVerificationStatusEnum:
+      enum:
+      - CREATED
+      - PENDING
+      - IN_REVIEW
+      - VERIFIED
+      - REJECTED
+      - EXPIRED
+      - CANCELLED
+      - ERROR
+      type: string
+      description: |-
+        * `CREATED` - Created
+        * `PENDING` - Pending
+        * `IN_REVIEW` - In review
+        * `VERIFIED` - Verified
+        * `REJECTED` - Rejected
+        * `EXPIRED` - Expired
+        * `CANCELLED` - Cancelled
+        * `ERROR` - Error
     KindEnum:
       enum:
       - TEAM
@@ -5851,14 +8015,14 @@ components:
     Login:
       type: object
       properties:
+        identifier:
+          type: string
         email:
           type: string
-          format: email
         password:
           type: string
           writeOnly: true
       required:
-      - email
       - password
     Logout:
       type: object
@@ -6158,8 +8322,9 @@ components:
           type: string
         display_order:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
       required:
       - id
       - name
@@ -6182,6 +8347,18 @@ components:
       - recently_viewed
       - related_markets
       - watchlist
+    MarketDisputeDecisionTypeEnum:
+      enum:
+      - CONFIRM
+      - CORRECT
+      - VOID
+      - EXTEND_REVIEW
+      type: string
+      description: |-
+        * `CONFIRM` - Confirm provisional result
+        * `CORRECT` - Correct provisional result
+        * `VOID` - Void market
+        * `EXTEND_REVIEW` - Extend review
     MarketEventError:
       type: object
       properties:
@@ -6464,6 +8641,14 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,1}(?:\.\d{0,5})?$
+        time_in_force:
+          allOf:
+          - $ref: '#/components/schemas/TimeInForceEnum'
+          default: GTC
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
       required:
       - limit_price
       - outcome_id
@@ -6521,6 +8706,20 @@ components:
           allOf:
           - $ref: '#/components/schemas/MarketOrderReadStatusEnum'
           readOnly: true
+        time_in_force:
+          allOf:
+          - $ref: '#/components/schemas/TimeInForceEnum'
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        expired_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -6532,6 +8731,8 @@ components:
       required:
       - average_fill_price
       - created_at
+      - expired_at
+      - expires_at
       - filled_quantity
       - id
       - limit_price
@@ -6540,6 +8741,7 @@ components:
       - quantity
       - side
       - status
+      - time_in_force
       - updated_at
       - user
     MarketOrderReadStatusEnum:
@@ -6549,6 +8751,7 @@ components:
       - PARTIALLY_FILLED
       - FILLED
       - CANCELLED
+      - EXPIRED
       - REJECTED
       type: string
       description: |-
@@ -6557,6 +8760,7 @@ components:
         * `PARTIALLY_FILLED` - Partially filled
         * `FILLED` - Filled
         * `CANCELLED` - Cancelled
+        * `EXPIRED` - Expired
         * `REJECTED` - Rejected
     MarketOrderSideEnum:
       enum:
@@ -6577,8 +8781,9 @@ components:
           $ref: '#/components/schemas/MarketOutcomeSideEnum'
         position:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         label:
           type: string
           maxLength: 120
@@ -7231,6 +9436,108 @@ components:
         * `REJECTED` - Rejected
         * `DUPLICATE` - Duplicate
         * `WITHDRAWN` - Withdrawn
+    MarketProvisionalEvidenceRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        evidence_type:
+          $ref: '#/components/schemas/EvidenceTypeEnum'
+        label:
+          type: string
+          maxLength: 255
+        reference:
+          type: string
+        recorded_at:
+          type: string
+          format: date-time
+      required:
+      - evidence_type
+      - id
+      - label
+      - recorded_at
+      - reference
+    MarketProvisionalEvidenceWrite:
+      type: object
+      properties:
+        evidence_type:
+          $ref: '#/components/schemas/EvidenceTypeEnum'
+        label:
+          type: string
+          maxLength: 255
+        reference:
+          type: string
+      required:
+      - evidence_type
+      - label
+      - reference
+    MarketProvisionalResultPublish:
+      type: object
+      properties:
+        winning_outcome_id:
+          type: string
+          format: uuid
+        notes:
+          type: string
+        dispute_window_hours:
+          type: integer
+          maximum: 168
+          minimum: 1
+          default: 48
+        evidence_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketProvisionalEvidenceWrite'
+      required:
+      - evidence_items
+      - notes
+      - winning_outcome_id
+    MarketProvisionalResultRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        winning_outcome:
+          allOf:
+          - $ref: '#/components/schemas/MarketOutcomePublic'
+          readOnly: true
+        notes:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+        dispute_deadline:
+          type: string
+          format: date-time
+        dispute_status:
+          type: string
+          readOnly: true
+        financial_finalisation_blocked:
+          type: boolean
+          readOnly: true
+        evidence_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketProvisionalEvidenceRead'
+          readOnly: true
+      required:
+      - dispute_deadline
+      - dispute_status
+      - evidence_items
+      - financial_finalisation_blocked
+      - id
+      - market_id
+      - notes
+      - published_at
+      - winning_outcome
     MarketPublic:
       type: object
       properties:
@@ -7353,8 +9660,9 @@ components:
           format: date-time
         view_count:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 1
+          format: int64
         is_watchlisted:
           type: boolean
           readOnly: true
@@ -7377,6 +9685,270 @@ components:
       - evidence
       - notes
       - winning_outcome_id
+    MarketResultDisputeAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        provisional_result_id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant_id:
+          type: string
+          format: uuid
+          readOnly: true
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        explanation:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        evidence_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResultDisputeEvidenceRead'
+          readOnly: true
+      required:
+      - category
+      - evidence_items
+      - explanation
+      - id
+      - market_id
+      - participant_id
+      - provisional_result_id
+      - submitted_at
+    MarketResultDisputeDecisionAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        provisional_result_id:
+          type: string
+          format: uuid
+          readOnly: true
+        sequence:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        decision_type:
+          $ref: '#/components/schemas/MarketDisputeDecisionTypeEnum'
+        winning_outcome:
+          allOf:
+          - $ref: '#/components/schemas/MarketOutcomePublic'
+          readOnly: true
+          nullable: true
+        review_extended_until:
+          type: string
+          format: date-time
+          nullable: true
+        covered_dispute_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        notes:
+          type: string
+        evidence:
+          type: string
+        decided_at:
+          type: string
+          format: date-time
+        is_final:
+          type: boolean
+          readOnly: true
+        decision_maker_id:
+          type: string
+          format: uuid
+          readOnly: true
+      required:
+      - covered_dispute_count
+      - decided_at
+      - decision_maker_id
+      - decision_type
+      - evidence
+      - id
+      - is_final
+      - market_id
+      - notes
+      - provisional_result_id
+      - sequence
+      - winning_outcome
+    MarketResultDisputeDecisionCreate:
+      type: object
+      properties:
+        decision_type:
+          $ref: '#/components/schemas/MarketDisputeDecisionTypeEnum'
+        winning_outcome_id:
+          type: string
+          format: uuid
+          nullable: true
+        review_extension_hours:
+          type: integer
+          maximum: 168
+          minimum: 1
+          nullable: true
+        notes:
+          type: string
+        evidence:
+          type: string
+      required:
+      - decision_type
+      - evidence
+      - notes
+    MarketResultDisputeDecisionPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        provisional_result_id:
+          type: string
+          format: uuid
+          readOnly: true
+        sequence:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        decision_type:
+          $ref: '#/components/schemas/MarketDisputeDecisionTypeEnum'
+        winning_outcome:
+          allOf:
+          - $ref: '#/components/schemas/MarketOutcomePublic'
+          readOnly: true
+          nullable: true
+        review_extended_until:
+          type: string
+          format: date-time
+          nullable: true
+        covered_dispute_count:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        notes:
+          type: string
+        evidence:
+          type: string
+        decided_at:
+          type: string
+          format: date-time
+        is_final:
+          type: boolean
+          readOnly: true
+      required:
+      - covered_dispute_count
+      - decided_at
+      - decision_type
+      - evidence
+      - id
+      - is_final
+      - market_id
+      - notes
+      - provisional_result_id
+      - sequence
+      - winning_outcome
+    MarketResultDisputeEvidenceRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        label:
+          type: string
+          maxLength: 255
+        reference:
+          type: string
+        recorded_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - label
+      - recorded_at
+      - reference
+    MarketResultDisputeEvidenceWrite:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 255
+        reference:
+          type: string
+      required:
+      - label
+      - reference
+    MarketResultDisputeParticipant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+        provisional_result_id:
+          type: string
+          format: uuid
+          readOnly: true
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        explanation:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        evidence_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResultDisputeEvidenceRead'
+          readOnly: true
+      required:
+      - category
+      - evidence_items
+      - explanation
+      - id
+      - market_id
+      - provisional_result_id
+      - submitted_at
+    MarketResultDisputeSubmit:
+      type: object
+      properties:
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        explanation:
+          type: string
+        evidence_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResultDisputeEvidenceWrite'
+      required:
+      - category
+      - evidence_items
+      - explanation
     MarketScopeEnum:
       enum:
       - EVENT
@@ -7755,8 +10327,9 @@ components:
           maxLength: 100
         shirt_number:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
           nullable: true
         is_starter:
           type: boolean
@@ -7843,8 +10416,9 @@ components:
           $ref: '#/components/schemas/MatchCentreTimelineEventTypeEnum'
         minute:
           type: integer
-          maximum: 32767
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         participant:
           type: string
           format: uuid
@@ -7907,6 +10481,36 @@ components:
       required:
       - id
       - name
+    MeData:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthUserContext'
+      required:
+      - user
+    MeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/MeData'
+      required:
+      - data
+      - message
+      - success
+    MessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+      - message
+      - success
     NavigationMenu:
       type: object
       description: Serializer for navigation menu items.
@@ -8011,6 +10615,75 @@ components:
       - id
       - sport
       - title
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        category:
+          type: string
+          readOnly: true
+        event_type:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/NotificationSeverityEnum'
+          readOnly: true
+        data:
+          readOnly: true
+        deep_link_path:
+          type: string
+          readOnly: true
+        market_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        mandatory:
+          type: boolean
+          readOnly: true
+        occurred_at:
+          type: string
+          format: date-time
+          readOnly: true
+        read_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        archived_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - archived_at
+      - category
+      - created_at
+      - data
+      - deep_link_path
+      - event_type
+      - id
+      - mandatory
+      - market_id
+      - message
+      - occurred_at
+      - read_at
+      - severity
+      - title
     NotificationCategory:
       type: object
       description: |-
@@ -8085,6 +10758,17 @@ components:
       - id
       - name
       - provider
+    NotificationIds:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+      required:
+      - ids
     NotificationPreferenceAudit:
       type: object
       description: Serializer for notification preference audit logs.
@@ -8157,6 +10841,16 @@ components:
         * `CONSENT_WITHDRAWN` - Consent withdrawn
         * `RESET_TO_DEFAULTS` - Reset to defaults
         * `MANDATORY_NOTIFICATION_SENT` - Mandatory notification sent
+    NotificationSeverityEnum:
+      enum:
+      - INFO
+      - WARNING
+      - CRITICAL
+      type: string
+      description: |-
+        * `INFO` - Information
+        * `WARNING` - Warning
+        * `CRITICAL` - Critical
     NullEnum:
       enum:
       - null
@@ -8299,6 +10993,30 @@ components:
       - preferred_country
       - skipped_steps
       - updated_at
+    OnboardingAuthContext:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        current_step:
+          type: string
+          nullable: true
+      required:
+      - completed
+      - current_step
+    OnboardingStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Onboarding'
+      required:
+      - data
+      - message
+      - success
     OrderBookLevel:
       type: object
       properties:
@@ -8364,6 +11082,52 @@ components:
       - remaining_order_quantity
       - reserved_buy_amount
       - reserved_sell_quantity
+    PaginatedAdjustmentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Adjustment'
+    PaginatedAdminKYCSessionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminKYCSession'
     PaginatedCompetitionList:
       type: object
       required:
@@ -8387,6 +11151,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Competition'
+    PaginatedComplianceDecisionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplianceDecision'
     PaginatedComplianceReviewList:
       type: object
       required:
@@ -8801,6 +11588,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketRecentView'
+    PaginatedMarketResultDisputeAdminList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResultDisputeAdmin'
+    PaginatedMarketResultDisputeDecisionPublicList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResultDisputeDecisionPublic'
+    PaginatedMarketResultDisputeParticipantList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketResultDisputeParticipant'
     PaginatedMarketWatchlistEntryList:
       type: object
       required:
@@ -8847,6 +11703,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/News'
+    PaginatedNotificationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
     PaginatedParticipantOpenOrderList:
       type: object
       required:
@@ -8939,6 +11818,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Player'
+    PaginatedReconciliationMismatchList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReconciliationMismatch'
+    PaginatedReconciliationRunList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReconciliationRun'
     PaginatedResponsibleEventList:
       type: object
       required:
@@ -8962,6 +11887,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ResponsibleEvent'
+    PaginatedRiskAssessmentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskAssessment'
+    PaginatedRiskProfileList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskProfile'
     PaginatedSportPublicList:
       type: object
       required:
@@ -9059,6 +12030,20 @@ components:
         status:
           type: string
           readOnly: true
+        time_in_force:
+          allOf:
+          - $ref: '#/components/schemas/TimeInForceEnum'
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        expired_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         quantity:
           type: string
           format: decimal
@@ -9106,6 +12091,8 @@ components:
       required:
       - average_fill_price
       - created_at
+      - expired_at
+      - expires_at
       - fill_percentage
       - filled_quantity
       - id
@@ -9121,6 +12108,7 @@ components:
       - reserved_wallet_amount
       - side
       - status
+      - time_in_force
       - updated_at
     ParticipantPublic:
       type: object
@@ -9974,6 +12962,14 @@ components:
       - fill_id
       - price
       - quantity
+    ReassessmentRequest:
+      type: object
+      properties:
+        participant_id:
+          type: string
+          format: uuid
+      required:
+      - participant_id
     RecentTrade:
       type: object
       properties:
@@ -9996,6 +12992,219 @@ components:
       - id
       - price
       - quantity
+    ReconciliationMismatch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/ReconciliationMismatchSeverityEnum'
+          readOnly: true
+        market_id_snapshot:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        participant_id_snapshot:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        wallet_id_snapshot:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        order_id_snapshot:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        fill_id_snapshot:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        expected_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,20}(?:\.\d{0,4})?$
+          readOnly: true
+          nullable: true
+        actual_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,20}(?:\.\d{0,4})?$
+          readOnly: true
+          nullable: true
+        unit:
+          type: string
+          readOnly: true
+        explanation:
+          type: string
+          readOnly: true
+        detected_at:
+          type: string
+          format: date-time
+          readOnly: true
+        resolution_status:
+          allOf:
+          - $ref: '#/components/schemas/ResolutionStatusEnum'
+          readOnly: true
+        run:
+          type: string
+          format: uuid
+          readOnly: true
+      required:
+      - actual_value
+      - code
+      - created_at
+      - detected_at
+      - expected_value
+      - explanation
+      - fill_id_snapshot
+      - id
+      - market_id_snapshot
+      - order_id_snapshot
+      - participant_id_snapshot
+      - resolution_status
+      - run
+      - severity
+      - unit
+      - updated_at
+      - wallet_id_snapshot
+    ReconciliationMismatchSeverityEnum:
+      enum:
+      - INFO
+      - WARNING
+      - ERROR
+      - CRITICAL
+      type: string
+      description: |-
+        * `INFO` - Info
+        * `WARNING` - Warning
+        * `ERROR` - Error
+        * `CRITICAL` - Critical
+    ReconciliationRun:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        reference:
+          type: string
+          format: uuid
+          readOnly: true
+        run_date:
+          type: string
+          format: date
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ReconciliationRunStatusEnum'
+          readOnly: true
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        order_count:
+          type: integer
+          readOnly: true
+        fill_count:
+          type: integer
+          readOnly: true
+        mismatch_count:
+          type: integer
+          readOnly: true
+        total_fee_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,16}(?:\.\d{0,4})?$
+          readOnly: true
+        market:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        wallet:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        initiated_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+      required:
+      - completed_at
+      - created_at
+      - fill_count
+      - id
+      - initiated_by
+      - market
+      - mismatch_count
+      - order_count
+      - reference
+      - run_date
+      - started_at
+      - status
+      - total_fee_amount
+      - updated_at
+      - wallet
+    ReconciliationRunStatusEnum:
+      enum:
+      - PENDING
+      - RUNNING
+      - COMPLETED
+      - FAILED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `RUNNING` - Running
+        * `COMPLETED` - Completed
+        * `FAILED` - Failed
+    ReconciliationStart:
+      type: object
+      properties:
+        market_id:
+          type: string
+          format: uuid
+        wallet_id:
+          type: string
+          format: uuid
+        run_date:
+          type: string
+          format: date
     RegistrationStatusQuery:
       type: object
       properties:
@@ -10012,6 +13221,14 @@ components:
           format: email
       required:
       - email
+    ResolutionStatusEnum:
+      enum:
+      - OPEN
+      - RESOLVED
+      type: string
+      description: |-
+        * `OPEN` - Open
+        * `RESOLVED` - Resolved
     ResponsibleEvent:
       type: object
       properties:
@@ -10173,6 +13390,102 @@ components:
         * `CLEAR` - Clear
         * `RESTRICTED` - Restricted
         * `SUSPENDED` - Suspended
+    RiskAssessment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant_id:
+          type: string
+          format: uuid
+          readOnly: true
+        score:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        band:
+          $ref: '#/components/schemas/RiskBandEnum'
+        reason_codes: {}
+        recommended_action:
+          type: string
+          maxLength: 32
+        assessment_source:
+          type: string
+          maxLength: 16
+        input_digest:
+          type: string
+          maxLength: 64
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - band
+      - created_at
+      - id
+      - input_digest
+      - participant_id
+      - recommended_action
+      - score
+    RiskBandEnum:
+      enum:
+      - LOW
+      - MEDIUM
+      - HIGH
+      - CRITICAL
+      type: string
+      description: |-
+        * `LOW` - Low
+        * `MEDIUM` - Medium
+        * `HIGH` - High
+        * `CRITICAL` - Critical
+    RiskProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        participant_id:
+          type: string
+          format: uuid
+          readOnly: true
+        current_score:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        risk_band:
+          $ref: '#/components/schemas/RiskBandEnum'
+        restriction_recommendation:
+          type: string
+          maxLength: 32
+        reason_codes: {}
+        last_assessed_at:
+          type: string
+          format: date-time
+          nullable: true
+        assessment_source:
+          type: string
+          maxLength: 16
+        manual_override_state:
+          type: string
+          maxLength: 16
+        override_at:
+          type: string
+          format: date-time
+          nullable: true
+        revision:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+      required:
+      - id
+      - participant_id
     RoleEnum:
       enum:
       - HOME
@@ -10187,6 +13500,44 @@ components:
         * `COMPETITOR` - Competitor
         * `SUBJECT` - Subject
         * `OTHER` - Other
+    SafeKYCEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        event_type:
+          type: string
+          maxLength: 64
+        previous_status:
+          type: string
+          maxLength: 16
+        new_status:
+          type: string
+          maxLength: 16
+        source:
+          $ref: '#/components/schemas/SafeKYCEventSourceEnum'
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - event_type
+      - id
+      - new_status
+      - source
+    SafeKYCEventSourceEnum:
+      enum:
+      - PARTICIPANT
+      - PROVIDER
+      - ADMIN
+      - SYSTEM
+      type: string
+      description: |-
+        * `PARTICIPANT` - Participant
+        * `PROVIDER` - Provider
+        * `ADMIN` - Administrator
+        * `SYSTEM` - System
     SearchResponse:
       type: object
       description: Search response envelope.
@@ -10305,18 +13656,34 @@ components:
           $ref: '#/components/schemas/StepEnum'
       required:
       - step
-    SourceEnum:
-      enum:
-      - WEB
-      - MOBILE
-      - API
-      - ADMIN
-      type: string
-      description: |-
-        * `WEB` - Web
-        * `MOBILE` - Mobile
-        * `API` - API
-        * `ADMIN` - Admin
+    SkipStepData:
+      type: object
+      properties:
+        current_step:
+          type: string
+        completed:
+          type: boolean
+        skipped_steps:
+          type: array
+          items:
+            type: string
+      required:
+      - completed
+      - current_step
+      - skipped_steps
+    SkipStepResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/SkipStepData'
+      required:
+      - data
+      - message
+      - success
     SportCatalogue:
       type: object
       description: Serializer for the sport preference catalogue.
@@ -10375,6 +13742,34 @@ components:
             format: uuid
       required:
       - sport_ids
+    SportSelectionData:
+      type: object
+      properties:
+        sports:
+          type: array
+          items:
+            $ref: '#/components/schemas/SportCatalogue'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - completed
+      - current_step
+      - sports
+    SportSelectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/SportSelectionData'
+      required:
+      - data
+      - message
+      - success
     SportingEventPublic:
       type: object
       properties:
@@ -10505,6 +13900,18 @@ components:
       - entity_id
       - entity_type
       - suggestion_type
+    TimeInForceEnum:
+      enum:
+      - GTC
+      - GTD
+      - IOC
+      - FOK
+      type: string
+      description: |-
+        * `GTC` - Good till cancelled
+        * `GTD` - Good till date
+        * `IOC` - Immediate or cancel
+        * `FOK` - Fill or kill
     Timezone:
       type: object
       description: Serializer for the Timezone lookup table.
@@ -10538,6 +13945,21 @@ components:
       required:
       - access
       - refresh
+    UnreadCount:
+      type: object
+      properties:
+        unread_count:
+          type: integer
+      required:
+      - unread_count
+    UpdatedCount:
+      type: object
+      properties:
+        updated:
+          type: integer
+          minimum: 0
+      required:
+      - updated
     UserNotificationPreference:
       type: object
       description: Serializer for user notification preferences.
@@ -10577,6 +13999,12 @@ components:
           type: string
           format: uuid
           readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
         email:
           type: string
           format: email
@@ -10587,6 +14015,10 @@ components:
         last_name:
           type: string
           maxLength: 150
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
         is_verified:
           type: boolean
         roles:
@@ -10604,6 +14036,7 @@ components:
       - id
       - permissions
       - roles
+      - username
     UserRegistration:
       type: object
       properties:
@@ -10611,18 +14044,16 @@ components:
           type: string
         last_name:
           type: string
+        username:
+          type: string
+          maxLength: 150
         email:
           type: string
           format: email
           maxLength: 254
         phone_number:
+          type: string
           nullable: true
-          oneOf:
-          - type: string
-            pattern: ^\+?1?\d{9,15}$
-            maxLength: 20
-          - type: string
-            maxLength: 0
         password:
           type: string
           writeOnly: true
@@ -10636,6 +14067,43 @@ components:
       - first_name
       - last_name
       - password
+    VerificationChannelEnum:
+      enum:
+      - EMAIL
+      type: string
+      description: '* `EMAIL` - EMAIL'
+    VerificationDeliveryData:
+      type: object
+      properties:
+        verification_required:
+          type: boolean
+        verification_channel:
+          $ref: '#/components/schemas/VerificationChannelEnum'
+        destination:
+          type: string
+        expires_in:
+          type: integer
+        resend_available_in:
+          type: integer
+      required:
+      - destination
+      - expires_in
+      - resend_available_in
+      - verification_channel
+      - verification_required
+    VerificationDeliveryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/VerificationDeliveryData'
+      required:
+      - data
+      - message
+      - success
     VerifyOTP:
       type: object
       properties:

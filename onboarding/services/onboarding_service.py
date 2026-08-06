@@ -50,9 +50,11 @@ class OnboardingService:
         return OnboardingService.get_or_create_onboarding(user)
 
     @staticmethod
-    def advance_step(onboarding: UserOnboarding) -> None:
-        """Advance the onboarding to the next step."""
+    def advance_step(onboarding: UserOnboarding, completed_step: str | None = None) -> None:
+        """Advance only when the submitted step is the current step (replay-safe)."""
         if onboarding.completed:
+            return
+        if completed_step is not None and onboarding.current_step != completed_step:
             return
         try:
             current_index = OnboardingService.STEP_ORDER.index(onboarding.current_step)
@@ -92,7 +94,7 @@ class OnboardingService:
             metadata={"step": step},
         )
 
-        OnboardingService.advance_step(onboarding)
+        OnboardingService.advance_step(onboarding, step)
         return onboarding
 
     @staticmethod
