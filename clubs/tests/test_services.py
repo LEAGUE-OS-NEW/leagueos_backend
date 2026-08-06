@@ -2,22 +2,32 @@
 
 from __future__ import annotations
 
-import pytest
 from decimal import Decimal
 
+import pytest
+
 from accounts.models import User
-from profiles.models import Club, Country
-from clubs.models import ClubWorkspace, ClubProfileVersion, ClubMedia, MembershipPlan, TicketProduct, MerchandiseProduct, StoreOrder, ClubAnalytics, InventoryAdjustment, StaffInvitation, ClubAuditLog
-from clubs.services.club_workspace_service import ClubWorkspaceService
-from clubs.services.club_profile_service import ClubProfileService
-from clubs.services.media_service import MediaService
-from clubs.services.membership_service import MembershipService
-from clubs.services.ticket_service import TicketService
-from clubs.services.store_service import StoreService
-from clubs.services.inventory_service import InventoryService
-from clubs.services.staff_service import StaffService
+from clubs.models import (
+    ClubAnalytics,
+    ClubAuditLog,
+    ClubProfileVersion,
+    ClubWorkspace,
+    InventoryAdjustment,
+    MembershipPlan,
+    StaffInvitation,
+    TicketProduct,
+)
 from clubs.services.analytics_service import AnalyticsService
 from clubs.services.audit_service import ClubAuditService
+from clubs.services.club_profile_service import ClubProfileService
+from clubs.services.club_workspace_service import ClubWorkspaceService
+from clubs.services.inventory_service import InventoryService
+from clubs.services.media_service import MediaService
+from clubs.services.membership_service import MembershipService
+from clubs.services.staff_service import StaffService
+from clubs.services.store_service import StoreService
+from clubs.services.ticket_service import TicketService
+from profiles.models import Club
 
 
 @pytest.fixture
@@ -88,12 +98,14 @@ class TestClubProfileService:
 class TestMediaService:
     def test_validate_file_size(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
+
         file = SimpleUploadedFile("test.jpg", b"x" * (60 * 1024 * 1024), content_type="image/jpeg")
         with pytest.raises(ValueError, match="File size exceeds"):
             MediaService.validate_file(file)
 
     def test_validate_file_type(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
+
         file = SimpleUploadedFile("test.exe", b"x" * 1024, content_type="application/x-msdownload")
         with pytest.raises(ValueError, match="File type"):
             MediaService.validate_file(file)
@@ -102,13 +114,19 @@ class TestMediaService:
 class TestMembershipService:
     def test_create_plan(self, user, club, admin_workspace):
         plan = MembershipService.create_plan(
-            club, user, name="Gold Plan", price=Decimal("50000.00"), billing_period=MembershipPlan.BillingPeriod.MONTHLY
+            club,
+            user,
+            name="Gold Plan",
+            price=Decimal("50000.00"),
+            billing_period=MembershipPlan.BillingPeriod.MONTHLY,
         )
         assert plan.price == Decimal("50000.00")
         assert plan.status == MembershipPlan.Status.DRAFT
 
     def test_publish_plan(self, user, club, admin_workspace):
-        plan = MembershipService.create_plan(club, user, name="Gold Plan", price=Decimal("50000.00"))
+        plan = MembershipService.create_plan(
+            club, user, name="Gold Plan", price=Decimal("50000.00")
+        )
         published = MembershipService.publish_plan(plan, user)
         assert published.status == MembershipPlan.Status.ACTIVE
 
@@ -122,7 +140,9 @@ class TestTicketService:
         assert product.capacity == 1000
 
     def test_validate_sale(self, user, club, admin_workspace):
-        product = TicketService.create_product(club, user, name="Final Ticket", price=Decimal("10000.00"))
+        product = TicketService.create_product(
+            club, user, name="Final Ticket", price=Decimal("10000.00")
+        )
         product.status = TicketProduct.Status.ACTIVE
         product.save(update_fields=["status"])
         assert TicketService.validate_sale(product, 1) is True
@@ -137,7 +157,9 @@ class TestStoreService:
         assert product.available_stock == 100
 
     def test_create_order(self, user, club, admin_workspace):
-        product = StoreService.create_product(club, user, name="Jersey", price=Decimal("75000.00"), stock=100)
+        product = StoreService.create_product(
+            club, user, name="Jersey", price=Decimal("75000.00"), stock=100
+        )
         order = StoreService.create_order(user, club, [{"product": product, "quantity": 2}])
         assert order.total_amount == Decimal("150000.00")
         product.refresh_from_db()
@@ -146,16 +168,24 @@ class TestStoreService:
 
 class TestInventoryService:
     def test_adjust_stock(self, user, club, admin_workspace):
-        product = StoreService.create_product(club, user, name="Jersey", price=Decimal("75000.00"), stock=100)
-        adjustment = InventoryService.adjust_stock(product, InventoryAdjustment.AdjustmentType.RESTOCK, 50, user)
+        product = StoreService.create_product(
+            club, user, name="Jersey", price=Decimal("75000.00"), stock=100
+        )
+        adjustment = InventoryService.adjust_stock(
+            product, InventoryAdjustment.AdjustmentType.RESTOCK, 50, user
+        )
         assert adjustment.new_stock == 150
         product.refresh_from_db()
         assert product.stock == 150
 
     def test_negative_stock_raises(self, user, club, admin_workspace):
-        product = StoreService.create_product(club, user, name="Jersey", price=Decimal("75000.00"), stock=10)
+        product = StoreService.create_product(
+            club, user, name="Jersey", price=Decimal("75000.00"), stock=10
+        )
         with pytest.raises(ValueError, match="New stock cannot be negative"):
-            InventoryService.adjust_stock(product, InventoryAdjustment.AdjustmentType.SALE, -20, user)
+            InventoryService.adjust_stock(
+                product, InventoryAdjustment.AdjustmentType.SALE, -20, user
+            )
 
 
 class TestStaffService:

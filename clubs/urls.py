@@ -6,16 +6,16 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from clubs.views import (
-    ClubWorkspaceViewSet,
-    ClubProfileVersionViewSet,
+    ClubAuditLogViewSet,
     ClubMediaViewSet,
     ClubNewsViewSet,
+    ClubProfileVersionViewSet,
+    ClubWorkspaceViewSet,
     MembershipPlanViewSet,
-    TicketProductViewSet,
     MerchandiseProductViewSet,
-    StoreOrderViewSet,
-    ClubAuditLogViewSet,
     StaffInvitationViewSet,
+    StoreOrderViewSet,
+    TicketProductViewSet,
 )
 
 router = DefaultRouter()
@@ -40,7 +40,9 @@ urlpatterns = [
     ),
     path(
         "<uuid:club_pk>/workspaces/<uuid:pk>/",
-        ClubWorkspaceViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
+        ClubWorkspaceViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="club-workspace-detail",
     ),
     path(
@@ -50,7 +52,9 @@ urlpatterns = [
     ),
     path(
         "<uuid:club_pk>/profiles/<uuid:pk>/",
-        ClubProfileVersionViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
+        ClubProfileVersionViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="club-profile-detail",
     ),
     path(
@@ -60,7 +64,9 @@ urlpatterns = [
     ),
     path(
         "<uuid:club_pk>/media/<uuid:pk>/",
-        ClubMediaViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
+        ClubMediaViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="club-media-detail",
     ),
     path(
@@ -70,7 +76,9 @@ urlpatterns = [
     ),
     path(
         "<uuid:club_pk>/membership-plans/<uuid:pk>/",
-        MembershipPlanViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
+        MembershipPlanViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="membership-plan-detail",
     ),
     path(
@@ -80,7 +88,9 @@ urlpatterns = [
     ),
     path(
         "<uuid:club_pk>/ticket-products/<uuid:pk>/",
-        TicketProductViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
+        TicketProductViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="ticket-product-detail",
     ),
     path(
@@ -90,7 +100,9 @@ urlpatterns = [
     ),
     path(
         "<uuid:club_pk>/merchandise/<uuid:pk>/",
-        MerchandiseProductViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
+        MerchandiseProductViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="merchandise-detail",
     ),
     path(
@@ -110,7 +122,9 @@ urlpatterns = [
     ),
     path(
         "<uuid:club_pk>/staff-invitations/<uuid:pk>/",
-        StaffInvitationViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
+        StaffInvitationViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="staff-invitation-detail",
     ),
 ]
