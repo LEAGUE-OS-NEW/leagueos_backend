@@ -1,119 +1,124 @@
 # Wallet migration history repair
 
-## Root cause and confirmed drift
+## Historical states and root cause
 
-Commit `eb443f8` published `wallets.0001_wallet_ledger_foundation` as a two-table
-trading wallet/ledger migration. Its wallet had no `status`; its ledger used
-`wallet`, `entry_type`, balance snapshots, idempotency, and optional market,
-order, and fill references. Commit `8f8f5ae` later edited that same published
-file in place, replacing its meaning with a broader payments schema and adding
-six models. It also added 0002; `7c6dbbc` added 0003 and 0004.
+Commit `eb443f8` published `wallets.0001_wallet_ledger_foundation` with two
+trading tables. `wallets_wallet` had `id`, timestamps, currency, available and
+reserved balances, and `user_id`; it had no `status`. Its constraints were
+`wallet_user_currency_unique`, `wallet_available_balance_non_negative`, and
+`wallet_reserved_balance_non_negative`.
 
-Staging records 0001 as applied, but its two physical tables and original
-constraint names match the `eb443f8` version. The six payment tables and wallet
-`status` are absent. Its empty ledger has the original trading fields rather
-than the debit/credit/transaction fields represented by current 0001. Current
-0002 would therefore address absent tables, and 0003 would try to add columns
-already present in the physical legacy ledger.
+The original `wallets_ledgerentry` had `id`, timestamps, `entry_type`, a
+`numeric(20,4)` amount, four `numeric(20,4)` balance snapshots, a unique
+non-null idempotency UUID, and `wallet_id` plus nullable `market_id`, `order_id`,
+and `fill_id`. It had the five named positive/non-negative checks and the four
+published composite trading indexes. It did not have
+`wallets_led_created_abc123_idx`.
 
-## Why the repair is inside published 0002
+Commit `8f8f5ae` overwrote the already-published 0001 in place. The overwritten
+ledger has `debit_account`, `credit_account`, `numeric(16,4)` `amount`,
+`currency`, and nullable `transaction_id`, plus a created-at index named
+`wallets_led_created_abc123_idx`. It also introduced the six payments tables,
+wallet `status`, current wallet constraint names, and two WalletTransaction
+indexes. Its published 0002 removes the ledger created-at index and wallet
+composite index, renames both WalletTransaction indexes, adds
+`provider_reference`, and alters several fields (including making the ledger
+transaction non-null). Commit `7c6dbbc` published 0003, which adds the trading
+fields back with their current nullability/defaults and adds conditional
+idempotency uniqueness; 0004 adds the current five ledger checks.
 
-A separate migration inserted between published 0001 and published 0002 was
-rejected. A database that had already applied 0002 would have an applied
-migration whose newly introduced dependency was unapplied, producing
-`InconsistentMigrationHistory`. The graph remains exactly:
+Staging records only 0001, but its physical tables are the original `eb443f8`
+shape. Payment tables and wallet `status` are absent, and both wallet and ledger
+rows are zero. The first repair compared that ledger only with the overwritten
+0001 columns, classified it as unknown, and would otherwise have dropped and
+recreated it. That is unsafe: six validated, deferrable, initially-deferred
+Markets foreign keys reference `wallets_ledgerentry(id)`, so PostgreSQL refuses
+the drop and the replacement would lose the table identity and relationships.
+
+The earlier Render failure was:
 
 ```text
-0001_wallet_ledger_foundation
-  -> 0002_remove_ledgerentry_wallets_led_created_abc123_idx_and_more
-  -> 0003_ledgerentry_available_balance_after_and_more
-  -> 0004_ledgerentry_ledger_amount_positive_and_more
+relation "wallets_txn_wallet__abc123_idx" does not exist
 ```
 
-The compatibility repair is the first operation inside the existing 0002. This
-is a deliberate edit to a published migration, required because the previously
-published 0001 was overwritten. `SeparateDatabaseAndState` runs the physical
-repair while leaving migration state unchanged; current 0001 already provides
-that state. Every original 0002 operation follows in its original order.
+The same history also lacks `wallets_led_created_abc123_idx`, which the
+published 0002 tries to remove.
 
-On PostgreSQL the first operation:
+## In-place normalization in published 0002
 
-- requires the wallet table and accepts the exact current-0001 columns or that
-  shape without `status`;
-- adds `status` with the normal `ACTIVE` default while preserving wallet rows;
-- validates legacy and current wallet constraints by name and PostgreSQL
-  definition;
-- renames an equivalent legacy constraint to its current name, or removes only
-  an equivalent redundant legacy constraint when both names exist;
-- creates only missing payment tables from the historical apps registry in
-  foreign-key dependency order;
-- leaves an already-correct current-0001 ledger untouched;
-- recreates an incompatible ledger only when it is empty and has no inbound
-  foreign keys, using a plain drop without `CASCADE`;
-- refuses incompatible constraint definitions, unknown existing-table shapes,
-  and any incompatible nonempty ledger before destructive SQL.
+No migration name, dependency, graph edge, or recorder row changes. The repair
+remains the first database-only operation inside published 0002 because adding
+a new predecessor would make databases that already recorded 0002 inconsistent.
 
-Renaming `wallet_user_currency_unique` to `unique_user_currency_wallet` also
-renames PostgreSQL's constraint-owned unique index. The checks become
-`available_balance_not_negative` and `reserved_balance_not_negative`.
-Equivalent legacy duplicates do not remain.
+On PostgreSQL only, the repair verifies the complete original column types,
+sizes, nullability and defaults; the exact original indexes and same-table
+constraints; an `id` primary key; zero ledger rows; and exactly these validated,
+deferrable, initially-deferred inbound references to `wallets_ledgerentry(id)`:
 
-Fresh databases already match current 0001, so the repair no-ops before the
-original 0002 operations. Confirmed legacy staging databases recorded at 0001
-are repaired first. Environments where 0002 is already applied retain a
-consistent graph, do not rerun it, and have no new pending predecessor.
+- `markets_marketcloseordercancellation.wallet_release_ledger_entry_id`
+- `markets_marketfinancialadjustmentline.wallet_ledger_entry_id`
+- `markets_marketorderexpiryaudit.wallet_release_ledger_entry_id`
+- `markets_marketpositionsettlement.wallet_ledger_entry_id`
+- `markets_marketpositionvoidrefund.wallet_credit_ledger_entry_id`
+- `markets_marketvoidordercancellation.wallet_release_ledger_entry_id`
 
-There is intentionally no destructive reverse repair. Reversing 0002 cannot
-reconstruct the overwritten original schema. A nonempty legacy ledger requires
-a separately reviewed data-mapping migration; debit/credit mappings must not be
-inferred from trading records. Take and verify a database backup before rollout.
+Newer PostgreSQL versions can also represent `NOT NULL` constraints in
+`pg_constraint` with `contype = 'n'`, while older versions do not. Those rows
+alone are excluded from structural constraint-name comparisons; column
+nullability is still validated separately through `information_schema.columns`.
 
-## Read-only audit
+It then alters the existing ledger in place: narrows `amount` to
+`numeric(16,4)`; adds debit account, credit account, currency, and transaction;
+removes the original-only trading columns and their dependent same-table
+objects; and creates the overwritten-0001 created-at indexes. Missing payment
+tables are created first, including the two old WalletTransaction index names.
+Deferred schema-editor SQL is flushed before the untouched published 0002
+operations continue. Thus 0002 can remove/rename the expected old indexes, and
+0003 and 0004 can reintroduce the trading fields and final constraints normally.
 
-Run before rollout:
+The table is never dropped, renamed, or replaced. Its OID and `id` primary-key
+identity remain stable, so the six inbound constraint names and definitions are
+preserved untouched. There is no `CASCADE`, fake migration, recorder edit, or
+manual migration marking.
 
-```console
-python manage.py audit_wallet_schema
-```
+Wallet rows are preserved while `status` and normalized constraint names are
+added. Fresh databases and exact overwritten-0001 databases remain no-ops;
+missing payment tables are still created; already-applied 0002 histories retain
+the published graph.
 
-It reports migration records, missing tables, column drift, wallet and ledger
-row counts, and exactly one assessment: `NO-OP`, `SAFE REPAIR DURING WALLETS
-0002`, `REFUSE - incompatible ledger contains data`, or `REFUSE - unknown
-schema`. It never writes. A refusal returns a nonzero status.
+## Refusal conditions and audit
 
-## Local validation
+`python manage.py audit_wallet_schema` is read-only and shares the historical
+classification code embedded in 0002. It reports `NO-OP` for the final schema,
+`SAFE REPAIR DURING WALLETS 0002` only for the exact approved empty original
+shape, and refuses all other shapes. Refusal includes a nonempty incompatible
+ledger, unknown columns/types/nullability/defaults, unknown or missing indexes
+or constraints, a primary key other than `id`, any unknown inbound relationship,
+or any malformed/unvalidated/non-deferred inbound constraint.
 
-Use an isolated local PostgreSQL database and an explicit local `DATABASE_URL`.
-Never inherit a staging or production URL.
+A nonempty original ledger requires a separately reviewed data-mapping
+migration. Do not infer mappings, weaken this guard, use `--fake`, edit
+`django_migrations`, use `CASCADE`, or manually drop the ledger.
 
-```console
-python manage.py check
-python manage.py makemigrations --check --dry-run
-python manage.py migrate --plan
-pytest wallets/tests
-pytest markets/tests
-ruff check <modified Python files>
-black --check <modified Python files>
-git diff --check
-```
+## Disposable PostgreSQL dry run and rollback
 
-## Staging rollout order
+Use an isolated local database first, then a disposable Neon child branch only
+after review. Never point local commands at staging or production. Capture a
+verified backup/branch restore point, run the audit, inspect `migrate --plan`,
+apply through wallets 0002, audit again, apply through 0004, and run the final
+audit and integrity checks. Verify the ledger OID and all six inbound constraint
+names/definitions before and after.
 
-After a verified backup and approval, use the normal secret-injection mechanism
-and run exactly:
+Stop on any refusal or unexpected SQL. Rollback means discard the disposable
+child branch or restore the verified pre-run backup. Reversing recorder state is
+not a schema rollback, and this repair intentionally has no destructive reverse
+mapping.
 
 ```console
 python manage.py audit_wallet_schema
 python manage.py migrate wallets 0002_remove_ledgerentry_wallets_led_created_abc123_idx_and_more --plan
 python manage.py migrate wallets 0002_remove_ledgerentry_wallets_led_created_abc123_idx_and_more
 python manage.py audit_wallet_schema
-python manage.py migrate --plan
-python manage.py migrate
+python manage.py migrate wallets 0004_ledgerentry_ledger_amount_positive_and_more
 python manage.py audit_wallet_schema
 ```
-
-Stop immediately if the first audit refuses, especially for a nonempty
-incompatible ledger, or if the observed shape differs from the confirmed
-fixture. Do not use `--fake` and do not edit `django_migrations`. Rollback means
-restoring the pre-rollout backup or applying a separately reviewed forward
-repair; reversing a migration record alone is not a schema rollback.

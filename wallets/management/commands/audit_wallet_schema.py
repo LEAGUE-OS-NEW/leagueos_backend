@@ -1,5 +1,7 @@
 """Read-only audit of wallet migration and physical schema drift."""
 
+import importlib
+
 from django.apps import apps
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
@@ -83,16 +85,15 @@ class Command(BaseCommand):
         if wallet_extra or wallet_missing not in ([], ["status"]):
             return "REFUSE - unknown schema", True
 
-        expected_0001_ledger = {
-            "id",
-            "created_at",
-            "updated_at",
-            "debit_account",
-            "credit_account",
-            "amount",
-            "currency",
-            "transaction_id",
-        }
+        repair = importlib.import_module(
+            "wallets.migrations." "0002_remove_ledgerentry_wallets_led_created_abc123_idx_and_more"
+        )
+        if wallet_missing == ["status"]:
+            if connection.vendor != "postgresql" or repair._legacy_wallet_problem(
+                connection, wallet_table
+            ):
+                return "REFUSE - unknown schema", True
+        expected_legacy_ledger = set(repair.LEGACY_LEDGER_COLUMNS)
         current_ledger = apps.get_model("wallets", "LedgerEntry")
         expected_current = {field.column for field in current_ledger._meta.local_fields}
         repair_apps = (
@@ -119,26 +120,17 @@ class Command(BaseCommand):
                 }
         if ledger_table not in tables:
             actual_ledger = set()
-        elif actual_ledger not in (expected_0001_ledger, expected_current):
+        elif actual_ledger == expected_legacy_ledger:
             if counts[ledger_table]:
                 return "REFUSE - incompatible ledger contains data", True
             if connection.vendor != "postgresql":
                 return "REFUSE - unknown schema", True
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT conrelid::regclass::text, conname
-                    FROM pg_constraint
-                    WHERE contype = 'f'
-                      AND confrelid = %s::regclass
-                      AND conrelid <> confrelid
-                    ORDER BY 1, 2
-                    """,
-                    [ledger_table],
-                )
-                inbound = cursor.fetchall()
-            if inbound:
+            if repair._legacy_ledger_problem(connection, ledger_table):
                 return "REFUSE - unknown schema", True
+        elif actual_ledger not in (repair_columns[ledger_table], expected_current):
+            if counts[ledger_table]:
+                return "REFUSE - incompatible ledger contains data", True
+            return "REFUSE - unknown schema", True
 
         existing_unknown = []
         for table in drift:
@@ -156,8 +148,10 @@ class Command(BaseCommand):
         if (
             not missing_tables_from_drift(drift)
             and not wallet_missing
-            and actual_ledger in (expected_0001_ledger, expected_current)
+            and actual_ledger == expected_current
         ):
+            if connection.vendor != "postgresql" or repair._current_schema_problem(connection):
+                return "REFUSE - unknown schema", True
             return "NO-OP", False
         return "SAFE REPAIR DURING WALLETS 0002", False
 
