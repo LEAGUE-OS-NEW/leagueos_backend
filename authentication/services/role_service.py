@@ -1,3 +1,6 @@
+from django.db.models import Q
+from django.utils import timezone
+
 from authentication.models import Role, UserRole
 
 
@@ -7,12 +10,14 @@ class RoleService:
         user,
         role: Role,
         assigned_by=None,
+        expires_at=None,
     ) -> UserRole:
         user_role, _ = UserRole.objects.get_or_create(
             user=user,
             role=role,
             defaults={
                 "assigned_by": assigned_by,
+                "expires_at": expires_at,
             },
         )
 
@@ -22,17 +27,32 @@ class RoleService:
     def remove_role(
         user,
         role: Role,
-    ) -> None:
-        UserRole.objects.filter(
+        revoked_by=None,
+    ) -> UserRole | None:
+        user_role = UserRole.objects.filter(
             user=user,
             role=role,
-        ).delete()
+            is_active=True,
+        ).first()
+
+        if user_role:
+            user_role.is_active = False
+            user_role.revoked_at = timezone.now()
+            user_role.revoked_by = revoked_by
+            user_role.save(update_fields=["is_active", "revoked_at", "revoked_by"])
+
+        return user_role
 
     @staticmethod
     def get_user_roles(user) -> list[Role]:
         return list(
             Role.objects.filter(
                 user_roles__user=user,
+                user_roles__is_active=True,
+            )
+            .filter(
+                Q(user_roles__expires_at__isnull=True)
+                | Q(user_roles__expires_at__gt=timezone.now())
             )
             .distinct()
             .order_by("name")
