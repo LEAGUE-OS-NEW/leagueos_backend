@@ -63,7 +63,7 @@ jobs:
           python -m pip install -r requirements/dev.txt
 
       - name: Run Ruff lint checks
-        run: ruff check .
+        run: ruff check --no-cache .
 
       - name: Run Black formatting check
         run: black --check --diff .

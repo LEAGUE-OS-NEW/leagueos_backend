@@ -50,6 +50,7 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "accounts",
     "authentication",
+    "clubs",
     "dashboard",
     "discovery",
     "markets",
@@ -219,6 +220,10 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "ENUM_NAME_OVERRIDES": {
+        "RoleFf1Enum": [
+            ("ADMIN", "Club Admin"),
+            ("STAFF", "Club Staff"),
+        ],
         "KYCVerificationStatusEnum": [
             ("CREATED", "Created"),
             ("PENDING", "Pending"),

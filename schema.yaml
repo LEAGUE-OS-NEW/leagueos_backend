@@ -6,13 +6,15 @@ info:
 paths:
   /api/v1/:
     get:
-      operationId: root_retrieve
+      operationId: api_v1_retrieve
       description: |-
         Get dashboard data for the current user.
 
         Returns:
             Complete dashboard response with user summary, navigation,
             widgets, module data, and recommendations.
+      tags:
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -24,7 +26,7 @@ paths:
           description: ''
   /api/v1/admin/alerts/:
     get:
-      operationId: admin_alerts_list
+      operationId: api_v1_admin_alerts_list
       parameters:
       - name: page
         required: false
@@ -39,7 +41,7 @@ paths:
         schema:
           type: integer
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -51,7 +53,7 @@ paths:
           description: ''
   /api/v1/admin/alerts/{alert_id}/:
     get:
-      operationId: admin_alerts_retrieve
+      operationId: api_v1_admin_alerts_retrieve
       parameters:
       - in: path
         name: alert_id
@@ -60,7 +62,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -81,7 +83,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -102,7 +104,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -116,7 +118,7 @@ paths:
     get:
       operationId: admin_alert_unread_count
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -128,7 +130,7 @@ paths:
           description: ''
   /api/v1/admin/compliance/decisions/:
     get:
-      operationId: admin_compliance_decisions_list
+      operationId: api_v1_admin_compliance_decisions_list
       parameters:
       - name: page
         required: false
@@ -143,7 +145,7 @@ paths:
         schema:
           type: integer
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -156,7 +158,7 @@ paths:
     post:
       operationId: admin_compliance_decision_propose
       tags:
-      - admin
+      - api
       requestBody:
         content:
           application/json:
@@ -180,7 +182,7 @@ paths:
           description: ''
   /api/v1/admin/compliance/decisions/{proposal_id}/:
     get:
-      operationId: admin_compliance_decisions_retrieve
+      operationId: api_v1_admin_compliance_decisions_retrieve
       parameters:
       - in: path
         name: proposal_id
@@ -189,7 +191,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -210,7 +212,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - admin
+      - api
       requestBody:
         content:
           application/json:
@@ -234,7 +236,7 @@ paths:
           description: ''
   /api/v1/admin/compliance/kyc-sessions/:
     get:
-      operationId: admin_compliance_kyc_sessions_list
+      operationId: api_v1_admin_compliance_kyc_sessions_list
       parameters:
       - name: page
         required: false
@@ -249,7 +251,7 @@ paths:
         schema:
           type: integer
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -261,7 +263,7 @@ paths:
           description: ''
   /api/v1/admin/compliance/kyc-sessions/{session_id}/:
     get:
-      operationId: admin_compliance_kyc_sessions_retrieve
+      operationId: api_v1_admin_compliance_kyc_sessions_retrieve
       parameters:
       - in: path
         name: session_id
@@ -270,7 +272,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -282,7 +284,7 @@ paths:
           description: ''
   /api/v1/admin/compliance/risk-assessments/:
     get:
-      operationId: admin_compliance_risk_assessments_list
+      operationId: api_v1_admin_compliance_risk_assessments_list
       parameters:
       - name: page
         required: false
@@ -297,7 +299,7 @@ paths:
         schema:
           type: integer
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -309,7 +311,7 @@ paths:
           description: ''
   /api/v1/admin/compliance/risk-profiles/:
     get:
-      operationId: admin_compliance_risk_profiles_list
+      operationId: api_v1_admin_compliance_risk_profiles_list
       parameters:
       - name: page
         required: false
@@ -324,7 +326,7 @@ paths:
         schema:
           type: integer
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -336,7 +338,7 @@ paths:
           description: ''
   /api/v1/admin/compliance/risk-profiles/{profile_id}/:
     get:
-      operationId: admin_compliance_risk_profiles_retrieve
+      operationId: api_v1_admin_compliance_risk_profiles_retrieve
       parameters:
       - in: path
         name: profile_id
@@ -345,7 +347,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -359,7 +361,7 @@ paths:
     post:
       operationId: admin_market_risk_reassess
       tags:
-      - admin
+      - api
       requestBody:
         content:
           application/json:
@@ -383,7 +385,7 @@ paths:
           description: ''
   /api/v1/analytics/:
     post:
-      operationId: analytics_create
+      operationId: api_v1_analytics_create
       description: |-
         Record analytics event.
 
@@ -396,7 +398,7 @@ paths:
         Returns:
             Success response
       tags:
-      - analytics
+      - api
       requestBody:
         content:
           application/json:
@@ -418,11 +420,49 @@ paths:
               schema:
                 $ref: '#/components/schemas/DashboardAnalyticsCreate'
           description: ''
+  /api/v1/audit-logs/:
+    get:
+      operationId: api_v1_audit_logs_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubAuditLog'
+          description: ''
+  /api/v1/audit-logs/{id}/:
+    get:
+      operationId: api_v1_audit_logs_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club audit log.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubAuditLog'
+          description: ''
   /api/v1/auth/login/:
     post:
-      operationId: auth_login_create
+      operationId: api_v1_auth_login_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -443,13 +483,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthTokenResponse'
+                $ref: '#/components/schemas/Login'
           description: ''
   /api/v1/auth/logout/:
     post:
-      operationId: auth_logout_create
+      operationId: api_v1_auth_logout_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -469,13 +509,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                $ref: '#/components/schemas/Logout'
           description: ''
   /api/v1/auth/logout-all/:
     post:
-      operationId: auth_logout_all_create
+      operationId: api_v1_auth_logout_all_create
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -483,9 +523,9 @@ paths:
           description: No response body
   /api/v1/auth/me/:
     get:
-      operationId: auth_me_retrieve
+      operationId: api_v1_auth_me_retrieve
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -493,13 +533,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MeResponse'
+                $ref: '#/components/schemas/UserProfile'
           description: ''
   /api/v1/auth/password-reset/confirm/:
     post:
-      operationId: auth_password_reset_confirm_create
+      operationId: api_v1_auth_password_reset_confirm_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -524,9 +564,9 @@ paths:
           description: ''
   /api/v1/auth/password-reset/request/:
     post:
-      operationId: auth_password_reset_request_create
+      operationId: api_v1_auth_password_reset_request_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -551,9 +591,9 @@ paths:
           description: ''
   /api/v1/auth/password-reset/verify/:
     post:
-      operationId: auth_password_reset_verify_create
+      operationId: api_v1_auth_password_reset_verify_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -578,9 +618,9 @@ paths:
           description: ''
   /api/v1/auth/profile/:
     get:
-      operationId: auth_profile_retrieve
+      operationId: api_v1_auth_profile_retrieve
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -592,9 +632,9 @@ paths:
           description: ''
   /api/v1/auth/register/:
     post:
-      operationId: auth_register_create
+      operationId: api_v1_auth_register_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -611,23 +651,17 @@ paths:
       - jwtAuth: []
       - {}
       responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VerificationDeliveryResponse'
-          description: ''
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerificationDeliveryResponse'
+                $ref: '#/components/schemas/UserRegistration'
           description: ''
   /api/v1/auth/registration-status/:
     get:
-      operationId: auth_registration_status_retrieve
+      operationId: api_v1_auth_registration_status_retrieve
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -640,9 +674,9 @@ paths:
           description: ''
   /api/v1/auth/resend-otp/:
     post:
-      operationId: auth_resend_otp_create
+      operationId: api_v1_auth_resend_otp_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -663,13 +697,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerificationDeliveryResponse'
+                $ref: '#/components/schemas/ResendOTP'
           description: ''
   /api/v1/auth/resend-verification/:
     post:
-      operationId: auth_resend_verification_create
+      operationId: api_v1_auth_resend_verification_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -690,13 +724,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerificationDeliveryResponse'
+                $ref: '#/components/schemas/ResendOTP'
           description: ''
   /api/v1/auth/sessions/:
     get:
-      operationId: auth_sessions_retrieve
+      operationId: api_v1_auth_sessions_retrieve
       tags:
-      - auth
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -708,9 +742,9 @@ paths:
           description: ''
   /api/v1/auth/token/refresh/:
     post:
-      operationId: auth_token_refresh_create
+      operationId: api_v1_auth_token_refresh_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -730,13 +764,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthTokenResponse'
+                $ref: '#/components/schemas/TokenRefresh'
           description: ''
   /api/v1/auth/verify-otp/:
     post:
-      operationId: auth_verify_otp_create
+      operationId: api_v1_auth_verify_otp_create
       tags:
-      - auth
+      - api
       requestBody:
         content:
           application/json:
@@ -757,11 +791,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthTokenResponse'
+                $ref: '#/components/schemas/VerifyOTP'
           description: ''
   /api/v1/clubs/:
     get:
-      operationId: clubs_list
+      operationId: api_v1_clubs_list
       description: Public club list.
       parameters:
       - in: query
@@ -822,7 +856,7 @@ paths:
           description: ''
   /api/v1/clubs/{club_id}/:
     get:
-      operationId: clubs_retrieve
+      operationId: api_v1_clubs_retrieve
       description: Public club profile detail.
       parameters:
       - in: path
@@ -845,7 +879,7 @@ paths:
           description: ''
   /api/v1/clubs/{club_id}/follow/:
     post:
-      operationId: clubs_follow_create
+      operationId: api_v1_clubs_follow_create
       description: Follow a club.
       parameters:
       - in: path
@@ -877,7 +911,7 @@ paths:
                 $ref: '#/components/schemas/Follow'
           description: ''
     delete:
-      operationId: clubs_follow_destroy
+      operationId: api_v1_clubs_follow_destroy
       description: Follow a club.
       parameters:
       - in: path
@@ -887,7 +921,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - clubs
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -895,7 +929,7 @@ paths:
           description: No response body
   /api/v1/competitions/:
     get:
-      operationId: competitions_list
+      operationId: api_v1_competitions_list
       description: Public competition list.
       parameters:
       - name: page
@@ -924,7 +958,7 @@ paths:
           description: ''
   /api/v1/fixtures/:
     get:
-      operationId: fixtures_list
+      operationId: api_v1_fixtures_list
       description: Public fixture list.
       parameters:
       - in: query
@@ -1015,7 +1049,7 @@ paths:
           description: ''
   /api/v1/fixtures/{fixture_id}/:
     get:
-      operationId: fixtures_retrieve
+      operationId: api_v1_fixtures_retrieve
       description: Public fixture detail.
       parameters:
       - in: path
@@ -1038,10 +1072,10 @@ paths:
           description: ''
   /api/v1/lookups/countries/:
     get:
-      operationId: lookups_countries_list
+      operationId: api_v1_lookups_countries_list
       description: List all active countries for profile lookup.
       tags:
-      - lookups
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1055,10 +1089,10 @@ paths:
           description: ''
   /api/v1/lookups/genders/:
     get:
-      operationId: lookups_genders_list
+      operationId: api_v1_lookups_genders_list
       description: List all active genders for profile lookup.
       tags:
-      - lookups
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1072,10 +1106,10 @@ paths:
           description: ''
   /api/v1/lookups/languages/:
     get:
-      operationId: lookups_languages_list
+      operationId: api_v1_lookups_languages_list
       description: List all active languages for profile lookup.
       tags:
-      - lookups
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1089,10 +1123,10 @@ paths:
           description: ''
   /api/v1/lookups/timezones/:
     get:
-      operationId: lookups_timezones_list
+      operationId: api_v1_lookups_timezones_list
       description: List all active timezones for profile lookup.
       tags:
-      - lookups
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1106,7 +1140,7 @@ paths:
           description: ''
   /api/v1/market-admin/events/:
     get:
-      operationId: market_admin_events_list
+      operationId: api_v1_market_admin_events_list
       parameters:
       - name: page
         required: false
@@ -1121,7 +1155,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1132,9 +1166,9 @@ paths:
                 $ref: '#/components/schemas/PaginatedMarketEventPublicList'
           description: ''
     post:
-      operationId: market_admin_events_create
+      operationId: api_v1_market_admin_events_create
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -1158,7 +1192,7 @@ paths:
           description: ''
   /api/v1/market-admin/events/{event_id}/:
     get:
-      operationId: market_admin_events_retrieve
+      operationId: api_v1_market_admin_events_retrieve
       parameters:
       - in: path
         name: event_id
@@ -1167,7 +1201,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1178,7 +1212,7 @@ paths:
                 $ref: '#/components/schemas/MarketEventWrite'
           description: ''
     patch:
-      operationId: market_admin_events_partial_update
+      operationId: api_v1_market_admin_events_partial_update
       parameters:
       - in: path
         name: event_id
@@ -1187,7 +1221,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -1210,7 +1244,8 @@ paths:
           description: ''
   /api/v1/market-admin/events/{event_id}/archive/:
     post:
-      operationId: market_admin_events_archive_create
+      operationId: api_v1_market_admin_events_archive_create
+      description: The type of the None singleton.
       parameters:
       - in: path
         name: event_id
@@ -1219,7 +1254,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -1261,7 +1296,7 @@ paths:
           description: ''
   /api/v1/market-admin/events/{event_id}/markets/:
     post:
-      operationId: market_admin_events_markets_create
+      operationId: api_v1_market_admin_events_markets_create
       parameters:
       - in: path
         name: event_id
@@ -1270,7 +1305,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -1318,7 +1353,7 @@ paths:
           description: ''
   /api/v1/market-admin/events/{event_id}/markets/{market_id}/:
     delete:
-      operationId: market_admin_events_markets_destroy
+      operationId: api_v1_market_admin_events_markets_destroy
       parameters:
       - in: path
         name: event_id
@@ -1333,7 +1368,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -1341,7 +1376,8 @@ paths:
           description: No response body
   /api/v1/market-admin/events/{event_id}/publish/:
     post:
-      operationId: market_admin_events_publish_create
+      operationId: api_v1_market_admin_events_publish_create
+      description: The type of the None singleton.
       parameters:
       - in: path
         name: event_id
@@ -1350,7 +1386,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -1455,6 +1491,7 @@ paths:
   /api/v1/market-admin/fee-schedules/{schedule_id}/activate/:
     post:
       operationId: market_admin_fee_schedules_activate
+      description: The type of the None singleton.
       parameters:
       - in: path
         name: schedule_id
@@ -1476,6 +1513,7 @@ paths:
   /api/v1/market-admin/fee-schedules/{schedule_id}/retire/:
     post:
       operationId: market_admin_fee_schedules_retire
+      description: The type of the None singleton.
       parameters:
       - in: path
         name: schedule_id
@@ -1496,7 +1534,7 @@ paths:
           description: ''
   /api/v1/market-admin/financial-adjustments/:
     get:
-      operationId: market_admin_financial_adjustments_list
+      operationId: api_v1_market_admin_financial_adjustments_list
       parameters:
       - name: page
         required: false
@@ -1523,7 +1561,7 @@ paths:
           description: ''
   /api/v1/market-admin/financial-adjustments/{adjustment_id}/:
     get:
-      operationId: market_admin_financial_adjustments_retrieve
+      operationId: api_v1_market_admin_financial_adjustments_retrieve
       parameters:
       - in: path
         name: adjustment_id
@@ -1634,7 +1672,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/:
     get:
-      operationId: market_admin_markets_list
+      operationId: api_v1_market_admin_markets_list
       parameters:
       - in: query
         name: category
@@ -1716,7 +1754,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedMarketAdminReadList'
           description: ''
     post:
-      operationId: market_admin_markets_create
+      operationId: api_v1_market_admin_markets_create
       tags:
       - Market Administration
       requestBody:
@@ -1742,7 +1780,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/:
     get:
-      operationId: market_admin_markets_retrieve
+      operationId: api_v1_market_admin_markets_retrieve
       parameters:
       - in: path
         name: market_id
@@ -1762,7 +1800,7 @@ paths:
                 $ref: '#/components/schemas/MarketAdminRead'
           description: ''
     patch:
-      operationId: market_admin_markets_partial_update
+      operationId: api_v1_market_admin_markets_partial_update
       parameters:
       - in: path
         name: market_id
@@ -1794,7 +1832,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/approve/:
     post:
-      operationId: market_admin_markets_approve_create
+      operationId: api_v1_market_admin_markets_approve_create
       parameters:
       - in: path
         name: market_id
@@ -1827,7 +1865,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/close/:
     post:
-      operationId: market_admin_markets_close_create
+      operationId: api_v1_market_admin_markets_close_create
       parameters:
       - in: path
         name: market_id
@@ -1860,7 +1898,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/open/:
     post:
-      operationId: market_admin_markets_open_create
+      operationId: api_v1_market_admin_markets_open_create
       parameters:
       - in: path
         name: market_id
@@ -1893,7 +1931,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/provisional-result/:
     post:
-      operationId: market_admin_markets_provisional_result_create
+      operationId: api_v1_market_admin_markets_provisional_result_create
       parameters:
       - in: path
         name: market_id
@@ -1926,7 +1964,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/reject/:
     post:
-      operationId: market_admin_markets_reject_create
+      operationId: api_v1_market_admin_markets_reject_create
       parameters:
       - in: path
         name: market_id
@@ -1959,7 +1997,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/reopen/:
     post:
-      operationId: market_admin_markets_reopen_create
+      operationId: api_v1_market_admin_markets_reopen_create
       parameters:
       - in: path
         name: market_id
@@ -1992,7 +2030,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/resolve/:
     post:
-      operationId: market_admin_markets_resolve_create
+      operationId: api_v1_market_admin_markets_resolve_create
       parameters:
       - in: path
         name: market_id
@@ -2025,7 +2063,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/result-dispute-decisions/:
     post:
-      operationId: market_admin_markets_result_dispute_decisions_create
+      operationId: api_v1_market_admin_markets_result_dispute_decisions_create
       parameters:
       - in: path
         name: market_id
@@ -2058,7 +2096,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/submit/:
     post:
-      operationId: market_admin_markets_submit_create
+      operationId: api_v1_market_admin_markets_submit_create
       parameters:
       - in: path
         name: market_id
@@ -2091,7 +2129,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/suspend/:
     post:
-      operationId: market_admin_markets_suspend_create
+      operationId: api_v1_market_admin_markets_suspend_create
       parameters:
       - in: path
         name: market_id
@@ -2124,7 +2162,7 @@ paths:
           description: ''
   /api/v1/market-admin/markets/{market_id}/void/:
     post:
-      operationId: market_admin_markets_void_create
+      operationId: api_v1_market_admin_markets_void_create
       parameters:
       - in: path
         name: market_id
@@ -2157,7 +2195,7 @@ paths:
           description: ''
   /api/v1/market-admin/participants/{user_id}/compliance/:
     get:
-      operationId: market_admin_participants_compliance_retrieve
+      operationId: api_v1_market_admin_participants_compliance_retrieve
       parameters:
       - in: path
         name: user_id
@@ -2177,7 +2215,7 @@ paths:
                 $ref: '#/components/schemas/AdminComplianceDetail'
           description: ''
     patch:
-      operationId: market_admin_participants_compliance_partial_update
+      operationId: api_v1_market_admin_participants_compliance_partial_update
       parameters:
       - in: path
         name: user_id
@@ -2209,7 +2247,7 @@ paths:
           description: ''
   /api/v1/market-admin/participants/{user_id}/compliance/reviews/:
     get:
-      operationId: market_admin_participants_compliance_reviews_list
+      operationId: api_v1_market_admin_participants_compliance_reviews_list
       parameters:
       - name: page
         required: false
@@ -2230,7 +2268,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2242,7 +2280,7 @@ paths:
           description: ''
   /api/v1/market-admin/participants/{user_id}/responsible-participation/:
     get:
-      operationId: market_admin_participants_responsible_participation_retrieve
+      operationId: api_v1_market_admin_participants_responsible_participation_retrieve
       parameters:
       - in: path
         name: user_id
@@ -2262,7 +2300,7 @@ paths:
                 $ref: '#/components/schemas/AdminResponsibleStatus'
           description: ''
     patch:
-      operationId: market_admin_participants_responsible_participation_partial_update
+      operationId: api_v1_market_admin_participants_responsible_participation_partial_update
       parameters:
       - in: path
         name: user_id
@@ -2294,7 +2332,7 @@ paths:
           description: ''
   /api/v1/market-admin/participants/{user_id}/responsible-participation/events/:
     get:
-      operationId: market_admin_participants_responsible_participation_events_list
+      operationId: api_v1_market_admin_participants_responsible_participation_events_list
       parameters:
       - name: page
         required: false
@@ -2315,7 +2353,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2327,7 +2365,7 @@ paths:
           description: ''
   /api/v1/market-admin/proposals/:
     get:
-      operationId: market_admin_proposals_list
+      operationId: api_v1_market_admin_proposals_list
       parameters:
       - name: page
         required: false
@@ -2342,7 +2380,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2354,7 +2392,7 @@ paths:
           description: ''
   /api/v1/market-admin/proposals/{proposal_id}/:
     get:
-      operationId: market_admin_proposals_retrieve
+      operationId: api_v1_market_admin_proposals_retrieve
       parameters:
       - in: path
         name: proposal_id
@@ -2363,7 +2401,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2375,7 +2413,7 @@ paths:
           description: ''
   /api/v1/market-admin/proposals/{proposal_id}/review/:
     post:
-      operationId: market_admin_proposals_review_create
+      operationId: api_v1_market_admin_proposals_review_create
       parameters:
       - in: path
         name: proposal_id
@@ -2384,7 +2422,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       requestBody:
         content:
           application/json:
@@ -2432,7 +2470,7 @@ paths:
           description: ''
   /api/v1/market-admin/proposals/{proposal_id}/reviews/:
     get:
-      operationId: market_admin_proposals_reviews_list
+      operationId: api_v1_market_admin_proposals_reviews_list
       parameters:
       - name: page
         required: false
@@ -2453,7 +2491,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2465,7 +2503,7 @@ paths:
           description: ''
   /api/v1/market-admin/reconciliation/mismatches/:
     get:
-      operationId: market_admin_reconciliation_mismatches_list
+      operationId: api_v1_market_admin_reconciliation_mismatches_list
       parameters:
       - name: page
         required: false
@@ -2492,7 +2530,7 @@ paths:
           description: ''
   /api/v1/market-admin/reconciliation/mismatches/{mismatch_id}/:
     get:
-      operationId: market_admin_reconciliation_mismatches_retrieve
+      operationId: api_v1_market_admin_reconciliation_mismatches_retrieve
       parameters:
       - in: path
         name: mismatch_id
@@ -2513,7 +2551,7 @@ paths:
           description: ''
   /api/v1/market-admin/reconciliation/runs/:
     get:
-      operationId: market_admin_reconciliation_runs_list
+      operationId: api_v1_market_admin_reconciliation_runs_list
       parameters:
       - name: page
         required: false
@@ -2540,7 +2578,7 @@ paths:
           description: ''
   /api/v1/market-admin/reconciliation/runs/{run_id}/:
     get:
-      operationId: market_admin_reconciliation_runs_retrieve
+      operationId: api_v1_market_admin_reconciliation_runs_retrieve
       parameters:
       - in: path
         name: run_id
@@ -2608,7 +2646,7 @@ paths:
           description: ''
   /api/v1/market-admin/result-dispute-decisions/{decision_id}/:
     get:
-      operationId: market_admin_result_dispute_decisions_retrieve
+      operationId: api_v1_market_admin_result_dispute_decisions_retrieve
       parameters:
       - in: path
         name: decision_id
@@ -2617,7 +2655,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2629,7 +2667,7 @@ paths:
           description: ''
   /api/v1/market-admin/result-disputes/:
     get:
-      operationId: market_admin_result_disputes_list
+      operationId: api_v1_market_admin_result_disputes_list
       parameters:
       - name: page
         required: false
@@ -2644,7 +2682,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2656,7 +2694,7 @@ paths:
           description: ''
   /api/v1/market-admin/result-disputes/{dispute_id}/:
     get:
-      operationId: market_admin_result_disputes_retrieve
+      operationId: api_v1_market_admin_result_disputes_retrieve
       parameters:
       - in: path
         name: dispute_id
@@ -2665,7 +2703,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-admin
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2677,7 +2715,7 @@ paths:
           description: ''
   /api/v1/market-events/:
     get:
-      operationId: market_events_list
+      operationId: api_v1_market_events_list
       parameters:
       - name: page
         required: false
@@ -2692,7 +2730,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-events
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -2705,7 +2743,7 @@ paths:
           description: ''
   /api/v1/market-events/{event_id}/:
     get:
-      operationId: market_events_retrieve
+      operationId: api_v1_market_events_retrieve
       parameters:
       - in: path
         name: event_id
@@ -2714,7 +2752,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-events
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -2727,7 +2765,7 @@ paths:
           description: ''
   /api/v1/market-events/{event_id}/markets/:
     get:
-      operationId: market_events_markets_list
+      operationId: api_v1_market_events_markets_list
       parameters:
       - in: path
         name: event_id
@@ -2748,7 +2786,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-events
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -2761,7 +2799,7 @@ paths:
           description: ''
   /api/v1/market-fills/:
     get:
-      operationId: market_fills_list
+      operationId: api_v1_market_fills_list
       parameters:
       - name: page
         required: false
@@ -2788,7 +2826,7 @@ paths:
           description: ''
   /api/v1/market-fills/{fill_id}/:
     get:
-      operationId: market_fills_retrieve
+      operationId: api_v1_market_fills_retrieve
       parameters:
       - in: path
         name: fill_id
@@ -2809,7 +2847,7 @@ paths:
           description: ''
   /api/v1/market-orders/:
     get:
-      operationId: market_orders_list
+      operationId: api_v1_market_orders_list
       parameters:
       - name: page
         required: false
@@ -2836,7 +2874,7 @@ paths:
           description: ''
   /api/v1/market-orders/{order_id}/:
     get:
-      operationId: market_orders_retrieve
+      operationId: api_v1_market_orders_retrieve
       parameters:
       - in: path
         name: order_id
@@ -2857,7 +2895,7 @@ paths:
           description: ''
   /api/v1/market-orders/{order_id}/cancel/:
     post:
-      operationId: market_orders_cancel_create
+      operationId: api_v1_market_orders_cancel_create
       parameters:
       - in: path
         name: order_id
@@ -2878,7 +2916,7 @@ paths:
           description: ''
   /api/v1/market-positions/:
     get:
-      operationId: market_positions_list
+      operationId: api_v1_market_positions_list
       parameters:
       - name: page
         required: false
@@ -2905,7 +2943,7 @@ paths:
           description: ''
   /api/v1/market-positions/{position_id}/:
     get:
-      operationId: market_positions_retrieve
+      operationId: api_v1_market_positions_retrieve
       parameters:
       - in: path
         name: position_id
@@ -2926,7 +2964,7 @@ paths:
           description: ''
   /api/v1/market-result-disputes/:
     get:
-      operationId: market_result_disputes_list
+      operationId: api_v1_market_result_disputes_list
       parameters:
       - name: page
         required: false
@@ -2941,7 +2979,7 @@ paths:
         schema:
           type: integer
       tags:
-      - market-result-disputes
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2953,7 +2991,7 @@ paths:
           description: ''
   /api/v1/market-result-disputes/{dispute_id}/:
     get:
-      operationId: market_result_disputes_retrieve
+      operationId: api_v1_market_result_disputes_retrieve
       parameters:
       - in: path
         name: dispute_id
@@ -2962,7 +3000,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - market-result-disputes
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -2974,7 +3012,7 @@ paths:
           description: ''
   /api/v1/markets/:
     get:
-      operationId: markets_list
+      operationId: api_v1_markets_list
       parameters:
       - in: query
         name: category
@@ -3065,7 +3103,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/:
     get:
-      operationId: markets_retrieve
+      operationId: api_v1_markets_retrieve
       parameters:
       - in: path
         name: market_id
@@ -3087,7 +3125,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/orders/:
     post:
-      operationId: markets_orders_create
+      operationId: api_v1_markets_orders_create
       parameters:
       - in: path
         name: market_id
@@ -3159,7 +3197,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/outcomes/{outcome_id}/order-book/:
     get:
-      operationId: markets_outcomes_order_book_retrieve
+      operationId: api_v1_markets_outcomes_order_book_retrieve
       parameters:
       - in: query
         name: levels
@@ -3201,7 +3239,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/outcomes/{outcome_id}/price-history/:
     get:
-      operationId: markets_outcomes_price_history_retrieve
+      operationId: api_v1_markets_outcomes_price_history_retrieve
       description: Read-only executed-price history from immutable fills. RAW limit
         means executed fill points. HOUR and DAY limits mean complete OHLCV buckets.
         HOUR requests are bounded to 31 days and DAY requests to 730 days. Buckets
@@ -3277,7 +3315,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/provisional-result/:
     get:
-      operationId: markets_provisional_result_retrieve
+      operationId: api_v1_markets_provisional_result_retrieve
       parameters:
       - in: path
         name: market_id
@@ -3299,7 +3337,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/result-dispute-decisions/:
     get:
-      operationId: markets_result_dispute_decisions_list
+      operationId: api_v1_markets_result_dispute_decisions_list
       parameters:
       - in: path
         name: market_id
@@ -3320,7 +3358,7 @@ paths:
         schema:
           type: integer
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       - {}
@@ -3333,7 +3371,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/result-disputes/:
     post:
-      operationId: markets_result_disputes_create
+      operationId: api_v1_markets_result_disputes_create
       parameters:
       - in: path
         name: market_id
@@ -3366,7 +3404,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/settle/:
     post:
-      operationId: markets_settle_create
+      operationId: api_v1_markets_settle_create
       parameters:
       - in: path
         name: market_id
@@ -3387,7 +3425,7 @@ paths:
           description: ''
   /api/v1/markets/{market_id}/void-refund/:
     post:
-      operationId: markets_void_refund_create
+      operationId: api_v1_markets_void_refund_create
       parameters:
       - in: path
         name: market_id
@@ -3408,7 +3446,7 @@ paths:
           description: ''
   /api/v1/markets/categories/:
     get:
-      operationId: markets_categories_list
+      operationId: api_v1_markets_categories_list
       parameters:
       - name: page
         required: false
@@ -3436,7 +3474,7 @@ paths:
           description: ''
   /api/v1/markets/discovery/:
     get:
-      operationId: markets_discovery_retrieve
+      operationId: api_v1_markets_discovery_retrieve
       parameters:
       - in: query
         name: section_limit
@@ -3446,7 +3484,7 @@ paths:
           minimum: 1
           default: 5
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3458,7 +3496,7 @@ paths:
           description: ''
   /api/v1/markets/eligibility/:
     get:
-      operationId: markets_eligibility_retrieve
+      operationId: api_v1_markets_eligibility_retrieve
       tags:
       - Market Participation
       security:
@@ -3480,7 +3518,7 @@ paths:
           type: string
         required: true
       tags:
-      - markets
+      - api
       responses:
         '200':
           content:
@@ -3492,7 +3530,7 @@ paths:
     get:
       operationId: market_kyc_list
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3507,7 +3545,7 @@ paths:
     post:
       operationId: market_kyc_start
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -3537,7 +3575,7 @@ paths:
           description: ''
   /api/v1/markets/kyc/sessions/{session_id}/:
     get:
-      operationId: markets_kyc_sessions_retrieve
+      operationId: api_v1_markets_kyc_sessions_retrieve
       parameters:
       - in: path
         name: session_id
@@ -3546,7 +3584,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3567,7 +3605,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3581,7 +3619,7 @@ paths:
     get:
       operationId: market_kyc_compliance_summary
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3594,7 +3632,7 @@ paths:
           description: ''
   /api/v1/markets/orders/open/:
     get:
-      operationId: markets_orders_open_list
+      operationId: api_v1_markets_orders_open_list
       description: Return the authenticated participant's active OPEN and PARTIALLY_FILLED
         orders.
       parameters:
@@ -3647,7 +3685,7 @@ paths:
           description: ''
   /api/v1/markets/portfolio/activity/:
     get:
-      operationId: markets_portfolio_activity_list
+      operationId: api_v1_markets_portfolio_activity_list
       description: Return the authenticated participant's read-only, paginated UGX
         market activity across fills, cancellations, settlements, and void refunds.
       parameters:
@@ -3707,7 +3745,7 @@ paths:
           description: ''
   /api/v1/markets/portfolio/positions/:
     get:
-      operationId: markets_portfolio_positions_list
+      operationId: api_v1_markets_portfolio_positions_list
       description: Return the authenticated participant's positive current positions
         with valuation details.
       parameters:
@@ -3774,7 +3812,7 @@ paths:
           description: ''
   /api/v1/markets/portfolio/summary/:
     get:
-      operationId: markets_portfolio_summary_retrieve
+      operationId: api_v1_markets_portfolio_summary_retrieve
       description: Return the authenticated participant's read-only UGX portfolio
         summary. Money and quantities use four decimal places. total_pnl is null when
         any positive position is unpriced; mark_sources reports valuation coverage.
@@ -3798,7 +3836,7 @@ paths:
           description: ''
   /api/v1/markets/proposals/:
     get:
-      operationId: markets_proposals_list
+      operationId: api_v1_markets_proposals_list
       parameters:
       - name: page
         required: false
@@ -3813,7 +3851,7 @@ paths:
         schema:
           type: integer
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3824,9 +3862,9 @@ paths:
                 $ref: '#/components/schemas/PaginatedMarketProposalParticipantList'
           description: ''
     post:
-      operationId: markets_proposals_create
+      operationId: api_v1_markets_proposals_create
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -3850,7 +3888,7 @@ paths:
           description: ''
   /api/v1/markets/proposals/{proposal_id}/:
     get:
-      operationId: markets_proposals_retrieve
+      operationId: api_v1_markets_proposals_retrieve
       parameters:
       - in: path
         name: proposal_id
@@ -3859,7 +3897,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3870,7 +3908,7 @@ paths:
                 $ref: '#/components/schemas/MarketProposalParticipant'
           description: ''
     patch:
-      operationId: markets_proposals_partial_update
+      operationId: api_v1_markets_proposals_partial_update
       parameters:
       - in: path
         name: proposal_id
@@ -3879,7 +3917,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -3902,7 +3940,7 @@ paths:
           description: ''
   /api/v1/markets/proposals/{proposal_id}/withdraw/:
     post:
-      operationId: markets_proposals_withdraw_create
+      operationId: api_v1_markets_proposals_withdraw_create
       parameters:
       - in: path
         name: proposal_id
@@ -3911,7 +3949,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -3935,7 +3973,7 @@ paths:
           description: ''
   /api/v1/markets/recently-viewed/:
     get:
-      operationId: markets_recently_viewed_list
+      operationId: api_v1_markets_recently_viewed_list
       parameters:
       - name: page
         required: false
@@ -3950,7 +3988,7 @@ paths:
         schema:
           type: integer
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3963,7 +4001,7 @@ paths:
     delete:
       operationId: markets_recently_viewed_item_destroy
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -3971,7 +4009,7 @@ paths:
           description: No response body
   /api/v1/markets/recently-viewed/{market_id}/:
     put:
-      operationId: markets_recently_viewed_update
+      operationId: api_v1_markets_recently_viewed_update
       parameters:
       - in: path
         name: market_id
@@ -3980,7 +4018,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -4009,7 +4047,7 @@ paths:
                 $ref: '#/components/schemas/MarketRecentView'
           description: ''
     delete:
-      operationId: markets_recently_viewed_destroy
+      operationId: api_v1_markets_recently_viewed_destroy
       parameters:
       - in: path
         name: market_id
@@ -4018,7 +4056,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4026,7 +4064,7 @@ paths:
           description: No response body
   /api/v1/markets/responsible-participation/:
     get:
-      operationId: markets_responsible_participation_retrieve
+      operationId: api_v1_markets_responsible_participation_retrieve
       tags:
       - Market Responsible Participation
       security:
@@ -4039,7 +4077,7 @@ paths:
                 $ref: '#/components/schemas/ResponsibleStatus'
           description: ''
     patch:
-      operationId: markets_responsible_participation_partial_update
+      operationId: api_v1_markets_responsible_participation_partial_update
       tags:
       - Market Responsible Participation
       requestBody:
@@ -4064,7 +4102,7 @@ paths:
           description: ''
   /api/v1/markets/responsible-participation/cooling-off/:
     post:
-      operationId: markets_responsible_participation_cooling_off_create
+      operationId: api_v1_markets_responsible_participation_cooling_off_create
       tags:
       - Market Responsible Participation
       requestBody:
@@ -4090,7 +4128,7 @@ paths:
           description: ''
   /api/v1/markets/responsible-participation/events/:
     get:
-      operationId: markets_responsible_participation_events_list
+      operationId: api_v1_markets_responsible_participation_events_list
       parameters:
       - name: page
         required: false
@@ -4105,7 +4143,7 @@ paths:
         schema:
           type: integer
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4117,7 +4155,7 @@ paths:
           description: ''
   /api/v1/markets/responsible-participation/self-exclusion/:
     post:
-      operationId: markets_responsible_participation_self_exclusion_create
+      operationId: api_v1_markets_responsible_participation_self_exclusion_create
       tags:
       - Market Responsible Participation
       requestBody:
@@ -4143,7 +4181,7 @@ paths:
           description: ''
   /api/v1/markets/watchlist/:
     get:
-      operationId: markets_watchlist_list
+      operationId: api_v1_markets_watchlist_list
       parameters:
       - name: page
         required: false
@@ -4158,7 +4196,7 @@ paths:
         schema:
           type: integer
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4170,7 +4208,7 @@ paths:
           description: ''
   /api/v1/markets/watchlist/{market_id}/:
     put:
-      operationId: markets_watchlist_update
+      operationId: api_v1_markets_watchlist_update
       parameters:
       - in: path
         name: market_id
@@ -4179,7 +4217,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       requestBody:
         content:
           application/json:
@@ -4216,7 +4254,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - markets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4224,7 +4262,7 @@ paths:
           description: No response body
   /api/v1/match-centre/{fixture_id}/:
     get:
-      operationId: match_centre_retrieve
+      operationId: api_v1_match_centre_retrieve
       description: Aggregated match centre for a canonical fixture.
       parameters:
       - in: path
@@ -4245,16 +4283,451 @@ paths:
               schema:
                 $ref: '#/components/schemas/MatchCentre'
           description: ''
+  /api/v1/media/:
+    get:
+      operationId: api_v1_media_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubMedia'
+          description: ''
+    post:
+      operationId: api_v1_media_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMedia'
+          description: ''
+  /api/v1/media/{id}/:
+    get:
+      operationId: api_v1_media_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club media.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMedia'
+          description: ''
+    put:
+      operationId: api_v1_media_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club media.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMedia'
+          description: ''
+    patch:
+      operationId: api_v1_media_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club media.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClubMedia'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClubMedia'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClubMedia'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMedia'
+          description: ''
+    delete:
+      operationId: api_v1_media_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club media.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/membership-plans/:
+    get:
+      operationId: api_v1_membership_plans_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+    post:
+      operationId: api_v1_membership_plans_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+  /api/v1/membership-plans/{id}/:
+    get:
+      operationId: api_v1_membership_plans_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this membership plan.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+    put:
+      operationId: api_v1_membership_plans_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this membership plan.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+    patch:
+      operationId: api_v1_membership_plans_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this membership plan.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipPlan'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+    delete:
+      operationId: api_v1_membership_plans_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this membership plan.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/merchandise/:
+    get:
+      operationId: api_v1_merchandise_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+    post:
+      operationId: api_v1_merchandise_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+  /api/v1/merchandise/{id}/:
+    get:
+      operationId: api_v1_merchandise_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this merchandise product.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+    put:
+      operationId: api_v1_merchandise_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this merchandise product.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+    patch:
+      operationId: api_v1_merchandise_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this merchandise product.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMerchandiseProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMerchandiseProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMerchandiseProduct'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+    delete:
+      operationId: api_v1_merchandise_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this merchandise product.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/modules/:
     get:
-      operationId: modules_retrieve
+      operationId: api_v1_modules_retrieve
       description: |-
         Get available dashboard modules.
 
         Returns:
             List of active dashboard modules
       tags:
-      - modules
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4266,14 +4739,14 @@ paths:
           description: ''
   /api/v1/navigation/:
     get:
-      operationId: navigation_retrieve
+      operationId: api_v1_navigation_retrieve
       description: |-
         Get navigation menu for the current user.
 
         Returns:
             Hierarchical navigation structure
       tags:
-      - navigation
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4285,82 +4758,155 @@ paths:
           description: ''
   /api/v1/news/:
     get:
-      operationId: news_list
-      description: Public news list (published & verified only).
-      parameters:
-      - in: query
-        name: category
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: club
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: competition
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: featured
-        schema:
-          type: boolean
-      - in: query
-        name: ordering
-        schema:
-          enum:
-          - -published_at
-          - published_at
-          - -created_at
-          type: string
-          default: -published_at
-          minLength: 1
-        description: |-
-          * `-published_at` - -published_at
-          * `published_at` - published_at
-          * `-created_at` - -created_at
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: page_size
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      - in: query
-        name: search
-        schema:
-          type: string
-          maxLength: 180
-      - in: query
-        name: sport
-        schema:
-          type: string
-          format: uuid
+      operationId: api_v1_news_list
       tags:
-      - Discovery
+      - api
       security:
       - jwtAuth: []
-      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedNewsList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubNews'
           description: ''
+    post:
+      operationId: api_v1_news_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubNews'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubNews'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubNews'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubNews'
+          description: ''
+  /api/v1/news/{id}/:
+    get:
+      operationId: api_v1_news_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club news.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubNews'
+          description: ''
+    put:
+      operationId: api_v1_news_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club news.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubNews'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubNews'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubNews'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubNews'
+          description: ''
+    patch:
+      operationId: api_v1_news_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club news.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClubNews'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClubNews'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClubNews'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubNews'
+          description: ''
+    delete:
+      operationId: api_v1_news_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club news.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/notification-categories/:
     get:
-      operationId: notification_categories_retrieve
+      operationId: api_v1_notification_categories_retrieve
       description: Get all active notification categories.
       tags:
-      - notification-categories
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4372,10 +4918,10 @@ paths:
           description: ''
   /api/v1/notification-channels/:
     get:
-      operationId: notification_channels_retrieve
+      operationId: api_v1_notification_channels_retrieve
       description: Get all active notification channels.
       tags:
-      - notification-channels
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4387,10 +4933,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/:
     get:
-      operationId: notification_preferences_retrieve
+      operationId: api_v1_notification_preferences_retrieve
       description: Get user notification preferences.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4401,10 +4947,10 @@ paths:
                 $ref: '#/components/schemas/UserNotificationPreference'
           description: ''
     patch:
-      operationId: notification_preferences_partial_update
+      operationId: api_v1_notification_preferences_partial_update
       description: Bulk update user notification preferences.
       tags:
-      - notification-preferences
+      - api
       requestBody:
         content:
           application/json:
@@ -4427,10 +4973,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/audit-log/:
     get:
-      operationId: notification_preferences_audit_log_retrieve
+      operationId: api_v1_notification_preferences_audit_log_retrieve
       description: Get user's notification audit logs.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4442,10 +4988,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/capabilities/:
     get:
-      operationId: notification_preferences_capabilities_retrieve
+      operationId: api_v1_notification_preferences_capabilities_retrieve
       description: Get channel capabilities for current user.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4457,10 +5003,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/consents/:
     get:
-      operationId: notification_preferences_consents_retrieve
+      operationId: api_v1_notification_preferences_consents_retrieve
       description: Get current consent status.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4471,10 +5017,10 @@ paths:
                 $ref: '#/components/schemas/CommunicationConsent'
           description: ''
     post:
-      operationId: notification_preferences_consents_create
+      operationId: api_v1_notification_preferences_consents_create
       description: Grant or withdraw consent.
       tags:
-      - notification-preferences
+      - api
       requestBody:
         content:
           application/json:
@@ -4497,10 +5043,10 @@ paths:
           description: ''
   /api/v1/notification-preferences/quiet-hours/:
     post:
-      operationId: notification_preferences_quiet_hours_create
+      operationId: api_v1_notification_preferences_quiet_hours_create
       description: Set or update quiet hours.
       tags:
-      - notification-preferences
+      - api
       requestBody:
         content:
           application/json:
@@ -4523,10 +5069,10 @@ paths:
                 $ref: '#/components/schemas/QuietHours'
           description: ''
     delete:
-      operationId: notification_preferences_quiet_hours_destroy
+      operationId: api_v1_notification_preferences_quiet_hours_destroy
       description: Delete quiet hours configuration.
       tags:
-      - notification-preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4534,10 +5080,10 @@ paths:
           description: No response body
   /api/v1/notification-preferences/reset/:
     post:
-      operationId: notification_preferences_reset_create
+      operationId: api_v1_notification_preferences_reset_create
       description: Reset user preferences to defaults.
       tags:
-      - notification-preferences
+      - api
       requestBody:
         content:
           application/json:
@@ -4560,7 +5106,7 @@ paths:
           description: ''
   /api/v1/notifications/:
     get:
-      operationId: notifications_list
+      operationId: api_v1_notifications_list
       parameters:
       - name: page
         required: false
@@ -4575,7 +5121,7 @@ paths:
         schema:
           type: integer
       tags:
-      - notifications
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4587,7 +5133,7 @@ paths:
           description: ''
   /api/v1/notifications/{notification_id}/:
     get:
-      operationId: notifications_retrieve
+      operationId: api_v1_notifications_retrieve
       parameters:
       - in: path
         name: notification_id
@@ -4596,7 +5142,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - notifications
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4617,7 +5163,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - notifications
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4638,7 +5184,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - notifications
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4652,7 +5198,7 @@ paths:
     post:
       operationId: notification_inbox_mark_all_read
       tags:
-      - notifications
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4666,7 +5212,7 @@ paths:
     post:
       operationId: notification_inbox_mark_multiple_read
       tags:
-      - notifications
+      - api
       requestBody:
         content:
           application/json:
@@ -4692,7 +5238,7 @@ paths:
     get:
       operationId: notification_inbox_unread_count
       tags:
-      - notifications
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4704,11 +5250,11 @@ paths:
           description: ''
   /api/v1/onboarding/:
     get:
-      operationId: onboarding_retrieve
+      operationId: api_v1_onboarding_retrieve
       description: Return the current onboarding status and saved preferences.
       summary: Get onboarding status
       tags:
-      - onboarding
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4716,15 +5262,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OnboardingStatusResponse'
+                $ref: '#/components/schemas/Onboarding'
           description: ''
   /api/v1/onboarding/clubs/:
     post:
-      operationId: onboarding_clubs_create
+      operationId: api_v1_onboarding_clubs_create
       description: Select the user's favourite clubs during onboarding.
       summary: Select favourite clubs
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -4744,15 +5290,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ClubSelectionResponse'
+                $ref: '#/components/schemas/ClubSelection'
           description: ''
   /api/v1/onboarding/competitions/:
     post:
-      operationId: onboarding_competitions_create
+      operationId: api_v1_onboarding_competitions_create
       description: Select the user's favourite competitions during onboarding.
       summary: Select favourite competitions
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -4772,15 +5318,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CompetitionSelectionResponse'
+                $ref: '#/components/schemas/CompetitionSelection'
           description: ''
   /api/v1/onboarding/complete/:
     post:
-      operationId: onboarding_complete_create
+      operationId: api_v1_onboarding_complete_create
       description: Complete the onboarding flow and return the dashboard configuration.
       summary: Complete onboarding
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -4799,15 +5345,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardEnvelopeResponse'
+                $ref: '#/components/schemas/DashboardConfiguration'
           description: ''
   /api/v1/onboarding/country/:
     post:
-      operationId: onboarding_country_create
+      operationId: api_v1_onboarding_country_create
       description: Select the user's preferred country during onboarding.
       summary: Select preferred country
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -4827,15 +5373,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CountrySelectionResponse'
+                $ref: '#/components/schemas/CountrySelection'
           description: ''
   /api/v1/onboarding/dashboard/:
     get:
-      operationId: onboarding_dashboard_retrieve
+      operationId: api_v1_onboarding_dashboard_retrieve
       description: Return the personalized dashboard configuration.
       summary: Get dashboard configuration
       tags:
-      - onboarding
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -4843,15 +5389,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardEnvelopeResponse'
+                $ref: '#/components/schemas/DashboardConfiguration'
           description: ''
   /api/v1/onboarding/skip/:
     post:
-      operationId: onboarding_skip_create
+      operationId: api_v1_onboarding_skip_create
       description: Skip an onboarding step.
       summary: Skip onboarding step
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -4871,15 +5417,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SkipStepResponse'
+                $ref: '#/components/schemas/SkipStep'
           description: ''
   /api/v1/onboarding/sports/:
     post:
-      operationId: onboarding_sports_create
+      operationId: api_v1_onboarding_sports_create
       description: Select the user's favourite sports during onboarding.
       summary: Select favourite sports
       tags:
-      - onboarding
+      - api
       requestBody:
         content:
           application/json:
@@ -4899,11 +5445,49 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SportSelectionResponse'
+                $ref: '#/components/schemas/SportSelection'
+          description: ''
+  /api/v1/orders/:
+    get:
+      operationId: api_v1_orders_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StoreOrder'
+          description: ''
+  /api/v1/orders/{id}/:
+    get:
+      operationId: api_v1_orders_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this store order.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoreOrder'
           description: ''
   /api/v1/participants/:
     get:
-      operationId: participants_list
+      operationId: api_v1_participants_list
       parameters:
       - in: query
         name: kind
@@ -4959,7 +5543,7 @@ paths:
           description: ''
   /api/v1/players/:
     get:
-      operationId: players_list
+      operationId: api_v1_players_list
       description: Public player list.
       parameters:
       - in: query
@@ -5017,7 +5601,7 @@ paths:
           description: ''
   /api/v1/players/{player_id}/:
     get:
-      operationId: players_retrieve
+      operationId: api_v1_players_retrieve
       description: Public player profile detail.
       parameters:
       - in: path
@@ -5040,10 +5624,10 @@ paths:
           description: ''
   /api/v1/preferences/clubs/:
     get:
-      operationId: preferences_clubs_list
+      operationId: api_v1_preferences_clubs_list
       description: List active clubs, optionally filtered by competition.
       tags:
-      - preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5057,10 +5641,10 @@ paths:
           description: ''
   /api/v1/preferences/competitions/:
     get:
-      operationId: preferences_competitions_list
+      operationId: api_v1_preferences_competitions_list
       description: List active competitions, optionally filtered by sport.
       tags:
-      - preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5074,10 +5658,10 @@ paths:
           description: ''
   /api/v1/preferences/countries/:
     get:
-      operationId: preferences_countries_list
+      operationId: api_v1_preferences_countries_list
       description: List all active countries for the preference catalogue.
       tags:
-      - preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5091,10 +5675,10 @@ paths:
           description: ''
   /api/v1/preferences/sports/:
     get:
-      operationId: preferences_sports_list
+      operationId: api_v1_preferences_sports_list
       description: List all active sports for the preference catalogue.
       tags:
-      - preferences
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5108,11 +5692,11 @@ paths:
           description: ''
   /api/v1/profile/:
     get:
-      operationId: profile_retrieve
+      operationId: api_v1_profile_retrieve
       description: Retrieve the authenticated user's profile information.
       summary: Get profile
       tags:
-      - profile
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5123,13 +5707,13 @@ paths:
                 $ref: '#/components/schemas/Profile'
           description: ''
     patch:
-      operationId: profile_partial_update
+      operationId: api_v1_profile_partial_update
       description: 'Update the authenticated user''s profile. Allowed fields: first_name,
         last_name, display_name, date_of_birth, gender, country, city, biography,
         favourite_club, preferred_language, timezone, communication_preferences, notification_preferences.'
       summary: Update profile
       tags:
-      - profile
+      - api
       requestBody:
         content:
           application/json:
@@ -5152,12 +5736,12 @@ paths:
           description: ''
   /api/v1/profile/avatar/:
     get:
-      operationId: profile_avatar_retrieve
+      operationId: api_v1_profile_avatar_retrieve
       description: Retrieve the authenticated user's avatar metadata and URL. Returns
         the avatar URL (or default avatar URL if none set).
       summary: Get avatar info
       tags:
-      - profile
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5168,13 +5752,13 @@ paths:
                 $ref: '#/components/schemas/Avatar'
           description: ''
     post:
-      operationId: profile_avatar_create
+      operationId: api_v1_profile_avatar_create
       description: 'Upload or replace the authenticated user''s profile picture. Accepts
         multipart/form-data with an ''avatar'' image file. Supported formats: JPG,
         PNG, WebP. Max size: 5MB.'
       summary: Upload or replace avatar
       tags:
-      - profile
+      - api
       requestBody:
         content:
           application/json:
@@ -5194,12 +5778,12 @@ paths:
         '400':
           description: Invalid image or validation error
     delete:
-      operationId: profile_avatar_destroy
+      operationId: api_v1_profile_avatar_destroy
       description: Delete the authenticated user's profile picture. After deletion,
         the platform default avatar will be served.
       summary: Delete avatar
       tags:
-      - profile
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5207,7 +5791,7 @@ paths:
           description: Avatar deleted successfully
   /api/v1/profile/following/:
     get:
-      operationId: profile_following_list
+      operationId: api_v1_profile_following_list
       description: List clubs the authenticated user follows.
       parameters:
       - name: page
@@ -5233,9 +5817,154 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedFollowList'
           description: ''
+  /api/v1/profiles/:
+    get:
+      operationId: api_v1_profiles_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+    post:
+      operationId: api_v1_profiles_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+  /api/v1/profiles/{id}/:
+    get:
+      operationId: api_v1_profiles_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club profile version.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+    put:
+      operationId: api_v1_profiles_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club profile version.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+    patch:
+      operationId: api_v1_profiles_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club profile version.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClubProfileVersion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClubProfileVersion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClubProfileVersion'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+    delete:
+      operationId: api_v1_profiles_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club profile version.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/results/:
     get:
-      operationId: results_list
+      operationId: api_v1_results_list
       description: Public results list (completed fixtures).
       parameters:
       - in: query
@@ -5326,7 +6055,7 @@ paths:
           description: ''
   /api/v1/search/:
     get:
-      operationId: search_retrieve
+      operationId: api_v1_search_retrieve
       description: Enterprise search across clubs, players, competitions, fixtures.
       parameters:
       - in: query
@@ -5401,7 +6130,7 @@ paths:
           description: ''
   /api/v1/search/autocomplete/:
     get:
-      operationId: search_autocomplete_list
+      operationId: api_v1_search_autocomplete_list
       description: Search autocomplete for clubs, players, competitions, venues.
       parameters:
       - in: query
@@ -5450,7 +6179,7 @@ paths:
           description: ''
   /api/v1/search/suggestions/:
     get:
-      operationId: search_suggestions_list
+      operationId: api_v1_search_suggestions_list
       description: Database-driven search suggestions.
       tags:
       - Discovery
@@ -5468,7 +6197,7 @@ paths:
           description: ''
   /api/v1/sporting-events/:
     get:
-      operationId: sporting_events_list
+      operationId: api_v1_sporting_events_list
       parameters:
       - in: query
         name: competition
@@ -5557,7 +6286,7 @@ paths:
           description: ''
   /api/v1/sports/:
     get:
-      operationId: sports_list
+      operationId: api_v1_sports_list
       parameters:
       - name: page
         required: false
@@ -5583,9 +6312,154 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedSportPublicList'
           description: ''
+  /api/v1/staff-invitations/:
+    get:
+      operationId: api_v1_staff_invitations_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+    post:
+      operationId: api_v1_staff_invitations_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+  /api/v1/staff-invitations/{id}/:
+    get:
+      operationId: api_v1_staff_invitations_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this staff invitation.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+    put:
+      operationId: api_v1_staff_invitations_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this staff invitation.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+    patch:
+      operationId: api_v1_staff_invitations_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this staff invitation.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffInvitation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffInvitation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffInvitation'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+    delete:
+      operationId: api_v1_staff_invitations_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this staff invitation.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/system/health/:
     get:
-      operationId: system_health_retrieve
+      operationId: api_v1_system_health_retrieve
       summary: Backend health check
       tags:
       - System
@@ -5599,9 +6473,154 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthCheck'
           description: ''
+  /api/v1/ticket-products/:
+    get:
+      operationId: api_v1_ticket_products_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TicketProduct'
+          description: ''
+    post:
+      operationId: api_v1_ticket_products_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketProduct'
+          description: ''
+  /api/v1/ticket-products/{id}/:
+    get:
+      operationId: api_v1_ticket_products_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this ticket product.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketProduct'
+          description: ''
+    put:
+      operationId: api_v1_ticket_products_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this ticket product.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketProduct'
+          description: ''
+    patch:
+      operationId: api_v1_ticket_products_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this ticket product.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTicketProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTicketProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTicketProduct'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketProduct'
+          description: ''
+    delete:
+      operationId: api_v1_ticket_products_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this ticket product.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/wallets/:
     get:
-      operationId: wallets_list
+      operationId: api_v1_wallets_list
       parameters:
       - name: page
         required: false
@@ -5630,7 +6649,7 @@ paths:
           description: Authentication credentials are required.
   /api/v1/wallets/{currency}/:
     get:
-      operationId: wallets_retrieve
+      operationId: api_v1_wallets_retrieve
       parameters:
       - in: path
         name: currency
@@ -5656,7 +6675,7 @@ paths:
           description: Wallet not found.
   /api/v1/wallets/{currency}/ledger/:
     get:
-      operationId: wallets_ledger_list
+      operationId: api_v1_wallets_ledger_list
       parameters:
       - in: query
         name: created_from
@@ -5723,7 +6742,7 @@ paths:
           description: Wallet not found.
   /api/v1/wallets/deposits/:
     post:
-      operationId: wallets_deposits_create
+      operationId: api_v1_wallets_deposits_create
       tags:
       - Wallets
       requestBody:
@@ -5753,7 +6772,7 @@ paths:
           description: Authentication credentials are required.
   /api/v1/wallets/deposits/{intent_id}/:
     get:
-      operationId: wallets_deposits_retrieve
+      operationId: api_v1_wallets_deposits_retrieve
       parameters:
       - in: path
         name: intent_id
@@ -5762,7 +6781,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - wallets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5774,7 +6793,7 @@ paths:
           description: ''
   /api/v1/wallets/deposits/callback/{provider_code}/:
     post:
-      operationId: wallets_deposits_callback_create
+      operationId: api_v1_wallets_deposits_callback_create
       parameters:
       - in: path
         name: provider_code
@@ -5794,7 +6813,7 @@ paths:
           description: Provider not found.
   /api/v1/wallets/transactions/:
     get:
-      operationId: wallets_transactions_list
+      operationId: api_v1_wallets_transactions_list
       parameters:
       - name: page
         required: false
@@ -5809,7 +6828,7 @@ paths:
         schema:
           type: integer
       tags:
-      - wallets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5821,7 +6840,7 @@ paths:
           description: ''
   /api/v1/wallets/transactions/{tx_id}/:
     get:
-      operationId: wallets_transactions_retrieve
+      operationId: api_v1_wallets_transactions_retrieve
       parameters:
       - in: path
         name: tx_id
@@ -5830,7 +6849,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - wallets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5842,7 +6861,7 @@ paths:
           description: ''
   /api/v1/wallets/transactions/{tx_id}/receipt/:
     get:
-      operationId: wallets_transactions_receipt_retrieve
+      operationId: api_v1_wallets_transactions_receipt_retrieve
       parameters:
       - in: path
         name: tx_id
@@ -5861,7 +6880,7 @@ paths:
           description: Receipt not found.
   /api/v1/wallets/withdrawals/:
     post:
-      operationId: wallets_withdrawals_create
+      operationId: api_v1_wallets_withdrawals_create
       tags:
       - Wallets
       requestBody:
@@ -5891,7 +6910,7 @@ paths:
           description: Authentication credentials are required.
   /api/v1/wallets/withdrawals/{request_id}/:
     get:
-      operationId: wallets_withdrawals_retrieve
+      operationId: api_v1_wallets_withdrawals_retrieve
       parameters:
       - in: path
         name: request_id
@@ -5900,7 +6919,7 @@ paths:
           format: uuid
         required: true
       tags:
-      - wallets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5912,14 +6931,14 @@ paths:
           description: ''
   /api/v1/widgets/:
     get:
-      operationId: widgets_retrieve
+      operationId: api_v1_widgets_retrieve
       description: |-
         Get enabled widgets for the current user.
 
         Returns:
             List of enabled widgets
       tags:
-      - widgets
+      - api
       security:
       - jwtAuth: []
       responses:
@@ -5929,6 +6948,151 @@ paths:
               schema:
                 $ref: '#/components/schemas/DashboardWidget'
           description: ''
+  /api/v1/workspaces/:
+    get:
+      operationId: api_v1_workspaces_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+    post:
+      operationId: api_v1_workspaces_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+  /api/v1/workspaces/{id}/:
+    get:
+      operationId: api_v1_workspaces_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club workspace.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+    put:
+      operationId: api_v1_workspaces_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club workspace.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+    patch:
+      operationId: api_v1_workspaces_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club workspace.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClubWorkspace'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClubWorkspace'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClubWorkspace'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+    delete:
+      operationId: api_v1_workspaces_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this club workspace.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
 components:
   schemas:
     Adjustment:
@@ -6289,76 +7453,6 @@ components:
       - sell_allowed
       - sell_reason_codes
       - utilization
-    AuthTokenData:
-      type: object
-      properties:
-        access:
-          type: string
-        refresh:
-          type: string
-        user:
-          $ref: '#/components/schemas/AuthUserContext'
-      required:
-      - access
-      - refresh
-      - user
-    AuthTokenResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          $ref: '#/components/schemas/AuthTokenData'
-      required:
-      - data
-      - message
-      - success
-    AuthUserContext:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        username:
-          type: string
-        email:
-          type: string
-          format: email
-        first_name:
-          type: string
-        last_name:
-          type: string
-        phone_number:
-          type: string
-          nullable: true
-        is_verified:
-          type: boolean
-        roles:
-          type: array
-          items:
-            type: string
-        permissions:
-          type: array
-          items:
-            type: string
-        dashboard_access:
-          $ref: '#/components/schemas/DashboardAccess'
-        onboarding:
-          $ref: '#/components/schemas/OnboardingAuthContext'
-      required:
-      - dashboard_access
-      - email
-      - first_name
-      - id
-      - is_verified
-      - last_name
-      - onboarding
-      - permissions
-      - phone_number
-      - roles
-      - username
     AutocompleteResult:
       type: object
       description: A single autocomplete result.
@@ -6387,8 +7481,8 @@ components:
         avatar:
           type: string
           format: uri
-          nullable: true
           readOnly: true
+          nullable: true
         avatar_url:
           type: string
           nullable: true
@@ -6403,6 +7497,18 @@ components:
       - avatar_updated_at
       - avatar_url
       - id
+    BillingPeriodEnum:
+      enum:
+      - MONTHLY
+      - QUARTERLY
+      - ANNUAL
+      - ONE_TIME
+      type: string
+      description: |-
+        * `MONTHLY` - Monthly
+        * `QUARTERLY` - Quarterly
+        * `ANNUAL` - Annual
+        * `ONE_TIME` - One time
     CancellationReasonEnum:
       enum:
       - MANUAL
@@ -6486,6 +7592,78 @@ components:
       - is_active
       - name
       - slug
+    ClubAuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        user:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          $ref: '#/components/schemas/ClubAuditLogActionEnum'
+        entity_type:
+          type: string
+          maxLength: 50
+        entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+        metadata: {}
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - club
+      - created_at
+      - id
+    ClubAuditLogActionEnum:
+      enum:
+      - WORKSPACE_SWITCHED
+      - CLUB_PROFILE_UPDATED
+      - BRANDING_CHANGED
+      - MEDIA_UPLOADED
+      - NEWS_PUBLISHED
+      - MEMBERSHIP_CREATED
+      - TICKET_CREATED
+      - PRODUCT_CREATED
+      - INVENTORY_UPDATED
+      - STAFF_INVITED
+      - STAFF_DISABLED
+      - ROLE_GRANTED
+      - ROLE_REVOKED
+      - PERMISSION_CHANGED
+      - ANALYTICS_VIEWED
+      type: string
+      description: |-
+        * `WORKSPACE_SWITCHED` - Workspace switched
+        * `CLUB_PROFILE_UPDATED` - Club profile updated
+        * `BRANDING_CHANGED` - Branding changed
+        * `MEDIA_UPLOADED` - Media uploaded
+        * `NEWS_PUBLISHED` - News published
+        * `MEMBERSHIP_CREATED` - Membership created
+        * `TICKET_CREATED` - Ticket created
+        * `PRODUCT_CREATED` - Product created
+        * `INVENTORY_UPDATED` - Inventory updated
+        * `STAFF_INVITED` - Staff invited
+        * `STAFF_DISABLED` - Staff disabled
+        * `ROLE_GRANTED` - Role granted
+        * `ROLE_REVOKED` - Role revoked
+        * `PERMISSION_CHANGED` - Permission changed
+        * `ANALYTICS_VIEWED` - Analytics viewed
     ClubCatalogue:
       type: object
       description: Serializer for the club preference catalogue.
@@ -6540,6 +7718,143 @@ components:
       - id
       - name
       - slug
+    ClubMedia:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        media_type:
+          $ref: '#/components/schemas/MediaTypeEnum'
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        file:
+          type: string
+          format: uri
+          nullable: true
+        url:
+          type: string
+          format: uri
+          maxLength: 1024
+        thumbnail:
+          type: string
+          format: uri
+          nullable: true
+        file_size:
+          type: integer
+          readOnly: true
+          nullable: true
+        mime_type:
+          type: string
+          maxLength: 100
+        status:
+          $ref: '#/components/schemas/MarketEventStatusEnum'
+        is_featured:
+          type: boolean
+        display_order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        uploaded_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+      required:
+      - club
+      - file_size
+      - id
+      - media_type
+      - published_at
+      - published_by
+      - uploaded_by
+    ClubNews:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 300
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+        body:
+          type: string
+        category:
+          type: string
+          format: uuid
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        cover_image:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          $ref: '#/components/schemas/Status7b4Enum'
+        is_featured:
+          type: boolean
+        is_verified:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        source_name:
+          type: string
+          maxLength: 120
+        source_reference:
+          type: string
+          maxLength: 255
+      required:
+      - body
+      - category
+      - club
+      - created_by
+      - id
+      - published_at
+      - published_by
+      - slug
+      - title
     ClubProfile:
       type: object
       description: Extended club profile data.
@@ -6566,6 +7881,102 @@ components:
           type: string
           format: uuid
           nullable: true
+    ClubProfileVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/Status7b4Enum'
+        display_name:
+          type: string
+          maxLength: 200
+        tagline:
+          type: string
+          maxLength: 300
+        description:
+          type: string
+        founded:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        website:
+          type: string
+          format: uri
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        phone:
+          type: string
+          maxLength: 20
+        address:
+          type: string
+        city:
+          type: string
+          maxLength: 100
+        country:
+          type: string
+          format: uuid
+          nullable: true
+        logo:
+          type: string
+          format: uri
+          nullable: true
+        cover_image:
+          type: string
+          format: uri
+          nullable: true
+        stadium:
+          type: string
+          maxLength: 255
+        capacity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        coach:
+          type: string
+          maxLength: 180
+        league:
+          type: string
+          format: uuid
+          nullable: true
+        social_links: {}
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+      required:
+      - club
+      - created_by
+      - id
+      - published_at
+      - published_by
+      - version
     ClubSelection:
       type: object
       description: |-
@@ -6581,34 +7992,42 @@ components:
             format: uuid
       required:
       - club_ids
-    ClubSelectionData:
+    ClubWorkspace:
       type: object
       properties:
-        clubs:
-          type: array
-          items:
-            $ref: '#/components/schemas/ClubCatalogue'
-        current_step:
+        id:
           type: string
-        completed:
-          type: boolean
-      required:
-      - clubs
-      - completed
-      - current_step
-    ClubSelectionResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
+          format: uuid
+          readOnly: true
+        user:
           type: string
-        data:
-          $ref: '#/components/schemas/ClubSelectionData'
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/RoleFf1Enum'
+        permissions: {}
+        is_active:
+          type: boolean
+        invited_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        accepted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
       required:
-      - data
-      - message
-      - success
+      - accepted_at
+      - club
+      - id
+      - invited_at
+      - role
+      - user
     CommunicationConsent:
       type: object
       description: |-
@@ -6685,14 +8104,12 @@ components:
           type: string
           maxLength: 180
         slug:
-          oneOf:
-          - type: string
-            maxLength: 200
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
         country_code:
           type: string
+          default: UG
           maxLength: 2
         sport:
           type: string
@@ -6701,6 +8118,7 @@ components:
       required:
       - id
       - name
+      - slug
       - sport
     CompetitionCatalogue:
       type: object
@@ -6746,12 +8164,9 @@ components:
           type: string
           maxLength: 180
         slug:
-          oneOf:
-          - type: string
-            maxLength: 200
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
         country_code:
           type: string
           default: UG
@@ -6780,34 +8195,6 @@ components:
             format: uuid
       required:
       - competition_ids
-    CompetitionSelectionData:
-      type: object
-      properties:
-        competitions:
-          type: array
-          items:
-            $ref: '#/components/schemas/CompetitionCatalogue'
-        current_step:
-          type: string
-        completed:
-          type: boolean
-      required:
-      - competitions
-      - completed
-      - current_step
-    CompetitionSelectionResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          $ref: '#/components/schemas/CompetitionSelectionData'
-      required:
-      - data
-      - message
-      - success
     ComplianceDecision:
       type: object
       properties:
@@ -7001,32 +8388,6 @@ components:
           format: uuid
       required:
       - country_id
-    CountrySelectionData:
-      type: object
-      properties:
-        country:
-          $ref: '#/components/schemas/CountryCatalogue'
-        current_step:
-          type: string
-        completed:
-          type: boolean
-      required:
-      - completed
-      - country
-      - current_step
-    CountrySelectionResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          $ref: '#/components/schemas/CountrySelectionData'
-      required:
-      - data
-      - message
-      - success
     CurrentStepEnum:
       enum:
       - COUNTRY
@@ -7074,22 +8435,6 @@ components:
       - recommendations
       - user_summary
       - widgets
-    DashboardAccess:
-      type: object
-      properties:
-        entitlements:
-          type: array
-          items:
-            $ref: '#/components/schemas/DashboardEntitlement'
-        default_entitlement:
-          type: string
-          nullable: true
-        default_route:
-          type: string
-      required:
-      - default_entitlement
-      - default_route
-      - entitlements
     DashboardAnalyticsCreate:
       type: object
       description: Serializer for creating analytics events.
@@ -7140,42 +8485,6 @@ components:
       - favourite_sports
       - onboarding_completed
       - preferred_country
-    DashboardEntitlement:
-      type: object
-      properties:
-        role:
-          type: string
-        dashboard_url:
-          type: string
-      required:
-      - dashboard_url
-      - role
-    DashboardEnvelopeData:
-      type: object
-      properties:
-        configuration:
-          $ref: '#/components/schemas/DashboardConfiguration'
-        current_step:
-          type: string
-        completed:
-          type: boolean
-      required:
-      - completed
-      - configuration
-      - current_step
-    DashboardEnvelopeResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          $ref: '#/components/schemas/DashboardEnvelopeData'
-      required:
-      - data
-      - message
-      - success
     DashboardModule:
       type: object
       description: Serializer for dashboard modules.
@@ -7408,7 +8717,7 @@ components:
       type: object
       properties:
         role:
-          $ref: '#/components/schemas/RoleEnum'
+          $ref: '#/components/schemas/EventParticipantPublicRoleEnum'
         position:
           type: integer
           maximum: 9223372036854775807
@@ -7421,6 +8730,20 @@ components:
       required:
       - participant
       - position
+    EventParticipantPublicRoleEnum:
+      enum:
+      - HOME
+      - AWAY
+      - COMPETITOR
+      - SUBJECT
+      - OTHER
+      type: string
+      description: |-
+        * `HOME` - Home
+        * `AWAY` - Away
+        * `COMPETITOR` - Competitor
+        * `SUBJECT` - Subject
+        * `OTHER` - Other
     EvidenceTypeEnum:
       enum:
       - OFFICIAL_RESULT
@@ -7576,6 +8899,7 @@ components:
       - created_by
       - effective_at
       - id
+      - market
       - retired_at
       - retired_by
       - status
@@ -8015,14 +9339,14 @@ components:
     Login:
       type: object
       properties:
-        identifier:
-          type: string
         email:
           type: string
+          format: email
         password:
           type: string
           writeOnly: true
       required:
+      - email
       - password
     Logout:
       type: object
@@ -8312,12 +9636,9 @@ components:
           type: string
           maxLength: 120
         slug:
-          oneOf:
-          - type: string
-            maxLength: 140
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 140
+          pattern: ^[-a-zA-Z0-9_]+$
         description:
           type: string
         display_order:
@@ -10107,12 +11428,9 @@ components:
           type: string
           maxLength: 80
         slug:
-          oneOf:
-          - type: string
-            maxLength: 180
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 180
+          pattern: ^[-a-zA-Z0-9_]+$
         scope_type:
           $ref: '#/components/schemas/MarketScopeEnum'
       required:
@@ -10481,36 +11799,197 @@ components:
       required:
       - id
       - name
-    MeData:
+    MediaTypeEnum:
+      enum:
+      - IMAGE
+      - VIDEO
+      - DOCUMENT
+      type: string
+      description: |-
+        * `IMAGE` - Image
+        * `VIDEO` - Video
+        * `DOCUMENT` - Document
+    MembershipPlan:
       type: object
       properties:
-        user:
-          $ref: '#/components/schemas/AuthUserContext'
-      required:
-      - user
-    MeResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
+        id:
           type: string
-        data:
-          $ref: '#/components/schemas/MeData'
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        billing_period:
+          $ref: '#/components/schemas/BillingPeriodEnum'
+        duration_days:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        status:
+          $ref: '#/components/schemas/MembershipPlanStatusEnum'
+        is_featured:
+          type: boolean
+        max_members:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        benefits: {}
+        metadata: {}
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
       required:
-      - data
-      - message
-      - success
-    MessageResponse:
+      - club
+      - created_by
+      - id
+      - name
+      - price
+      - published_at
+      - published_by
+      - slug
+    MembershipPlanStatusEnum:
+      enum:
+      - DRAFT
+      - ACTIVE
+      - PAUSED
+      - ARCHIVED
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `ACTIVE` - Active
+        * `PAUSED` - Paused
+        * `ARCHIVED` - Archived
+    MerchandiseProduct:
       type: object
       properties:
-        success:
-          type: boolean
-        message:
+        id:
           type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        sku:
+          type: string
+          maxLength: 100
+        stock:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        reserved_stock:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        available_stock:
+          type: integer
+          readOnly: true
+        is_low_stock:
+          type: boolean
+          readOnly: true
+        low_stock_threshold:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        images: {}
+        metadata: {}
+        status:
+          $ref: '#/components/schemas/MerchandiseProductStatusEnum'
+        is_featured:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
       required:
-      - message
-      - success
+      - available_stock
+      - club
+      - created_by
+      - id
+      - is_low_stock
+      - name
+      - price
+      - published_at
+      - published_by
+      - slug
+    MerchandiseProductStatusEnum:
+      enum:
+      - DRAFT
+      - ACTIVE
+      - PAUSED
+      - ARCHIVED
+      - OUT_OF_STOCK
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `ACTIVE` - Active
+        * `PAUSED` - Paused
+        * `ARCHIVED` - Archived
+        * `OUT_OF_STOCK` - Out of stock
     NavigationMenu:
       type: object
       description: Serializer for navigation menu items.
@@ -10560,61 +12039,6 @@ components:
       - parent
       - permission_required
       - route
-    News:
-      type: object
-      description: Public news serializer (published & verified only).
-      properties:
-        id:
-          type: string
-          format: uuid
-          readOnly: true
-        title:
-          type: string
-          maxLength: 300
-        slug:
-          oneOf:
-          - type: string
-            maxLength: 320
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
-        summary:
-          type: string
-        body:
-          type: string
-        category:
-          type: string
-          format: uuid
-          readOnly: true
-        sport:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        competition:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        club:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        is_featured:
-          type: boolean
-        published_at:
-          type: string
-          format: date-time
-          nullable: true
-      required:
-      - body
-      - category
-      - club
-      - competition
-      - id
-      - sport
-      - title
     Notification:
       type: object
       properties:
@@ -10993,30 +12417,6 @@ components:
       - preferred_country
       - skipped_steps
       - updated_at
-    OnboardingAuthContext:
-      type: object
-      properties:
-        completed:
-          type: boolean
-        current_step:
-          type: string
-          nullable: true
-      required:
-      - completed
-      - current_step
-    OnboardingStatusResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          $ref: '#/components/schemas/Onboarding'
-      required:
-      - data
-      - message
-      - success
     OrderBookLevel:
       type: object
       properties:
@@ -11680,29 +13080,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketWatchlistEntry'
-    PaginatedNewsList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/News'
     PaginatedNotificationList:
       type: object
       required:
@@ -12124,12 +13501,9 @@ components:
           type: string
           maxLength: 80
         slug:
-          oneOf:
-          - type: string
-            maxLength: 200
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
         kind:
           allOf:
           - $ref: '#/components/schemas/KindEnum'
@@ -12275,6 +13649,243 @@ components:
         reason:
           type: string
           writeOnly: true
+    PatchedClubMedia:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        media_type:
+          $ref: '#/components/schemas/MediaTypeEnum'
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        file:
+          type: string
+          format: uri
+          nullable: true
+        url:
+          type: string
+          format: uri
+          maxLength: 1024
+        thumbnail:
+          type: string
+          format: uri
+          nullable: true
+        file_size:
+          type: integer
+          readOnly: true
+          nullable: true
+        mime_type:
+          type: string
+          maxLength: 100
+        status:
+          $ref: '#/components/schemas/MarketEventStatusEnum'
+        is_featured:
+          type: boolean
+        display_order:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        uploaded_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+    PatchedClubNews:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 300
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+        body:
+          type: string
+        category:
+          type: string
+          format: uuid
+        sport:
+          type: string
+          format: uuid
+          nullable: true
+        cover_image:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          $ref: '#/components/schemas/Status7b4Enum'
+        is_featured:
+          type: boolean
+        is_verified:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        source_name:
+          type: string
+          maxLength: 120
+        source_reference:
+          type: string
+          maxLength: 255
+    PatchedClubProfileVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/Status7b4Enum'
+        display_name:
+          type: string
+          maxLength: 200
+        tagline:
+          type: string
+          maxLength: 300
+        description:
+          type: string
+        founded:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        website:
+          type: string
+          format: uri
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        phone:
+          type: string
+          maxLength: 20
+        address:
+          type: string
+        city:
+          type: string
+          maxLength: 100
+        country:
+          type: string
+          format: uuid
+          nullable: true
+        logo:
+          type: string
+          format: uri
+          nullable: true
+        cover_image:
+          type: string
+          format: uri
+          nullable: true
+        stadium:
+          type: string
+          maxLength: 255
+        capacity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        coach:
+          type: string
+          maxLength: 180
+        league:
+          type: string
+          format: uuid
+          nullable: true
+        social_links: {}
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+    PatchedClubWorkspace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/RoleFf1Enum'
+        permissions: {}
+        is_active:
+          type: boolean
+        invited_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        accepted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
     PatchedComplianceUpdate:
       type: object
       properties:
@@ -12458,6 +14069,141 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatchedMembershipPlan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        billing_period:
+          $ref: '#/components/schemas/BillingPeriodEnum'
+        duration_days:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        status:
+          $ref: '#/components/schemas/MembershipPlanStatusEnum'
+        is_featured:
+          type: boolean
+        max_members:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        benefits: {}
+        metadata: {}
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+    PatchedMerchandiseProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        category:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        sku:
+          type: string
+          maxLength: 100
+        stock:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        reserved_stock:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        available_stock:
+          type: integer
+          readOnly: true
+        is_low_stock:
+          type: boolean
+          readOnly: true
+        low_stock_threshold:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        images: {}
+        metadata: {}
+        status:
+          $ref: '#/components/schemas/MerchandiseProductStatusEnum'
+        is_featured:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
     PatchedParticipantLimitsUpdate:
       type: object
       properties:
@@ -12550,6 +14296,120 @@ components:
           nullable: true
         communication_preferences: {}
         notification_preferences: {}
+    PatchedStaffInvitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        role:
+          $ref: '#/components/schemas/RoleFf1Enum'
+        permissions: {}
+        token:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StaffInvitationStatusEnum'
+          readOnly: true
+          default: PENDING
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+        invited_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        accepted_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        accepted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+    PatchedTicketProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        event:
+          type: string
+          format: uuid
+          nullable: true
+        venue:
+          type: string
+          maxLength: 255
+        sales_start:
+          type: string
+          format: date-time
+          nullable: true
+        sales_end:
+          type: string
+          format: date-time
+          nullable: true
+        capacity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        sold:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/TicketProductStatusEnum'
+        is_refundable:
+          type: boolean
+        metadata: {}
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
     PatchedUserNotificationPreference:
       type: object
       description: Serializer for user notification preferences.
@@ -12591,12 +14451,9 @@ components:
           type: string
           maxLength: 80
         slug:
-          oneOf:
-          - type: string
-            maxLength: 200
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 200
+          pattern: ^[-a-zA-Z0-9_]+$
         sport:
           type: string
           format: uuid
@@ -12834,8 +14691,8 @@ components:
         avatar:
           type: string
           format: uri
-          nullable: true
           readOnly: true
+          nullable: true
         avatar_url:
           type: string
           nullable: true
@@ -13486,20 +15343,14 @@ components:
       required:
       - id
       - participant_id
-    RoleEnum:
+    RoleFf1Enum:
       enum:
-      - HOME
-      - AWAY
-      - COMPETITOR
-      - SUBJECT
-      - OTHER
+      - ADMIN
+      - STAFF
       type: string
       description: |-
-        * `HOME` - Home
-        * `AWAY` - Away
-        * `COMPETITOR` - Competitor
-        * `SUBJECT` - Subject
-        * `OTHER` - Other
+        * `ADMIN` - Club Admin
+        * `STAFF` - Club Staff
     SafeKYCEvent:
       type: object
       properties:
@@ -13656,34 +15507,6 @@ components:
           $ref: '#/components/schemas/StepEnum'
       required:
       - step
-    SkipStepData:
-      type: object
-      properties:
-        current_step:
-          type: string
-        completed:
-          type: boolean
-        skipped_steps:
-          type: array
-          items:
-            type: string
-      required:
-      - completed
-      - current_step
-      - skipped_steps
-    SkipStepResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          $ref: '#/components/schemas/SkipStepData'
-      required:
-      - data
-      - message
-      - success
     SportCatalogue:
       type: object
       description: Serializer for the sport preference catalogue.
@@ -13721,12 +15544,9 @@ components:
           type: string
           maxLength: 30
         slug:
-          oneOf:
-          - type: string
-            maxLength: 120
-            pattern: ^[-a-zA-Z0-9_]+$
-          - type: string
-            maxLength: 0
+          type: string
+          maxLength: 120
+          pattern: ^[-a-zA-Z0-9_]+$
       required:
       - code
       - id
@@ -13742,34 +15562,6 @@ components:
             format: uuid
       required:
       - sport_ids
-    SportSelectionData:
-      type: object
-      properties:
-        sports:
-          type: array
-          items:
-            $ref: '#/components/schemas/SportCatalogue'
-        current_step:
-          type: string
-        completed:
-          type: boolean
-      required:
-      - completed
-      - current_step
-      - sports
-    SportSelectionResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          $ref: '#/components/schemas/SportSelectionData'
-      required:
-      - data
-      - message
-      - success
     SportingEventPublic:
       type: object
       properties:
@@ -13870,6 +15662,85 @@ components:
         * `BOUT` - Bout
         * `SERIES` - Series
         * `OTHER` - Other
+    StaffInvitation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        role:
+          $ref: '#/components/schemas/RoleFf1Enum'
+        permissions: {}
+        token:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StaffInvitationStatusEnum'
+          readOnly: true
+          default: PENDING
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+        invited_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        accepted_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        accepted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - accepted_at
+      - accepted_by
+      - club
+      - email
+      - expires_at
+      - id
+      - invited_by
+      - role
+      - status
+      - token
+    StaffInvitationStatusEnum:
+      enum:
+      - PENDING
+      - ACCEPTED
+      - EXPIRED
+      - CANCELLED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `ACCEPTED` - Accepted
+        * `EXPIRED` - Expired
+        * `CANCELLED` - Cancelled
+    Status7b4Enum:
+      enum:
+      - DRAFT
+      - PENDING_APPROVAL
+      - PUBLISHED
+      - ARCHIVED
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `PENDING_APPROVAL` - Pending approval
+        * `PUBLISHED` - Published
+        * `ARCHIVED` - Archived
     StepEnum:
       enum:
       - COUNTRY
@@ -13882,6 +15753,64 @@ components:
         * `SPORTS` - SPORTS
         * `COMPETITIONS` - COMPETITIONS
         * `CLUBS` - CLUBS
+    StoreOrder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+        club:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/StoreOrderStatusEnum'
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        currency:
+          type: string
+          maxLength: 3
+        shipping_address: {}
+        metadata: {}
+        fulfilled_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - cancelled_at
+      - club
+      - fulfilled_at
+      - id
+      - total_amount
+      - user
+    StoreOrderStatusEnum:
+      enum:
+      - PENDING
+      - PAID
+      - PROCESSING
+      - FULFILLED
+      - CANCELLED
+      - REFUNDED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `PAID` - Paid
+        * `PROCESSING` - Processing
+        * `FULFILLED` - Fulfilled
+        * `CANCELLED` - Cancelled
+        * `REFUNDED` - Refunded
     Suggestion:
       type: object
       description: A single search suggestion.
@@ -13900,6 +15829,100 @@ components:
       - entity_id
       - entity_type
       - suggestion_type
+    TicketProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        club:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        event:
+          type: string
+          format: uuid
+          nullable: true
+        venue:
+          type: string
+          maxLength: 255
+        sales_start:
+          type: string
+          format: date-time
+          nullable: true
+        sales_end:
+          type: string
+          format: date-time
+          nullable: true
+        capacity:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        sold:
+          type: integer
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/TicketProductStatusEnum'
+        is_refundable:
+          type: boolean
+        metadata: {}
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+      required:
+      - club
+      - created_by
+      - id
+      - name
+      - price
+      - published_at
+      - published_by
+      - slug
+      - sold
+    TicketProductStatusEnum:
+      enum:
+      - DRAFT
+      - ACTIVE
+      - PAUSED
+      - ARCHIVED
+      - SOLD_OUT
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `ACTIVE` - Active
+        * `PAUSED` - Paused
+        * `ARCHIVED` - Archived
+        * `SOLD_OUT` - Sold out
     TimeInForceEnum:
       enum:
       - GTC
@@ -13999,12 +16022,6 @@ components:
           type: string
           format: uuid
           readOnly: true
-        username:
-          type: string
-          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
-            only.
-          pattern: ^[\w.@+-]+$
-          maxLength: 150
         email:
           type: string
           format: email
@@ -14015,10 +16032,6 @@ components:
         last_name:
           type: string
           maxLength: 150
-        phone_number:
-          type: string
-          nullable: true
-          maxLength: 20
         is_verified:
           type: boolean
         roles:
@@ -14036,7 +16049,6 @@ components:
       - id
       - permissions
       - roles
-      - username
     UserRegistration:
       type: object
       properties:
@@ -14044,9 +16056,6 @@ components:
           type: string
         last_name:
           type: string
-        username:
-          type: string
-          maxLength: 150
         email:
           type: string
           format: email
@@ -14054,6 +16063,8 @@ components:
         phone_number:
           type: string
           nullable: true
+          pattern: ^\+?1?\d{9,15}$
+          maxLength: 20
         password:
           type: string
           writeOnly: true
@@ -14067,43 +16078,6 @@ components:
       - first_name
       - last_name
       - password
-    VerificationChannelEnum:
-      enum:
-      - EMAIL
-      type: string
-      description: '* `EMAIL` - EMAIL'
-    VerificationDeliveryData:
-      type: object
-      properties:
-        verification_required:
-          type: boolean
-        verification_channel:
-          $ref: '#/components/schemas/VerificationChannelEnum'
-        destination:
-          type: string
-        expires_in:
-          type: integer
-        resend_available_in:
-          type: integer
-      required:
-      - destination
-      - expires_in
-      - resend_available_in
-      - verification_channel
-      - verification_required
-    VerificationDeliveryResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        message:
-          type: string
-        data:
-          $ref: '#/components/schemas/VerificationDeliveryData'
-      required:
-      - data
-      - message
-      - success
     VerifyOTP:
       type: object
       properties:

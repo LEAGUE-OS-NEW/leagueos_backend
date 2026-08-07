@@ -44,5 +44,5 @@ known-first-party = [
     "onboarding",
     "profiles",
     "sports",
-    "system",
+    "system"
 ]
