@@ -376,7 +376,9 @@ class MarketResultDisputeDecisionService:
         current = (
             MarketResultDisputeDecision.objects.filter(
                 provisional_result=provisional_result,
-            ).aggregate(maximum=Max("sequence"),)["maximum"]
+            ).aggregate(
+                maximum=Max("sequence"),
+            )["maximum"]
             or 0
         )
 
