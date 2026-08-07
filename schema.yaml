@@ -24,6 +24,1303 @@ paths:
               schema:
                 $ref: '#/components/schemas/Dashboard'
           description: ''
+  /api/v1/{club_pk}/audit-logs/:
+    get:
+      operationId: api_v1_audit_logs_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubAuditLog'
+          description: ''
+  /api/v1/{club_pk}/media/:
+    get:
+      operationId: api_v1_media_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubMedia'
+          description: ''
+    post:
+      operationId: api_v1_media_create
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMedia'
+          description: ''
+  /api/v1/{club_pk}/media/{id}/:
+    get:
+      operationId: api_v1_media_retrieve
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMedia'
+          description: ''
+    put:
+      operationId: api_v1_media_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubMedia'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMedia'
+          description: ''
+    patch:
+      operationId: api_v1_media_partial_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClubMedia'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClubMedia'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClubMedia'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubMedia'
+          description: ''
+    delete:
+      operationId: api_v1_media_destroy
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{club_pk}/membership-plans/:
+    get:
+      operationId: api_v1_membership_plans_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+    post:
+      operationId: api_v1_membership_plans_create
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+  /api/v1/{club_pk}/membership-plans/{id}/:
+    get:
+      operationId: api_v1_membership_plans_retrieve
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+    put:
+      operationId: api_v1_membership_plans_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MembershipPlan'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+    patch:
+      operationId: api_v1_membership_plans_partial_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipPlan'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPlan'
+          description: ''
+    delete:
+      operationId: api_v1_membership_plans_destroy
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{club_pk}/merchandise/:
+    get:
+      operationId: api_v1_merchandise_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+    post:
+      operationId: api_v1_merchandise_create
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+  /api/v1/{club_pk}/merchandise/{id}/:
+    get:
+      operationId: api_v1_merchandise_retrieve
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+    put:
+      operationId: api_v1_merchandise_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MerchandiseProduct'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+    patch:
+      operationId: api_v1_merchandise_partial_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMerchandiseProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMerchandiseProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMerchandiseProduct'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchandiseProduct'
+          description: ''
+    delete:
+      operationId: api_v1_merchandise_destroy
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{club_pk}/orders/:
+    get:
+      operationId: api_v1_orders_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StoreOrder'
+          description: ''
+  /api/v1/{club_pk}/profiles/:
+    get:
+      operationId: api_v1_profiles_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+    post:
+      operationId: api_v1_profiles_create
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+  /api/v1/{club_pk}/profiles/{id}/:
+    get:
+      operationId: api_v1_profiles_retrieve
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+    put:
+      operationId: api_v1_profiles_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubProfileVersion'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+    patch:
+      operationId: api_v1_profiles_partial_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClubProfileVersion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClubProfileVersion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClubProfileVersion'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubProfileVersion'
+          description: ''
+    delete:
+      operationId: api_v1_profiles_destroy
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{club_pk}/staff-invitations/:
+    get:
+      operationId: api_v1_staff_invitations_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+    post:
+      operationId: api_v1_staff_invitations_create
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+  /api/v1/{club_pk}/staff-invitations/{id}/:
+    get:
+      operationId: api_v1_staff_invitations_retrieve
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+    put:
+      operationId: api_v1_staff_invitations_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StaffInvitation'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+    patch:
+      operationId: api_v1_staff_invitations_partial_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffInvitation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffInvitation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStaffInvitation'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffInvitation'
+          description: ''
+    delete:
+      operationId: api_v1_staff_invitations_destroy
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{club_pk}/ticket-products/:
+    get:
+      operationId: api_v1_ticket_products_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TicketProduct'
+          description: ''
+    post:
+      operationId: api_v1_ticket_products_create
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketProduct'
+          description: ''
+  /api/v1/{club_pk}/ticket-products/{id}/:
+    get:
+      operationId: api_v1_ticket_products_retrieve
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketProduct'
+          description: ''
+    put:
+      operationId: api_v1_ticket_products_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TicketProduct'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketProduct'
+          description: ''
+    patch:
+      operationId: api_v1_ticket_products_partial_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTicketProduct'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTicketProduct'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTicketProduct'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketProduct'
+          description: ''
+    delete:
+      operationId: api_v1_ticket_products_destroy
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{club_pk}/workspaces/:
+    get:
+      operationId: api_v1_workspaces_list
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+    post:
+      operationId: api_v1_workspaces_create
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+  /api/v1/{club_pk}/workspaces/{id}/:
+    get:
+      operationId: api_v1_workspaces_retrieve
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+    put:
+      operationId: api_v1_workspaces_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClubWorkspace'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+    patch:
+      operationId: api_v1_workspaces_partial_update
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedClubWorkspace'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedClubWorkspace'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedClubWorkspace'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubWorkspace'
+          description: ''
+    delete:
+      operationId: api_v1_workspaces_destroy
+      parameters:
+      - in: path
+        name: club_pk
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/admin/alerts/:
     get:
       operationId: api_v1_admin_alerts_list
@@ -383,6 +1680,267 @@ paths:
               schema:
                 $ref: '#/components/schemas/RiskAssessment'
           description: ''
+  /api/v1/admin/invitations/:
+    get:
+      operationId: admin_invitations_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminInvitationRead'
+          description: ''
+    post:
+      operationId: admin_invitation_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminInvitationCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminInvitationCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminInvitationCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminInvitationRead'
+          description: ''
+        '400':
+          description: No response body
+        '403':
+          description: No response body
+  /api/v1/admin/me/:
+    get:
+      operationId: admin_me
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/admin/permissions/:
+    get:
+      operationId: admin_permissions_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminPermission'
+          description: ''
+  /api/v1/admin/roles/:
+    get:
+      operationId: admin_roles_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminRole'
+          description: ''
+  /api/v1/admin/roles/{role_id}/:
+    get:
+      operationId: admin_role_detail
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRole'
+          description: ''
+        '404':
+          description: No response body
+  /api/v1/admin/users/:
+    get:
+      operationId: admin_users_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminUserList'
+          description: ''
+  /api/v1/admin/users/{user_id}/:
+    get:
+      operationId: admin_user_detail
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserList'
+          description: ''
+        '404':
+          description: No response body
+    patch:
+      operationId: admin_user_update
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserRoleUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserRoleUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserRoleUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserList'
+          description: ''
+        '400':
+          description: No response body
+        '403':
+          description: No response body
+        '404':
+          description: No response body
+  /api/v1/admin/users/{user_id}/roles/:
+    post:
+      operationId: admin_user_role_assign
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRoleAssignment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminRoleAssignment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminRoleAssignment'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserList'
+          description: ''
+        '400':
+          description: No response body
+        '403':
+          description: No response body
+        '404':
+          description: No response body
+  /api/v1/admin/users/{user_id}/roles/{role_id}/:
+    delete:
+      operationId: admin_user_role_revoke
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserList'
+          description: ''
+        '403':
+          description: No response body
+        '404':
+          description: No response body
   /api/v1/analytics/:
     post:
       operationId: api_v1_analytics_create
@@ -420,44 +1978,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/DashboardAnalyticsCreate'
           description: ''
-  /api/v1/audit-logs/:
-    get:
-      operationId: api_v1_audit_logs_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ClubAuditLog'
-          description: ''
-  /api/v1/audit-logs/{id}/:
-    get:
-      operationId: api_v1_audit_logs_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club audit log.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubAuditLog'
-          description: ''
   /api/v1/auth/login/:
     post:
       operationId: api_v1_auth_login_create
@@ -483,7 +2003,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Login'
+                $ref: '#/components/schemas/AuthTokenResponse'
           description: ''
   /api/v1/auth/logout/:
     post:
@@ -509,7 +2029,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Logout'
+                $ref: '#/components/schemas/MessageResponse'
           description: ''
   /api/v1/auth/logout-all/:
     post:
@@ -533,7 +2053,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfile'
+                $ref: '#/components/schemas/MeResponse'
           description: ''
   /api/v1/auth/password-reset/confirm/:
     post:
@@ -651,11 +2171,17 @@ paths:
       - jwtAuth: []
       - {}
       responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationDeliveryResponse'
+          description: ''
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRegistration'
+                $ref: '#/components/schemas/VerificationDeliveryResponse'
           description: ''
   /api/v1/auth/registration-status/:
     get:
@@ -697,7 +2223,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResendOTP'
+                $ref: '#/components/schemas/VerificationDeliveryResponse'
           description: ''
   /api/v1/auth/resend-verification/:
     post:
@@ -724,7 +2250,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResendOTP'
+                $ref: '#/components/schemas/VerificationDeliveryResponse'
           description: ''
   /api/v1/auth/sessions/:
     get:
@@ -764,7 +2290,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenRefresh'
+                $ref: '#/components/schemas/AuthTokenResponse'
           description: ''
   /api/v1/auth/verify-otp/:
     post:
@@ -791,7 +2317,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VerifyOTP'
+                $ref: '#/components/schemas/AuthTokenResponse'
           description: ''
   /api/v1/clubs/:
     get:
@@ -4283,441 +5809,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/MatchCentre'
           description: ''
-  /api/v1/media/:
-    get:
-      operationId: api_v1_media_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ClubMedia'
-          description: ''
-    post:
-      operationId: api_v1_media_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClubMedia'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ClubMedia'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ClubMedia'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubMedia'
-          description: ''
-  /api/v1/media/{id}/:
-    get:
-      operationId: api_v1_media_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club media.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubMedia'
-          description: ''
-    put:
-      operationId: api_v1_media_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club media.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClubMedia'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ClubMedia'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ClubMedia'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubMedia'
-          description: ''
-    patch:
-      operationId: api_v1_media_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club media.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedClubMedia'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedClubMedia'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedClubMedia'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubMedia'
-          description: ''
-    delete:
-      operationId: api_v1_media_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club media.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-  /api/v1/membership-plans/:
-    get:
-      operationId: api_v1_membership_plans_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MembershipPlan'
-          description: ''
-    post:
-      operationId: api_v1_membership_plans_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MembershipPlan'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/MembershipPlan'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/MembershipPlan'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MembershipPlan'
-          description: ''
-  /api/v1/membership-plans/{id}/:
-    get:
-      operationId: api_v1_membership_plans_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this membership plan.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MembershipPlan'
-          description: ''
-    put:
-      operationId: api_v1_membership_plans_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this membership plan.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MembershipPlan'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/MembershipPlan'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/MembershipPlan'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MembershipPlan'
-          description: ''
-    patch:
-      operationId: api_v1_membership_plans_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this membership plan.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedMembershipPlan'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedMembershipPlan'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedMembershipPlan'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MembershipPlan'
-          description: ''
-    delete:
-      operationId: api_v1_membership_plans_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this membership plan.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-  /api/v1/merchandise/:
-    get:
-      operationId: api_v1_merchandise_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MerchandiseProduct'
-          description: ''
-    post:
-      operationId: api_v1_merchandise_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MerchandiseProduct'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/MerchandiseProduct'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/MerchandiseProduct'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MerchandiseProduct'
-          description: ''
-  /api/v1/merchandise/{id}/:
-    get:
-      operationId: api_v1_merchandise_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this merchandise product.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MerchandiseProduct'
-          description: ''
-    put:
-      operationId: api_v1_merchandise_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this merchandise product.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MerchandiseProduct'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/MerchandiseProduct'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/MerchandiseProduct'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MerchandiseProduct'
-          description: ''
-    patch:
-      operationId: api_v1_merchandise_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this merchandise product.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedMerchandiseProduct'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedMerchandiseProduct'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedMerchandiseProduct'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MerchandiseProduct'
-          description: ''
-    delete:
-      operationId: api_v1_merchandise_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this merchandise product.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
   /api/v1/modules/:
     get:
       operationId: api_v1_modules_retrieve
@@ -4759,148 +5850,75 @@ paths:
   /api/v1/news/:
     get:
       operationId: api_v1_news_list
+      description: Public news list (published & verified only).
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: club
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: competition
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: featured
+        schema:
+          type: boolean
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - -published_at
+          - published_at
+          - -created_at
+          type: string
+          default: -published_at
+          minLength: 1
+        description: |-
+          * `-published_at` - -published_at
+          * `published_at` - published_at
+          * `-created_at` - -created_at
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+          maxLength: 180
+      - in: query
+        name: sport
+        schema:
+          type: string
+          format: uuid
       tags:
-      - api
+      - Discovery
       security:
       - jwtAuth: []
+      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ClubNews'
+                $ref: '#/components/schemas/PaginatedNewsList'
           description: ''
-    post:
-      operationId: api_v1_news_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClubNews'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ClubNews'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ClubNews'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubNews'
-          description: ''
-  /api/v1/news/{id}/:
-    get:
-      operationId: api_v1_news_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club news.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubNews'
-          description: ''
-    put:
-      operationId: api_v1_news_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club news.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClubNews'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ClubNews'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ClubNews'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubNews'
-          description: ''
-    patch:
-      operationId: api_v1_news_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club news.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedClubNews'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedClubNews'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedClubNews'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubNews'
-          description: ''
-    delete:
-      operationId: api_v1_news_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club news.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
   /api/v1/notification-categories/:
     get:
       operationId: api_v1_notification_categories_retrieve
@@ -5262,7 +6280,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Onboarding'
+                $ref: '#/components/schemas/OnboardingStatusResponse'
           description: ''
   /api/v1/onboarding/clubs/:
     post:
@@ -5290,7 +6308,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ClubSelection'
+                $ref: '#/components/schemas/ClubSelectionResponse'
           description: ''
   /api/v1/onboarding/competitions/:
     post:
@@ -5318,7 +6336,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CompetitionSelection'
+                $ref: '#/components/schemas/CompetitionSelectionResponse'
           description: ''
   /api/v1/onboarding/complete/:
     post:
@@ -5345,7 +6363,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardConfiguration'
+                $ref: '#/components/schemas/DashboardEnvelopeResponse'
           description: ''
   /api/v1/onboarding/country/:
     post:
@@ -5373,7 +6391,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CountrySelection'
+                $ref: '#/components/schemas/CountrySelectionResponse'
           description: ''
   /api/v1/onboarding/dashboard/:
     get:
@@ -5389,7 +6407,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardConfiguration'
+                $ref: '#/components/schemas/DashboardEnvelopeResponse'
           description: ''
   /api/v1/onboarding/skip/:
     post:
@@ -5417,7 +6435,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SkipStep'
+                $ref: '#/components/schemas/SkipStepResponse'
           description: ''
   /api/v1/onboarding/sports/:
     post:
@@ -5445,45 +6463,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SportSelection'
-          description: ''
-  /api/v1/orders/:
-    get:
-      operationId: api_v1_orders_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/StoreOrder'
-          description: ''
-  /api/v1/orders/{id}/:
-    get:
-      operationId: api_v1_orders_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this store order.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StoreOrder'
+                $ref: '#/components/schemas/SportSelectionResponse'
           description: ''
   /api/v1/participants/:
     get:
@@ -5817,151 +6797,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedFollowList'
           description: ''
-  /api/v1/profiles/:
-    get:
-      operationId: api_v1_profiles_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ClubProfileVersion'
-          description: ''
-    post:
-      operationId: api_v1_profiles_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClubProfileVersion'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ClubProfileVersion'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ClubProfileVersion'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubProfileVersion'
-          description: ''
-  /api/v1/profiles/{id}/:
-    get:
-      operationId: api_v1_profiles_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club profile version.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubProfileVersion'
-          description: ''
-    put:
-      operationId: api_v1_profiles_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club profile version.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClubProfileVersion'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ClubProfileVersion'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ClubProfileVersion'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubProfileVersion'
-          description: ''
-    patch:
-      operationId: api_v1_profiles_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club profile version.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedClubProfileVersion'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedClubProfileVersion'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedClubProfileVersion'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubProfileVersion'
-          description: ''
-    delete:
-      operationId: api_v1_profiles_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club profile version.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
   /api/v1/results/:
     get:
       operationId: api_v1_results_list
@@ -6312,151 +7147,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedSportPublicList'
           description: ''
-  /api/v1/staff-invitations/:
-    get:
-      operationId: api_v1_staff_invitations_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/StaffInvitation'
-          description: ''
-    post:
-      operationId: api_v1_staff_invitations_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StaffInvitation'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/StaffInvitation'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/StaffInvitation'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StaffInvitation'
-          description: ''
-  /api/v1/staff-invitations/{id}/:
-    get:
-      operationId: api_v1_staff_invitations_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this staff invitation.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StaffInvitation'
-          description: ''
-    put:
-      operationId: api_v1_staff_invitations_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this staff invitation.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/StaffInvitation'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/StaffInvitation'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/StaffInvitation'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StaffInvitation'
-          description: ''
-    patch:
-      operationId: api_v1_staff_invitations_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this staff invitation.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedStaffInvitation'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedStaffInvitation'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedStaffInvitation'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StaffInvitation'
-          description: ''
-    delete:
-      operationId: api_v1_staff_invitations_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this staff invitation.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
   /api/v1/system/health/:
     get:
       operationId: api_v1_system_health_retrieve
@@ -6473,151 +7163,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/HealthCheck'
           description: ''
-  /api/v1/ticket-products/:
-    get:
-      operationId: api_v1_ticket_products_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TicketProduct'
-          description: ''
-    post:
-      operationId: api_v1_ticket_products_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TicketProduct'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TicketProduct'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TicketProduct'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TicketProduct'
-          description: ''
-  /api/v1/ticket-products/{id}/:
-    get:
-      operationId: api_v1_ticket_products_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this ticket product.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TicketProduct'
-          description: ''
-    put:
-      operationId: api_v1_ticket_products_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this ticket product.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TicketProduct'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TicketProduct'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TicketProduct'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TicketProduct'
-          description: ''
-    patch:
-      operationId: api_v1_ticket_products_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this ticket product.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedTicketProduct'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedTicketProduct'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedTicketProduct'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TicketProduct'
-          description: ''
-    delete:
-      operationId: api_v1_ticket_products_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this ticket product.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
   /api/v1/wallets/:
     get:
       operationId: api_v1_wallets_list
@@ -6948,151 +7493,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/DashboardWidget'
           description: ''
-  /api/v1/workspaces/:
-    get:
-      operationId: api_v1_workspaces_list
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ClubWorkspace'
-          description: ''
-    post:
-      operationId: api_v1_workspaces_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClubWorkspace'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ClubWorkspace'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ClubWorkspace'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubWorkspace'
-          description: ''
-  /api/v1/workspaces/{id}/:
-    get:
-      operationId: api_v1_workspaces_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club workspace.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubWorkspace'
-          description: ''
-    put:
-      operationId: api_v1_workspaces_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club workspace.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ClubWorkspace'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ClubWorkspace'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ClubWorkspace'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubWorkspace'
-          description: ''
-    patch:
-      operationId: api_v1_workspaces_partial_update
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club workspace.
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedClubWorkspace'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedClubWorkspace'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedClubWorkspace'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClubWorkspace'
-          description: ''
-    delete:
-      operationId: api_v1_workspaces_destroy
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this club workspace.
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
 components:
   schemas:
     Adjustment:
@@ -7282,6 +7682,77 @@ components:
       - requirements
       - reviewed_at
       - reviewed_by
+    AdminInvitationCreate:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        expires_in_days:
+          type: integer
+          maximum: 30
+          minimum: 1
+          default: 7
+      required:
+      - email
+      - role_ids
+    AdminInvitationRead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        assigned_roles:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        invited_by_email:
+          type: string
+          format: email
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/AdminInvitationReadStatusEnum'
+        token_expires_at:
+          type: string
+          format: date-time
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - assigned_roles
+      - created_at
+      - email
+      - id
+      - invited_by_email
+      - token_expires_at
+    AdminInvitationReadStatusEnum:
+      enum:
+      - PENDING
+      - ACCEPTED
+      - EXPIRED
+      - REVOKED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `ACCEPTED` - Accepted
+        * `EXPIRED` - Expired
+        * `REVOKED` - Revoked
     AdminKYCSession:
       type: object
       properties:
@@ -7370,6 +7841,39 @@ components:
       - id
       - participant_id
       - provider_code
+    AdminPermission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        resource:
+          type: string
+          maxLength: 100
+        action:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - created_at
+      - id
+      - name
+      - resource
+      - updated_at
     AdminResponsibleStatus:
       type: object
       properties:
@@ -7453,6 +7957,186 @@ components:
       - sell_allowed
       - sell_reason_codes
       - utilization
+    AdminRole:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        display_name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        dashboard_url:
+          type: string
+          maxLength: 500
+        is_system:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - display_name
+      - id
+      - name
+      - permissions
+      - updated_at
+    AdminRoleAssignment:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        role_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - role_id
+      - user_id
+    AdminUserList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        is_active:
+          type: boolean
+          title: Active
+          description: Designates whether this user should be treated as active. Unselect
+            this instead of deleting accounts.
+        is_verified:
+          type: boolean
+        is_superuser:
+          type: boolean
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+        roles:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        permissions:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - id
+      - permissions
+      - roles
+      - updated_at
+    AuthTokenData:
+      type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUserContext'
+      required:
+      - access
+      - refresh
+      - user
+    AuthTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/AuthTokenData'
+      required:
+      - data
+      - message
+      - success
+    AuthUserContext:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone_number:
+          type: string
+          nullable: true
+        is_verified:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        dashboard_access:
+          $ref: '#/components/schemas/DashboardAccess'
+        onboarding:
+          $ref: '#/components/schemas/OnboardingAuthContext'
+      required:
+      - dashboard_access
+      - email
+      - first_name
+      - id
+      - is_verified
+      - last_name
+      - onboarding
+      - permissions
+      - phone_number
+      - roles
+      - username
     AutocompleteResult:
       type: object
       description: A single autocomplete result.
@@ -7728,6 +8412,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         media_type:
           $ref: '#/components/schemas/MediaTypeEnum'
         title:
@@ -7786,75 +8471,6 @@ components:
       - published_at
       - published_by
       - uploaded_by
-    ClubNews:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          readOnly: true
-        club:
-          type: string
-          format: uuid
-        title:
-          type: string
-          maxLength: 300
-        slug:
-          type: string
-          readOnly: true
-          pattern: ^[-a-zA-Z0-9_]+$
-        summary:
-          type: string
-        body:
-          type: string
-        category:
-          type: string
-          format: uuid
-        sport:
-          type: string
-          format: uuid
-          nullable: true
-        cover_image:
-          type: string
-          format: uuid
-          nullable: true
-        status:
-          $ref: '#/components/schemas/Status7b4Enum'
-        is_featured:
-          type: boolean
-        is_verified:
-          type: boolean
-        published_at:
-          type: string
-          format: date-time
-          readOnly: true
-          nullable: true
-        published_by:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        created_by:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        source_name:
-          type: string
-          maxLength: 120
-        source_reference:
-          type: string
-          maxLength: 255
-      required:
-      - body
-      - category
-      - club
-      - created_by
-      - id
-      - published_at
-      - published_by
-      - slug
-      - title
     ClubProfile:
       type: object
       description: Extended club profile data.
@@ -7891,11 +8507,12 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         version:
           type: integer
           readOnly: true
         status:
-          $ref: '#/components/schemas/Status7b4Enum'
+          $ref: '#/components/schemas/ClubProfileVersionStatusEnum'
         display_name:
           type: string
           maxLength: 200
@@ -7977,6 +8594,18 @@ components:
       - published_at
       - published_by
       - version
+    ClubProfileVersionStatusEnum:
+      enum:
+      - DRAFT
+      - PENDING_APPROVAL
+      - PUBLISHED
+      - ARCHIVED
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `PENDING_APPROVAL` - Pending approval
+        * `PUBLISHED` - Published
+        * `ARCHIVED` - Archived
     ClubSelection:
       type: object
       description: |-
@@ -7992,6 +8621,34 @@ components:
             format: uuid
       required:
       - club_ids
+    ClubSelectionData:
+      type: object
+      properties:
+        clubs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClubCatalogue'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - clubs
+      - completed
+      - current_step
+    ClubSelectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ClubSelectionData'
+      required:
+      - data
+      - message
+      - success
     ClubWorkspace:
       type: object
       properties:
@@ -8002,10 +8659,10 @@ components:
         user:
           type: string
           format: uuid
-          readOnly: true
         club:
           type: string
           format: uuid
+          readOnly: true
         role:
           $ref: '#/components/schemas/RoleFf1Enum'
         permissions: {}
@@ -8195,6 +8852,34 @@ components:
             format: uuid
       required:
       - competition_ids
+    CompetitionSelectionData:
+      type: object
+      properties:
+        competitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetitionCatalogue'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - competitions
+      - completed
+      - current_step
+    CompetitionSelectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/CompetitionSelectionData'
+      required:
+      - data
+      - message
+      - success
     ComplianceDecision:
       type: object
       properties:
@@ -8388,6 +9073,32 @@ components:
           format: uuid
       required:
       - country_id
+    CountrySelectionData:
+      type: object
+      properties:
+        country:
+          $ref: '#/components/schemas/CountryCatalogue'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - completed
+      - country
+      - current_step
+    CountrySelectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/CountrySelectionData'
+      required:
+      - data
+      - message
+      - success
     CurrentStepEnum:
       enum:
       - COUNTRY
@@ -8435,6 +9146,22 @@ components:
       - recommendations
       - user_summary
       - widgets
+    DashboardAccess:
+      type: object
+      properties:
+        entitlements:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardEntitlement'
+        default_entitlement:
+          type: string
+          nullable: true
+        default_route:
+          type: string
+      required:
+      - default_entitlement
+      - default_route
+      - entitlements
     DashboardAnalyticsCreate:
       type: object
       description: Serializer for creating analytics events.
@@ -8485,6 +9212,42 @@ components:
       - favourite_sports
       - onboarding_completed
       - preferred_country
+    DashboardEntitlement:
+      type: object
+      properties:
+        role:
+          type: string
+        dashboard_url:
+          type: string
+      required:
+      - dashboard_url
+      - role
+    DashboardEnvelopeData:
+      type: object
+      properties:
+        configuration:
+          $ref: '#/components/schemas/DashboardConfiguration'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - completed
+      - configuration
+      - current_step
+    DashboardEnvelopeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/DashboardEnvelopeData'
+      required:
+      - data
+      - message
+      - success
     DashboardModule:
       type: object
       description: Serializer for dashboard modules.
@@ -9339,14 +10102,14 @@ components:
     Login:
       type: object
       properties:
+        identifier:
+          type: string
         email:
           type: string
-          format: email
         password:
           type: string
           writeOnly: true
       required:
-      - email
       - password
     Logout:
       type: object
@@ -11799,6 +12562,26 @@ components:
       required:
       - id
       - name
+    MeData:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthUserContext'
+      required:
+      - user
+    MeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/MeData'
+      required:
+      - data
+      - message
+      - success
     MediaTypeEnum:
       enum:
       - IMAGE
@@ -11819,6 +12602,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         name:
           type: string
           maxLength: 200
@@ -11900,6 +12684,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         category:
           type: string
           format: uuid
@@ -11990,6 +12775,16 @@ components:
         * `PAUSED` - Paused
         * `ARCHIVED` - Archived
         * `OUT_OF_STOCK` - Out of stock
+    MessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+      - message
+      - success
     NavigationMenu:
       type: object
       description: Serializer for navigation menu items.
@@ -12039,6 +12834,58 @@ components:
       - parent
       - permission_required
       - route
+    News:
+      type: object
+      description: Public news serializer (published & verified only).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 300
+        slug:
+          type: string
+          maxLength: 320
+          pattern: ^[-a-zA-Z0-9_]+$
+        summary:
+          type: string
+        body:
+          type: string
+        category:
+          type: string
+          format: uuid
+          readOnly: true
+        sport:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        competition:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        club:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        is_featured:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - body
+      - category
+      - club
+      - competition
+      - id
+      - sport
+      - title
     Notification:
       type: object
       properties:
@@ -12417,6 +13264,30 @@ components:
       - preferred_country
       - skipped_steps
       - updated_at
+    OnboardingAuthContext:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        current_step:
+          type: string
+          nullable: true
+      required:
+      - completed
+      - current_step
+    OnboardingStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Onboarding'
+      required:
+      - data
+      - message
+      - success
     OrderBookLevel:
       type: object
       properties:
@@ -13080,6 +13951,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MarketWatchlistEntry'
+    PaginatedNewsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/News'
     PaginatedNotificationList:
       type: object
       required:
@@ -13649,6 +14543,14 @@ components:
         reason:
           type: string
           writeOnly: true
+    PatchedAdminUserRoleUpdate:
+      type: object
+      properties:
+        role_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
     PatchedClubMedia:
       type: object
       properties:
@@ -13659,6 +14561,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         media_type:
           $ref: '#/components/schemas/MediaTypeEnum'
         title:
@@ -13709,65 +14612,6 @@ components:
           format: uuid
           readOnly: true
           nullable: true
-    PatchedClubNews:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          readOnly: true
-        club:
-          type: string
-          format: uuid
-        title:
-          type: string
-          maxLength: 300
-        slug:
-          type: string
-          readOnly: true
-          pattern: ^[-a-zA-Z0-9_]+$
-        summary:
-          type: string
-        body:
-          type: string
-        category:
-          type: string
-          format: uuid
-        sport:
-          type: string
-          format: uuid
-          nullable: true
-        cover_image:
-          type: string
-          format: uuid
-          nullable: true
-        status:
-          $ref: '#/components/schemas/Status7b4Enum'
-        is_featured:
-          type: boolean
-        is_verified:
-          type: boolean
-        published_at:
-          type: string
-          format: date-time
-          readOnly: true
-          nullable: true
-        published_by:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        created_by:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        source_name:
-          type: string
-          maxLength: 120
-        source_reference:
-          type: string
-          maxLength: 255
     PatchedClubProfileVersion:
       type: object
       properties:
@@ -13778,11 +14622,12 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         version:
           type: integer
           readOnly: true
         status:
-          $ref: '#/components/schemas/Status7b4Enum'
+          $ref: '#/components/schemas/ClubProfileVersionStatusEnum'
         display_name:
           type: string
           maxLength: 200
@@ -13867,10 +14712,10 @@ components:
         user:
           type: string
           format: uuid
-          readOnly: true
         club:
           type: string
           format: uuid
+          readOnly: true
         role:
           $ref: '#/components/schemas/RoleFf1Enum'
         permissions: {}
@@ -14079,6 +14924,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         name:
           type: string
           maxLength: 200
@@ -14139,6 +14985,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         category:
           type: string
           format: uuid
@@ -14306,6 +15153,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         email:
           type: string
           format: email
@@ -14350,6 +15198,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         name:
           type: string
           maxLength: 200
@@ -15507,6 +16356,34 @@ components:
           $ref: '#/components/schemas/StepEnum'
       required:
       - step
+    SkipStepData:
+      type: object
+      properties:
+        current_step:
+          type: string
+        completed:
+          type: boolean
+        skipped_steps:
+          type: array
+          items:
+            type: string
+      required:
+      - completed
+      - current_step
+      - skipped_steps
+    SkipStepResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/SkipStepData'
+      required:
+      - data
+      - message
+      - success
     SportCatalogue:
       type: object
       description: Serializer for the sport preference catalogue.
@@ -15562,6 +16439,34 @@ components:
             format: uuid
       required:
       - sport_ids
+    SportSelectionData:
+      type: object
+      properties:
+        sports:
+          type: array
+          items:
+            $ref: '#/components/schemas/SportCatalogue'
+        current_step:
+          type: string
+        completed:
+          type: boolean
+      required:
+      - completed
+      - current_step
+      - sports
+    SportSelectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/SportSelectionData'
+      required:
+      - data
+      - message
+      - success
     SportingEventPublic:
       type: object
       properties:
@@ -15672,6 +16577,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         email:
           type: string
           format: email
@@ -15729,18 +16635,6 @@ components:
         * `ACCEPTED` - Accepted
         * `EXPIRED` - Expired
         * `CANCELLED` - Cancelled
-    Status7b4Enum:
-      enum:
-      - DRAFT
-      - PENDING_APPROVAL
-      - PUBLISHED
-      - ARCHIVED
-      type: string
-      description: |-
-        * `DRAFT` - Draft
-        * `PENDING_APPROVAL` - Pending approval
-        * `PUBLISHED` - Published
-        * `ARCHIVED` - Archived
     StepEnum:
       enum:
       - COUNTRY
@@ -15839,6 +16733,7 @@ components:
         club:
           type: string
           format: uuid
+          readOnly: true
         name:
           type: string
           maxLength: 200
@@ -16022,6 +16917,12 @@ components:
           type: string
           format: uuid
           readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
         email:
           type: string
           format: email
@@ -16032,6 +16933,10 @@ components:
         last_name:
           type: string
           maxLength: 150
+        phone_number:
+          type: string
+          nullable: true
+          maxLength: 20
         is_verified:
           type: boolean
         roles:
@@ -16049,6 +16954,7 @@ components:
       - id
       - permissions
       - roles
+      - username
     UserRegistration:
       type: object
       properties:
@@ -16056,6 +16962,9 @@ components:
           type: string
         last_name:
           type: string
+        username:
+          type: string
+          maxLength: 150
         email:
           type: string
           format: email
@@ -16063,8 +16972,6 @@ components:
         phone_number:
           type: string
           nullable: true
-          pattern: ^\+?1?\d{9,15}$
-          maxLength: 20
         password:
           type: string
           writeOnly: true
@@ -16078,6 +16985,43 @@ components:
       - first_name
       - last_name
       - password
+    VerificationChannelEnum:
+      enum:
+      - EMAIL
+      type: string
+      description: '* `EMAIL` - EMAIL'
+    VerificationDeliveryData:
+      type: object
+      properties:
+        verification_required:
+          type: boolean
+        verification_channel:
+          $ref: '#/components/schemas/VerificationChannelEnum'
+        destination:
+          type: string
+        expires_in:
+          type: integer
+        resend_available_in:
+          type: integer
+      required:
+      - destination
+      - expires_in
+      - resend_available_in
+      - verification_channel
+      - verification_required
+    VerificationDeliveryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/VerificationDeliveryData'
+      required:
+      - data
+      - message
+      - success
     VerifyOTP:
       type: object
       properties:
