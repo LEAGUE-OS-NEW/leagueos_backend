@@ -39,7 +39,21 @@ class ClubWorkspaceSerializer(serializers.ModelSerializer):
             "invited_at",
             "accepted_at",
         ]
-        read_only_fields = ["id", "user", "club", "invited_at", "accepted_at"]
+        read_only_fields = ["id", "club", "invited_at", "accepted_at"]
+
+    def validate(self, attrs):
+        user = attrs.get("user")
+        club = self.context.get("club")
+
+        if not user:
+            raise serializers.ValidationError({"user": "A user is required."})
+
+        if ClubWorkspace.objects.filter(user=user, club=club).exists():
+            raise serializers.ValidationError(
+                {"user": "This user already has a workspace for this club."}
+            )
+
+        return attrs
 
 
 class ClubProfileVersionSerializer(serializers.ModelSerializer):
@@ -71,7 +85,7 @@ class ClubProfileVersionSerializer(serializers.ModelSerializer):
             "published_by",
             "created_by",
         ]
-        read_only_fields = ["id", "version", "published_at", "published_by", "created_by"]
+        read_only_fields = ["id", "club", "version", "published_at", "published_by", "created_by"]
 
 
 class ClubMediaSerializer(serializers.ModelSerializer):
@@ -95,7 +109,14 @@ class ClubMediaSerializer(serializers.ModelSerializer):
             "published_at",
             "published_by",
         ]
-        read_only_fields = ["id", "file_size", "uploaded_by", "published_at", "published_by"]
+        read_only_fields = [
+            "id",
+            "club",
+            "file_size",
+            "uploaded_by",
+            "published_at",
+            "published_by",
+        ]
 
 
 class ClubNewsSerializer(serializers.ModelSerializer):
@@ -145,7 +166,7 @@ class MembershipPlanSerializer(serializers.ModelSerializer):
             "published_by",
             "created_by",
         ]
-        read_only_fields = ["id", "slug", "published_at", "published_by", "created_by"]
+        read_only_fields = ["id", "club", "slug", "published_at", "published_by", "created_by"]
 
 
 class TicketProductSerializer(serializers.ModelSerializer):
@@ -172,7 +193,15 @@ class TicketProductSerializer(serializers.ModelSerializer):
             "published_by",
             "created_by",
         ]
-        read_only_fields = ["id", "slug", "sold", "published_at", "published_by", "created_by"]
+        read_only_fields = [
+            "id",
+            "club",
+            "slug",
+            "sold",
+            "published_at",
+            "published_by",
+            "created_by",
+        ]
 
 
 class MerchandiseProductSerializer(serializers.ModelSerializer):
@@ -206,6 +235,7 @@ class MerchandiseProductSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "club",
             "slug",
             "available_stock",
             "is_low_stock",
@@ -269,6 +299,7 @@ class StaffInvitationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "club",
             "token",
             "status",
             "expires_at",

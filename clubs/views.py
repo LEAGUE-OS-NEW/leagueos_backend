@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
+
+from django.utils import timezone
 from rest_framework import viewsets
 
 from clubs.models import (
@@ -51,7 +54,7 @@ class ClubWorkspaceViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
-        serializer.save(club=club, user=self.request.user)
+        serializer.save(club=club)
 
 
 class ClubProfileVersionViewSet(viewsets.ModelViewSet):
@@ -66,7 +69,14 @@ class ClubProfileVersionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
-        serializer.save(club=club, created_by=self.request.user)
+        next_version = (
+            ClubProfileVersion.objects.filter(club=club)
+            .order_by("-version")
+            .values_list("version", flat=True)
+            .first()
+            or 0
+        ) + 1
+        serializer.save(club=club, version=next_version, created_by=self.request.user)
 
 
 class ClubMediaViewSet(viewsets.ModelViewSet):
@@ -174,4 +184,9 @@ class StaffInvitationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
-        serializer.save(club=club, invited_by=self.request.user)
+        serializer.save(
+            club=club,
+            invited_by=self.request.user,
+            token=uuid.uuid4().hex,
+            expires_at=timezone.now() + timezone.timedelta(days=7),
+        )
