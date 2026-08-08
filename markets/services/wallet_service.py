@@ -4,12 +4,12 @@ import logging
 from decimal import Decimal
 
 from django.db import transaction
+
+from accounts.models import User
 from wallets.exceptions import (
     InsufficientFundsError,
     WalletOperationError,
 )
-
-from accounts.models import User
 from wallets.models import LedgerEntry, Wallet
 
 logger = logging.getLogger(__name__)

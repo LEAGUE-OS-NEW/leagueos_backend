@@ -233,10 +233,8 @@ class SeedRolesCommandTests(APITestCase):
         call_command("seed_roles", verbosity=0)
 
         expected_mappings = {
-            "Market Operations Admin": {
+            "Market Operations & Approval Admin": {
                 "manage_market",
-            },
-            "Market Approval Admin": {
                 "approve_market",
             },
             "Result Verification Admin": {

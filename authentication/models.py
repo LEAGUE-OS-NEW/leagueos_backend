@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Role(models.Model):
@@ -82,13 +83,100 @@ class UserRole(models.Model):
         related_name="assigned_user_roles",
     )
     assigned_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="revoked_user_roles",
+    )
 
     class Meta:
         unique_together = ["user", "role"]
         ordering = ["user__email", "role__name"]
+        indexes = [
+            models.Index(fields=["user", "is_active"]),
+            models.Index(fields=["role", "is_active"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user} - {self.role}"
+
+    @property
+    def is_expired(self) -> bool:
+        return self.expires_at is not None and timezone.now() >= self.expires_at
+
+    @property
+    def is_effective(self) -> bool:
+        return self.is_active and not self.is_expired
+
+
+class AdminInvitation(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        EXPIRED = "EXPIRED", "Expired"
+        REVOKED = "REVOKED", "Revoked"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField()
+    token = models.CharField(max_length=255, unique=True, db_index=True)
+    token_expires_at = models.DateTimeField()
+    assigned_roles = models.ManyToManyField(
+        "authentication.Role",
+        related_name="admin_invitations",
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="sent_admin_invitations",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accepted_admin_invitations",
+    )
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="revoked_admin_invitations",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["email", "status"]),
+            models.Index(fields=["token", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Admin invitation for {self.email}"
+
+    @property
+    def is_expired(self) -> bool:
+        return timezone.now() >= self.token_expires_at
+
+    @property
+    def is_effective(self) -> bool:
+        return self.status == self.Status.PENDING and not self.is_expired
 
 
 class UserSession(models.Model):

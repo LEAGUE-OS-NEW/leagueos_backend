@@ -25,7 +25,6 @@ extend-exclude = [
 select = [
     "E",
     "F",
-    "I",
     "UP",
     "B",
     "DJ",
