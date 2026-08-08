@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
-from django.db import transaction
-
 from accounts.models import User
+from django.db import transaction
 from wallets.exceptions import (
     InsufficientFundsError,
     WalletOperationError,
