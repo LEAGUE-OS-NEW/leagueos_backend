@@ -392,6 +392,54 @@ SYSTEM_PERMISSIONS = [
         "action": "manage",
         "description": "Manage sports data.",
     },
+    {
+        "name": "admin.users.view",
+        "resource": "admin",
+        "action": "users.view",
+        "description": "View administrative users.",
+    },
+    {
+        "name": "admin.users.manage",
+        "resource": "admin",
+        "action": "users.manage",
+        "description": "Manage administrative users.",
+    },
+    {
+        "name": "admin.users.invite",
+        "resource": "admin",
+        "action": "users.invite",
+        "description": "Invite administrators.",
+    },
+    {
+        "name": "admin.roles.view",
+        "resource": "admin",
+        "action": "roles.view",
+        "description": "View roles.",
+    },
+    {
+        "name": "admin.permissions.view",
+        "resource": "admin",
+        "action": "permissions.view",
+        "description": "View permissions.",
+    },
+    {
+        "name": "admin.audit.view",
+        "resource": "admin",
+        "action": "audit.view",
+        "description": "View audit logs.",
+    },
+    {
+        "name": "admin.dashboard.view",
+        "resource": "admin",
+        "action": "dashboard.view",
+        "description": "View administrative dashboard.",
+    },
+    {
+        "name": "admin.configuration.manage",
+        "resource": "admin",
+        "action": "configuration.manage",
+        "description": "Manage platform configuration.",
+    },
 ]
 
 ROLE_PERMISSIONS = {

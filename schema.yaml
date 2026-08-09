@@ -1425,6 +1425,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/UnreadCount'
           description: ''
+  /api/v1/admin/audit/:
+    get:
+      operationId: admin_audit_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminAuditLog'
+          description: ''
   /api/v1/admin/compliance/decisions/:
     get:
       operationId: api_v1_admin_compliance_decisions_list
@@ -1680,6 +1696,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/RiskAssessment'
           description: ''
+  /api/v1/admin/dashboard/:
+    get:
+      operationId: admin_dashboard_summary
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardSummary'
+          description: ''
   /api/v1/admin/invitations/:
     get:
       operationId: admin_invitations_list
@@ -1725,9 +1755,78 @@ paths:
           description: No response body
         '403':
           description: No response body
+  /api/v1/admin/invitations/{invitation_id}/revoke/:
+    post:
+      operationId: admin_invitation_revoke
+      parameters:
+      - in: path
+        name: invitation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminInvitationRead'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminInvitationRead'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminInvitationRead'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminInvitationRead'
+          description: ''
+        '400':
+          description: No response body
+        '403':
+          description: No response body
+        '404':
+          description: No response body
   /api/v1/admin/me/:
     get:
       operationId: admin_me
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/admin/me/permissions/:
+    get:
+      operationId: admin_me_permissions
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/admin/me/roles/:
+    get:
+      operationId: admin_me_roles
       tags:
       - api
       security:
@@ -1872,6 +1971,64 @@ paths:
         '404':
           description: No response body
   /api/v1/admin/users/{user_id}/roles/:
+    get:
+      operationId: admin_user_roles_list
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminRole'
+          description: ''
+        '403':
+          description: No response body
+        '404':
+          description: No response body
+  /api/v1/admin/users/{user_id}/roles/{role_id}/:
+    delete:
+      operationId: admin_user_role_revoke
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserList'
+          description: ''
+        '403':
+          description: No response body
+        '404':
+          description: No response body
+  /api/v1/admin/users/{user_id}/roles/assign/:
     post:
       operationId: admin_user_role_assign
       parameters:
@@ -1906,37 +2063,6 @@ paths:
           description: ''
         '400':
           description: No response body
-        '403':
-          description: No response body
-        '404':
-          description: No response body
-  /api/v1/admin/users/{user_id}/roles/{role_id}/:
-    delete:
-      operationId: admin_user_role_revoke
-      parameters:
-      - in: path
-        name: role_id
-        schema:
-          type: string
-          format: uuid
-        required: true
-      - in: path
-        name: user_id
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - api
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminUserList'
-          description: ''
         '403':
           description: No response body
         '404':
@@ -7632,6 +7758,171 @@ components:
       - evidence_reference
       - lines
       - reason
+    AdminAuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        actor_email:
+          type: string
+          format: email
+          readOnly: true
+          nullable: true
+        action:
+          $ref: '#/components/schemas/AdminAuditLogActionEnum'
+        resource_type:
+          type: string
+          maxLength: 64
+        resource_id:
+          type: string
+          format: uuid
+          nullable: true
+        request_id:
+          type: string
+          maxLength: 100
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+        metadata: {}
+        timestamp:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+      - actor_email
+      - id
+      - timestamp
+    AdminAuditLogActionEnum:
+      enum:
+      - USER_REGISTERED
+      - VERIFICATION_EMAIL_SENT
+      - OTP_VERIFIED
+      - ACCOUNT_ACTIVATED
+      - OTP_RESENT
+      - FAILED_VERIFICATION
+      - EMAIL_VERIFICATION_REQUESTED
+      - EMAIL_VERIFICATION_SENT
+      - EMAIL_VERIFICATION_RESENT
+      - EMAIL_VERIFICATION_SUCCESS
+      - EMAIL_VERIFICATION_FAILED
+      - EMAIL_VERIFICATION_EXPIRED
+      - PASSWORD_RESET_REQUESTED
+      - PASSWORD_RESET_EMAIL_SENT
+      - PASSWORD_RESET_VERIFIED
+      - PASSWORD_RESET_SUCCESS
+      - PASSWORD_RESET_FAILED
+      - PASSWORD_RESET_EXPIRED
+      - PASSWORD_RESET_TOKEN_REUSED
+      - ALL_SESSIONS_TERMINATED
+      - PROFILE_VIEWED
+      - PROFILE_UPDATED
+      - FAVOURITE_CLUB_UPDATED
+      - AVATAR_UPLOADED
+      - AVATAR_UPDATED
+      - AVATAR_DELETED
+      - UPLOAD_FAILED
+      - ONBOARDING_STARTED
+      - COUNTRY_SELECTED
+      - SPORT_SELECTED
+      - COMPETITION_SELECTED
+      - CLUB_SELECTED
+      - STEP_SKIPPED
+      - ONBOARDING_RESUMED
+      - ONBOARDING_COMPLETED
+      - PREFERENCES_UPDATED
+      - DASHBOARD_CONFIGURATION_GENERATED
+      - MARKET_ORDER_BLOCKED
+      - ADMIN_INVITED
+      - ADMIN_INVITATION_ACCEPTED
+      - ADMIN_DISABLED
+      - ADMIN_ENABLED
+      - ROLE_ASSIGNED
+      - ROLE_REVOKED
+      - PERMISSION_GRANTED
+      - PERMISSION_REVOKED
+      - MARKET_CREATED
+      - MARKET_UPDATED
+      - MARKET_REVIEWED
+      - MARKET_APPROVED
+      - MARKET_REJECTED
+      - MARKET_PUBLISHED
+      - MARKET_SUSPENDED
+      - MARKET_RESUMED
+      - MARKET_CLOSED
+      - MARKET_ARCHIVED
+      - RESULT_VERIFIED
+      - RESULT_REVERIFIED
+      - COMPLIANCE_ACTION
+      - FINANCIAL_RECONCILIATION
+      - PLATFORM_CONFIGURATION_CHANGED
+      type: string
+      description: |-
+        * `USER_REGISTERED` - User registered
+        * `VERIFICATION_EMAIL_SENT` - Verification email sent
+        * `OTP_VERIFIED` - OTP verified
+        * `ACCOUNT_ACTIVATED` - Account activated
+        * `OTP_RESENT` - OTP resent
+        * `FAILED_VERIFICATION` - Failed verification
+        * `EMAIL_VERIFICATION_REQUESTED` - Email verification requested
+        * `EMAIL_VERIFICATION_SENT` - Email verification sent
+        * `EMAIL_VERIFICATION_RESENT` - Email verification resent
+        * `EMAIL_VERIFICATION_SUCCESS` - Email verification success
+        * `EMAIL_VERIFICATION_FAILED` - Email verification failed
+        * `EMAIL_VERIFICATION_EXPIRED` - Email verification expired
+        * `PASSWORD_RESET_REQUESTED` - Password reset requested
+        * `PASSWORD_RESET_EMAIL_SENT` - Password reset email sent
+        * `PASSWORD_RESET_VERIFIED` - Password reset verified
+        * `PASSWORD_RESET_SUCCESS` - Password reset successful
+        * `PASSWORD_RESET_FAILED` - Password reset failed
+        * `PASSWORD_RESET_EXPIRED` - Password reset token expired
+        * `PASSWORD_RESET_TOKEN_REUSED` - Password reset token reused
+        * `ALL_SESSIONS_TERMINATED` - All sessions terminated
+        * `PROFILE_VIEWED` - Profile viewed
+        * `PROFILE_UPDATED` - Profile updated
+        * `FAVOURITE_CLUB_UPDATED` - Favourite club updated
+        * `AVATAR_UPLOADED` - Avatar uploaded
+        * `AVATAR_UPDATED` - Avatar updated
+        * `AVATAR_DELETED` - Avatar deleted
+        * `UPLOAD_FAILED` - Upload failed
+        * `ONBOARDING_STARTED` - Onboarding started
+        * `COUNTRY_SELECTED` - Country selected
+        * `SPORT_SELECTED` - Sport selected
+        * `COMPETITION_SELECTED` - Competition selected
+        * `CLUB_SELECTED` - Club selected
+        * `STEP_SKIPPED` - Onboarding step skipped
+        * `ONBOARDING_RESUMED` - Onboarding resumed
+        * `ONBOARDING_COMPLETED` - Onboarding completed
+        * `PREFERENCES_UPDATED` - Preferences updated
+        * `DASHBOARD_CONFIGURATION_GENERATED` - Dashboard configuration generated
+        * `MARKET_ORDER_BLOCKED` - Market order blocked
+        * `ADMIN_INVITED` - Admin invited
+        * `ADMIN_INVITATION_ACCEPTED` - Admin invitation accepted
+        * `ADMIN_DISABLED` - Admin disabled
+        * `ADMIN_ENABLED` - Admin enabled
+        * `ROLE_ASSIGNED` - Role assigned
+        * `ROLE_REVOKED` - Role revoked
+        * `PERMISSION_GRANTED` - Permission granted
+        * `PERMISSION_REVOKED` - Permission revoked
+        * `MARKET_CREATED` - Market created
+        * `MARKET_UPDATED` - Market updated
+        * `MARKET_REVIEWED` - Market reviewed
+        * `MARKET_APPROVED` - Market approved
+        * `MARKET_REJECTED` - Market rejected
+        * `MARKET_PUBLISHED` - Market published
+        * `MARKET_SUSPENDED` - Market suspended
+        * `MARKET_RESUMED` - Market resumed
+        * `MARKET_CLOSED` - Market closed
+        * `MARKET_ARCHIVED` - Market archived
+        * `RESULT_VERIFIED` - Result verified
+        * `RESULT_REVERIFIED` - Result re-verified
+        * `COMPLIANCE_ACTION` - Compliance action
+        * `FINANCIAL_RECONCILIATION` - Financial reconciliation
+        * `PLATFORM_CONFIGURATION_CHANGED` - Platform configuration changed
     AdminComplianceDetail:
       type: object
       properties:
@@ -7682,6 +7973,30 @@ components:
       - requirements
       - reviewed_at
       - reviewed_by
+    AdminDashboardSummary:
+      type: object
+      properties:
+        active_administrators:
+          type: integer
+        role_distribution:
+          type: array
+          items: {}
+        pending_markets:
+          type: integer
+        published_markets:
+          type: integer
+        suspended_markets:
+          type: integer
+        pending_result_verification:
+          type: integer
+        compliance_cases:
+          type: integer
+        support_cases:
+          type: integer
+        financial_reconciliation_status:
+          type: integer
+        sports_data_issues:
+          type: integer
     AdminInvitationCreate:
       type: object
       properties:
@@ -8012,7 +8327,6 @@ components:
           nullable: true
       required:
       - role_id
-      - user_id
     AdminUserList:
       type: object
       properties:
@@ -14551,6 +14865,8 @@ components:
           items:
             type: string
             format: uuid
+        is_active:
+          type: boolean
     PatchedClubMedia:
       type: object
       properties:

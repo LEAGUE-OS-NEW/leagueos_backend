@@ -55,5 +55,22 @@ class SessionService:
         )
 
     @staticmethod
+    def invalidate_user_sessions(user):
+        """Terminate all active sessions for a user.
+
+        Used when a user's roles or permissions change so that their
+        existing access tokens no longer reflect the new authorization.
+        """
+        SessionService.terminate_user_sessions(user)
+        from rest_framework_simplejwt.token_blacklist.models import (
+            BlacklistedToken,
+            OutstandingToken,
+        )
+
+        outstanding_tokens = OutstandingToken.objects.filter(user=user)
+        for token in outstanding_tokens:
+            BlacklistedToken.objects.get_or_create(token=token)
+
+    @staticmethod
     def get_active_sessions(user):
         return UserSession.objects.filter(user=user, is_active=True)
