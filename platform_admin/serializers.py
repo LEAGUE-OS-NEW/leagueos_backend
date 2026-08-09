@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from accounts.models import User
+from accounts.models import AuditLog, User
 from authentication.models import AdminInvitation, Permission, Role
 
 
@@ -93,7 +93,7 @@ class AdminPermissionSerializer(serializers.ModelSerializer):
 
 
 class AdminRoleAssignmentSerializer(serializers.Serializer):
-    user_id = serializers.UUIDField()
+    user_id = serializers.UUIDField(required=False)
     role_id = serializers.UUIDField()
     expires_at = serializers.DateTimeField(required=False, allow_null=True)
 
@@ -103,4 +103,39 @@ class AdminRoleRevokeSerializer(serializers.Serializer):
 
 
 class AdminUserRoleUpdateSerializer(serializers.Serializer):
-    role_ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=True)
+    role_ids = serializers.ListField(
+        child=serializers.UUIDField(), allow_empty=True, required=False
+    )
+    is_active = serializers.BooleanField(required=False)
+
+
+class AdminAuditLogSerializer(serializers.ModelSerializer):
+    actor_email = serializers.EmailField(source="user.email", read_only=True, allow_null=True)
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            "id",
+            "actor_email",
+            "action",
+            "resource_type",
+            "resource_id",
+            "request_id",
+            "ip_address",
+            "user_agent",
+            "metadata",
+            "timestamp",
+        ]
+
+
+class AdminDashboardSummarySerializer(serializers.Serializer):
+    active_administrators = serializers.IntegerField(required=False)
+    role_distribution = serializers.ListField(required=False)
+    pending_markets = serializers.IntegerField(required=False)
+    published_markets = serializers.IntegerField(required=False)
+    suspended_markets = serializers.IntegerField(required=False)
+    pending_result_verification = serializers.IntegerField(required=False)
+    compliance_cases = serializers.IntegerField(required=False)
+    support_cases = serializers.IntegerField(required=False)
+    financial_reconciliation_status = serializers.IntegerField(required=False)
+    sports_data_issues = serializers.IntegerField(required=False)

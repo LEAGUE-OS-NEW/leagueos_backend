@@ -148,6 +148,29 @@ class AuditLog(models.Model):
         ("PREFERENCES_UPDATED", "Preferences updated"),
         ("DASHBOARD_CONFIGURATION_GENERATED", "Dashboard configuration generated"),
         ("MARKET_ORDER_BLOCKED", "Market order blocked"),
+        ("ADMIN_INVITED", "Admin invited"),
+        ("ADMIN_INVITATION_ACCEPTED", "Admin invitation accepted"),
+        ("ADMIN_DISABLED", "Admin disabled"),
+        ("ADMIN_ENABLED", "Admin enabled"),
+        ("ROLE_ASSIGNED", "Role assigned"),
+        ("ROLE_REVOKED", "Role revoked"),
+        ("PERMISSION_GRANTED", "Permission granted"),
+        ("PERMISSION_REVOKED", "Permission revoked"),
+        ("MARKET_CREATED", "Market created"),
+        ("MARKET_UPDATED", "Market updated"),
+        ("MARKET_REVIEWED", "Market reviewed"),
+        ("MARKET_APPROVED", "Market approved"),
+        ("MARKET_REJECTED", "Market rejected"),
+        ("MARKET_PUBLISHED", "Market published"),
+        ("MARKET_SUSPENDED", "Market suspended"),
+        ("MARKET_RESUMED", "Market resumed"),
+        ("MARKET_CLOSED", "Market closed"),
+        ("MARKET_ARCHIVED", "Market archived"),
+        ("RESULT_VERIFIED", "Result verified"),
+        ("RESULT_REVERIFIED", "Result re-verified"),
+        ("COMPLIANCE_ACTION", "Compliance action"),
+        ("FINANCIAL_RECONCILIATION", "Financial reconciliation"),
+        ("PLATFORM_CONFIGURATION_CHANGED", "Platform configuration changed"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -158,7 +181,10 @@ class AuditLog(models.Model):
         blank=True,
         related_name="audit_logs",
     )
-    action = models.CharField(max_length=40, choices=ACTION_CHOICES)
+    action = models.CharField(max_length=64, choices=ACTION_CHOICES, db_index=True)
+    resource_type = models.CharField(max_length=64, blank=True, db_index=True)
+    resource_id = models.UUIDField(null=True, blank=True, db_index=True)
+    request_id = models.CharField(max_length=100, blank=True, db_index=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
     metadata = models.JSONField(default=dict, blank=True)

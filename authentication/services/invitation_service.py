@@ -17,11 +17,24 @@ class InvitationService:
         invited_by: User,
         expires_in_days: int = 7,
     ) -> AdminInvitation:
+        email = email.lower().strip()
+
+        duplicate = AdminInvitation.objects.filter(
+            email=email,
+            status=AdminInvitation.Status.PENDING,
+        ).first()
+
+        if duplicate:
+            raise ValueError(
+                f"A pending invitation already exists for {email}. "
+                "Revoke the existing invitation before creating a new one."
+            )
+
         token = secrets.token_urlsafe(32)
         expires_at = timezone.now() + timezone.timedelta(days=expires_in_days)
 
         invitation = AdminInvitation.objects.create(
-            email=email.lower().strip(),
+            email=email,
             token=token,
             token_expires_at=expires_at,
             invited_by=invited_by,
