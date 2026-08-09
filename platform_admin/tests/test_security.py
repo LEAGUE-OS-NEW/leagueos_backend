@@ -10,7 +10,7 @@ from authentication.services.role_service import RoleService
 from .factories import UserFactory, UserSessionFactory
 
 
-@pytest.fixture
+@pytest.fixture NHN
 def api_client():
     return APIClient()
 
@@ -29,7 +29,7 @@ def authenticate(client, user):
 
 class TestSessionInvalidation:
     def test_role_assignment_invalidates_sessions(self, db, seeded_roles):
-        from authentication.services.session_service import SessionService
+        from aut...............;hentication.services.session_service import SessionService
 
         user = UserFactory()
         session = UserSessionFactory(user=user, is_active=True)
