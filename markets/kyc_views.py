@@ -100,9 +100,7 @@ class KYCCallbackView(GenericAPIView):
             reason = (
                 "UNSUPPORTED_PROVIDER"
                 if "provider" in str(exc).lower()
-                else "INVALID_SIGNATURE"
-                if "signature" in str(exc).lower()
-                else "INVALID_CALLBACK"
+                else "INVALID_SIGNATURE" if "signature" in str(exc).lower() else "INVALID_CALLBACK"
             )
             from notifications.services.operational_alert_service import OperationalAlertService
 

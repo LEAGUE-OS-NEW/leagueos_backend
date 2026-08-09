@@ -57,20 +57,12 @@ class MarketRiskService:
         band = (
             "LOW"
             if score < 20
-            else "MEDIUM"
-            if score < 40
-            else "HIGH"
-            if score < 70
-            else "CRITICAL"
+            else "MEDIUM" if score < 40 else "HIGH" if score < 70 else "CRITICAL"
         )
         action = (
             "BLOCK"
             if band == "CRITICAL"
-            else "REVIEW"
-            if band == "HIGH"
-            else "MONITOR"
-            if band == "MEDIUM"
-            else "NONE"
+            else "REVIEW" if band == "HIGH" else "MONITOR" if band == "MEDIUM" else "NONE"
         )
         summary = {
             "kyc_status": compliance.kyc_status,
