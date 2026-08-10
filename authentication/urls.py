@@ -1,53 +1,28 @@
-from django.urls import path
-
-from authentication.views import (
-    LoginView,
-    LogoutAllView,
-    LogoutView,
-    MeView,
-    PasswordResetConfirmView,
-    PasswordResetRequestView,
-    PasswordResetVerifyView,
-    ProfileView,
-    SessionListView,
-    TokenRefreshView,
+from django.contrib import admin
+from django.urls import include, path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
 )
 
-app_name = "authentication"
-
 urlpatterns = [
-    path("login/", LoginView.as_view(), name="login"),
+    path("admin/", admin.site.urls),
+    # API v1
+    path("api/v1/accounts/", include("accounts.urls", namespace="accounts")),
+    path("api/v1/auth/", include("authentication.urls", namespace="authentication")),
     path(
-        "token/refresh/",
-        TokenRefreshView.as_view(),
-        name="token-refresh",
+        "api/v1/admin/",
+        include("authentication.admin_urls", namespace="admin_authentication"),
     ),
-    path("logout/", LogoutView.as_view(), name="logout"),
+    # Other apps would be included here
+    # ...
+    # OpenAPI Schema
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
-        "logout-all/",
-        LogoutAllView.as_view(),
-        name="logout-all",
+        "api/schema/swagger-ui/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
     ),
-    path("profile/", ProfileView.as_view(), name="profile"),
-    path("me/", MeView.as_view(), name="me"),
-    path(
-        "sessions/",
-        SessionListView.as_view(),
-        name="sessions",
-    ),
-    path(
-        "password-reset/request/",
-        PasswordResetRequestView.as_view(),
-        name="password-reset-request",
-    ),
-    path(
-        "password-reset/verify/",
-        PasswordResetVerifyView.as_view(),
-        name="password-reset-verify",
-    ),
-    path(
-        "password-reset/confirm/",
-        PasswordResetConfirmView.as_view(),
-        name="password-reset-confirm",
-    ),
+    path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ]
