@@ -78,6 +78,7 @@ class DatabaseBackedPermissionTests(APITestCase):
         )
         permission = Permission.objects.create(
             name="approve_market",
+            code="approve_market",
             resource="market",
             action="approve",
             description="Approve market items.",
@@ -127,6 +128,7 @@ class DatabaseBackedPermissionTests(APITestCase):
         )
         permission = Permission.objects.create(
             name="approve_market",
+            code="approve_market",
             resource="market",
             action="approve",
         )
@@ -161,6 +163,7 @@ class DatabaseBackedPermissionTests(APITestCase):
         )
         permission = Permission.objects.create(
             name="approve_market",
+            code="approve_market",
             resource="market",
             action="approve",
         )
