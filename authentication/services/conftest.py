@@ -8,7 +8,6 @@ from authentication.tests.conftest import (
     user_factory,
 )
 
-
 __all__ = [
     "user_factory",
     "role_factory",
