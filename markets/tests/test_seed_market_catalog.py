@@ -5,9 +5,19 @@ from django.test import TestCase
 
 from markets.models import MarketCategory
 
+EXPECTED_CATEGORIES = [
+    "Match Result",
+    "Totals",
+    "Handicap / Spread",
+    "Correct Score / Margin",
+    "Player / Team Prop",
+    "Tournament / Season",
+    "Event / Occurrence",
+]
+
 
 class SeedMarketCatalogCommandTests(TestCase):
-    def test_seed_creates_match_result_category(self):
+    def test_seed_creates_required_market_categories(self):
         output = StringIO()
 
         call_command(
@@ -15,20 +25,20 @@ class SeedMarketCatalogCommandTests(TestCase):
             stdout=output,
         )
 
-        category = MarketCategory.objects.get(
-            name="Match Result",
+        categories = list(
+            MarketCategory.objects.filter(
+                is_active=True,
+            )
+            .order_by("display_order")
+            .values_list(
+                "name",
+                flat=True,
+            )
         )
 
-        self.assertTrue(
-            category.is_active,
-        )
         self.assertEqual(
-            category.slug,
-            "match-result",
-        )
-        self.assertEqual(
-            category.display_order,
-            10,
+            categories,
+            EXPECTED_CATEGORIES,
         )
 
         self.assertIn(
@@ -48,8 +58,6 @@ class SeedMarketCatalogCommandTests(TestCase):
         )
 
         self.assertEqual(
-            MarketCategory.objects.filter(
-                name="Match Result",
-            ).count(),
-            1,
+            MarketCategory.objects.count(),
+            len(EXPECTED_CATEGORIES),
         )
