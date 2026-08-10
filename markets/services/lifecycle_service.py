@@ -97,11 +97,6 @@ class MarketLifecycleService:
             },
             action="approve",
         )
-        cls._require_independent_approver(
-            market,
-            actor,
-        )
-
         clean_notes = cls._clean_notes(notes)
         now = timezone.now()
 
@@ -141,11 +136,6 @@ class MarketLifecycleService:
             },
             action="reject",
         )
-        cls._require_independent_approver(
-            market,
-            actor,
-        )
-
         clean_notes = cls._clean_notes(notes)
 
         return cls._apply_transition(
@@ -339,14 +329,6 @@ class MarketLifecycleService:
             permission_name,
         ):
             raise PermissionDenied("You do not have the " f"{permission_name} permission.")
-
-    @staticmethod
-    def _require_independent_approver(
-        market: Market,
-        actor,
-    ) -> None:
-        if market.created_by_id is not None and market.created_by_id == actor.id:
-            raise PermissionDenied("Market creators cannot approve " "or reject their own markets.")
 
     @staticmethod
     def _require_status(
