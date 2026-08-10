@@ -99,7 +99,7 @@ class TestSubordinateUserCreation:
         THEN a new user is created with the correct role and a 201 status is returned.
         """
         api_client.force_authenticate(user=super_admin)
-        url = reverse("admin:subordinate-user-list")
+        url = reverse("admin_authentication:subordinate-user-list")
         data = {
             "email": "new.platform.admin@leagueos.com",
             "first_name": "New",
@@ -129,7 +129,7 @@ class TestSubordinateUserCreation:
         THEN a new user is created with the correct role and workspace membership.
         """
         api_client.force_authenticate(user=club_admin_a)
-        url = reverse("admin:subordinate-user-list")
+        url = reverse("admin_authentication:subordinate-user-list")
         data = {
             "email": "new.content.manager@club.com",
             "first_name": "New",
@@ -155,7 +155,7 @@ class TestSubordinateUserCreation:
         THEN the request is forbidden with a 403 status.
         """
         api_client.force_authenticate(user=club_admin_a)
-        url = reverse("admin:subordinate-user-list")
+        url = reverse("admin_authentication:subordinate-user-list")
         data = {
             "email": "hacker@club.com",
             "first_name": "Hacker",
@@ -182,7 +182,7 @@ class TestSubordinateUserCreation:
         THEN the request is forbidden with a 403 status.
         """
         api_client.force_authenticate(user=club_admin_a)
-        url = reverse("admin:subordinate-user-list")
+        url = reverse("admin_authentication:subordinate-user-list")
         data = {
             "email": "cross.workspace@club.com",
             "first_name": "Cross",
@@ -208,7 +208,7 @@ class TestSubordinateUserListingAndRetrieval:
         THEN they see all subordinate users regardless of workspace.
         """
         api_client.force_authenticate(user=super_admin)
-        url = reverse("admin:subordinate-user-list")
+        url = reverse("admin_authentication:subordinate-user-list")
 
         response = api_client.get(url)
 
@@ -231,7 +231,7 @@ class TestSubordinateUserListingAndRetrieval:
         THEN they only see users who are members of Workspace A.
         """
         api_client.force_authenticate(user=club_admin_a)
-        url = reverse("admin:subordinate-user-list")
+        url = reverse("admin_authentication:subordinate-user-list")
 
         response = api_client.get(url)
 
@@ -250,7 +250,7 @@ class TestSubordinateUserListingAndRetrieval:
         THEN the request is successful.
         """
         api_client.force_authenticate(user=club_admin_a)
-        url = reverse("admin:subordinate-user-detail", kwargs={"pk": user_in_workspace_a.id})
+        url = reverse("admin_authentication:subordinate-user-detail", kwargs={"pk": user_in_workspace_a.id})
 
         response = api_client.get(url)
 
@@ -266,7 +266,7 @@ class TestSubordinateUserListingAndRetrieval:
         THEN the request fails with a 404 Not Found.
         """
         api_client.force_authenticate(user=club_admin_a)
-        url = reverse("admin:subordinate-user-detail", kwargs={"pk": user_in_workspace_b.id})
+        url = reverse("admin_authentication:subordinate-user-detail", kwargs={"pk": user_in_workspace_b.id})
 
         response = api_client.get(url)
 
@@ -280,7 +280,7 @@ class TestSubordinateUserListingAndRetrieval:
         """
         regular_user = user_factory(is_staff=True)
         api_client.force_authenticate(user=regular_user)
-        url = reverse("admin:subordinate-user-list")
+        url = reverse("admin_authentication:subordinate-user-list")
         data = {"email": "test@test.com"}
 
         response = api_client.post(url, data, format="json")

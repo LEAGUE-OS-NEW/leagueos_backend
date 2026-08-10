@@ -7,7 +7,7 @@ from authentication.admin_views import (
     SubordinateUserViewSet,
 )
 
-app_name = "admin"
+app_name = "admin_authentication"
 
 router = DefaultRouter()
 router.register("users", SubordinateUserViewSet, basename="subordinate-user")

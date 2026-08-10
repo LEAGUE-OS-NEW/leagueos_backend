@@ -80,6 +80,52 @@ class ClubWorkspace(TimeStampedUUIDModel):
         return f"{self.user} -> {self.club} ({self.role})"
 
 
+class WorkspaceMembership(TimeStampedUUIDModel):
+    """Membership of a user in a club workspace.
+
+    Encapsulates a user's role (and effective permissions) within a specific
+    ``ClubWorkspace``. Distinct from the platform-level ``Role``/``UserRole``
+    assignments; a club-scoped administrator is linked to clubs through this
+    model.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="workspace_memberships",
+    )
+    workspace = models.ForeignKey(
+        ClubWorkspace,
+        on_delete=models.CASCADE,
+        related_name="workspace_memberships",
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=ClubWorkspace.WorkspaceRole.choices,
+        db_index=True,
+    )
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="added_workspace_memberships",
+    )
+    added_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        unique_together = [("user", "workspace")]
+        ordering = ["-added_at"]
+        indexes = [
+            models.Index(fields=["workspace", "is_active", "role"]),
+            models.Index(fields=["user", "is_active"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} -> {self.workspace} ({self.role})"
+
+
 class StaffInvitation(TimeStampedUUIDModel):
     """Pending invitation for club staff."""
 

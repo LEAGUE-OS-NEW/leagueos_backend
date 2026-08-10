@@ -15,12 +15,13 @@ from authentication.admin_serializers import (
     SubordinateUserCreateSerializer,
     UserLifecycleSerializer,
 )
-from authentication.models import ClubWorkspace, Permission, Role
+from authentication.models import Permission, Role
 from authentication.permissions import HasPermission
 from authentication.serializers import UserProfileSerializer
 from authentication.services.delegation_service import DelegationService
 from authentication.services.role_service import RoleService
 from authentication.services.user_admin_service import UserAdminService
+from clubs.models import ClubWorkspace
 
 logger = logging.getLogger(__name__)
 
