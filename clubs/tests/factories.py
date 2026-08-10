@@ -39,6 +39,6 @@ class WorkspaceMembershipFactory(factory.django.DjangoModelFactory):
 
     user = factory.SubFactory("authentication.tests.factories.UserFactory")
     workspace = factory.SubFactory(ClubWorkspaceFactory)
-    role = WorkspaceMembership.WorkspaceRole.STAFF
+    role = ClubWorkspace.WorkspaceRole.STAFF
     added_by = None
     is_active = True
