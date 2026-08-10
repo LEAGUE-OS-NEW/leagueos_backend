@@ -4,7 +4,8 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import User
-from authentication.models import Permission, Role, UserRole, WorkspaceMembership
+from authentication.models import Permission, Role, UserRole
+from clubs.models import WorkspaceMembership
 
 pytestmark = pytest.mark.django_db
 
