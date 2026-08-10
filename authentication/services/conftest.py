@@ -1,7 +1,5 @@
 """Pytest fixtures for authentication services tests."""
 
-import pytest
-
 from authentication.tests.conftest import (
     club_workspace_factory,
     permission_factory,
