@@ -146,7 +146,7 @@ class DatabaseBackedPermissionTests(APITestCase):
         self.assertFalse(
             PermissionService.has_permission(
                 self.user,
-                "approve_market",
+                permission.code,
             )
         )
 

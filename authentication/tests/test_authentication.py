@@ -134,5 +134,5 @@ class RBACTests(APITestCase):
         user = UserFactory()
         UserRoleFactory(user=user, role=role)
 
-        self.assertTrue(PermissionService.has_permission(user, permission.name))
+        self.assertTrue(PermissionService.has_permission(user, permission.code))
         self.assertFalse(PermissionService.has_permission(user, "nonexistent"))

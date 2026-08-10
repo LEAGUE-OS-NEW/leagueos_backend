@@ -9,9 +9,9 @@ def populate_permission_data(apps, schema_editor):
 
     # Populate Permission fields
     for permission in Permission.objects.all():
-        # Generate code from resource:action
-        code = f"{permission.resource}.{permission.action}"
-        permission.code = code
+        # Use the permission name as the unique code
+        # The name field contains values like "approve_market", "manage_market", etc.
+        permission.code = permission.name
         permission.category = "General"
         permission.scope = "PLATFORM"
         permission.delegatable = True
@@ -41,6 +41,7 @@ def reverse_populate(apps, schema_editor):
     Role = apps.get_model("authentication", "Role")
 
     for permission in Permission.objects.all():
+        # Reset code to None (removing any suffixes added for duplicates)
         permission.code = None
         permission.category = None
         permission.scope = "PLATFORM"
