@@ -8,6 +8,20 @@ from django.utils import timezone
 
 
 class User(AbstractUser):
+    """League OS user.
+
+    ``account_status`` tracks the account lifecycle independently of Django's
+    ``is_active`` flag so that suspended/deactivated accounts can be clearly
+    distinguished from pending invitations.
+    """
+
+    class AccountStatus(models.TextChoices):
+        PENDING_INVITATION = "PENDING_INVITATION", "Pending Invitation"
+        ACTIVE = "ACTIVE", "Active"
+        SUSPENDED = "SUSPENDED", "Suspended"
+        DEACTIVATED = "DEACTIVATED", "Deactivated"
+        INVITATION_EXPIRED = "INVITATION_EXPIRED", "Invitation Expired"
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -26,6 +40,12 @@ class User(AbstractUser):
         choices=[("EMAIL", "Email"), ("SMS", "SMS")],
         blank=True,
         default="EMAIL",
+    )
+    account_status = models.CharField(
+        max_length=20,
+        choices=AccountStatus.choices,
+        default=AccountStatus.ACTIVE,
+        db_index=True,
     )
     failed_attempts = models.IntegerField(default=0)
     last_failed_attempt = models.DateTimeField(null=True, blank=True)
@@ -171,6 +191,20 @@ class AuditLog(models.Model):
         ("COMPLIANCE_ACTION", "Compliance action"),
         ("FINANCIAL_RECONCILIATION", "Financial reconciliation"),
         ("PLATFORM_CONFIGURATION_CHANGED", "Platform configuration changed"),
+        ("USER_CREATED", "User created"),
+        ("USER_INVITED", "User invited"),
+        ("INVITATION_RESENT", "Invitation resent"),
+        ("INVITATION_REVOKED", "Invitation revoked"),
+        ("ACCOUNT_ACTIVATED", "Account activated"),
+        ("ACCOUNT_SUSPENDED", "Account suspended"),
+        ("ACCOUNT_DEACTIVATED", "Account deactivated"),
+        ("ACCOUNT_REACTIVATED", "Account reactivated"),
+        ("PASSWORD_CHANGED", "Password changed"),
+        ("PASSWORD_SETUP_COMPLETED", "Password setup completed"),
+        ("WORKSPACE_ASSIGNED", "Workspace assigned"),
+        ("WORKSPACE_REMOVED", "Workspace removed"),
+        ("USER_ROLE_CHANGED", "User role changed"),
+        ("USER_PERMISSIONS_UPDATED", "User permissions updated"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -20,7 +20,8 @@ def user(email):
 
 def grant_manage_compliance(actor, suffix):
     permission, _ = Permission.objects.get_or_create(
-        name="manage_compliance", defaults={"resource": "compliance", "action": "manage"}
+        name="manage_compliance",
+        defaults={"code": "manage_compliance", "resource": "compliance", "action": "manage"},
     )
     role = Role.objects.create(name=f"compliance_{suffix}", display_name="Compliance")
     RolePermission.objects.create(role=role, permission=permission)

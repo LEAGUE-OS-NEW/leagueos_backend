@@ -1,5 +1,6 @@
 import logging
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -11,6 +12,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import AuditLog, User
+from accounts.serializers import build_response
 from authentication.models import UserSession
 from authentication.serializers import (
     AuthTokenResponseSerializer,
@@ -24,11 +26,13 @@ from authentication.serializers import (
     PasswordResetVerifySerializer,
     SessionSerializer,
     UserProfileSerializer,
+    ChangePasswordSerializer,
 )
 from authentication.services.auth_context_service import AuthContextService
 from authentication.services.authentication_service import AuthenticationService
 from authentication.services.login_history_service import LoginHistoryService
 from authentication.services.password_reset_service import PasswordResetService
+from authentication.services.password_change_service import PasswordChangeService
 from authentication.services.session_service import SessionService
 from authentication.services.token_service import TokenService
 
@@ -362,6 +366,45 @@ class PasswordResetVerifyView(APIView):
         )
 
 
+class ChangePasswordView(APIView):
+    """Allows an authenticated user to change their own password."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ChangePasswordSerializer
+
+    @extend_schema(
+        request=ChangePasswordSerializer,
+        responses={
+            200: {"description": "Password changed successfully."},
+            400: {"description": "Invalid input or validation error."},
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            PasswordChangeService.change_password(
+                user=request.user,
+                current_password=serializer.validated_data["current_password"],
+                new_password=serializer.validated_data["new_password"],
+                ip_address=get_client_ip(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
+        except PermissionError as e:
+            return Response(
+                build_response(False, str(e), errors={"current_password": [str(e)]}),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValidationError as e:
+            return Response(
+                build_response(False, e.message, errors={"new_password": e.messages}),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(build_response(True, "Password changed successfully."))
+
+
 class PasswordResetConfirmView(APIView):
     serializer_class = PasswordResetConfirmSerializer
     permission_classes = [permissions.AllowAny]
@@ -389,10 +432,3 @@ class PasswordResetConfirmView(APIView):
             build_response(success=False, message=result["message"]),
             status=status.HTTP_400_BAD_REQUEST,
         )
-
-
-def build_response(success: bool, message: str, data=None):
-    payload = {"success": success, "message": message}
-    if data is not None:
-        payload["data"] = data
-    return payload

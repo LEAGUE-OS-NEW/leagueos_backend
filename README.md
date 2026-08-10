@@ -63,6 +63,22 @@ Fan registration, email OTP verification, authentication, authorization, session
    python manage.py seed_lookups
    ```
 
+5. Provision the initial administrators (DEV ONLY):
+   ```bash
+   python manage.py bootstrap_admins
+   ```
+   This creates the initial Super Admin (`admin@leagueos.com`) and Club Admin
+   (`clubadmin@leagueos.com`). It is idempotent and never overwrites an existing
+   user's password.
+
+   > **IMPORTANT — development password must be changed in production.**
+   > With no `SUPER_ADMIN_INITIAL_PASSWORD` / `CLUB_ADMIN_INITIAL_PASSWORD`
+   > environment variables, the command uses the local development password
+   > `Strong123!`, but **only when `DEBUG=True`**. In any non-development
+   > environment (`DEBUG=False`) the command **refuses** to run without strong
+   > passwords supplied via those environment variables. Always set strong
+   > passwords via the environment before any production/first-boot deployment.
+
 5. Start the server:
    ```bash
    python manage.py runserver

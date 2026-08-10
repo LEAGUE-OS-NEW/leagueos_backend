@@ -537,7 +537,10 @@ class Command(BaseCommand):
 
         for permission_data in SYSTEM_PERMISSIONS:
             permission_name = permission_data["name"]
-            defaults = {key: value for key, value in permission_data.items() if key != "name"}
+            defaults = {
+                key: value for key, value in permission_data.items() if key not in ("name", "code")
+            }
+            defaults.setdefault("code", permission_name)
 
             permission, created = Permission.objects.update_or_create(
                 name=permission_name,

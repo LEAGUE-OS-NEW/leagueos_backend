@@ -52,6 +52,7 @@ class PermissionFactory(factory.django.DjangoModelFactory):
         model = Permission
 
     name = factory.Sequence(lambda n: f"perm_{n}")
+    code = factory.SelfAttribute("name")
     resource = factory.Faker("word")
     action = factory.Faker("word")
     description = factory.Faker("text")
