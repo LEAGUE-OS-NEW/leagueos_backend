@@ -10,8 +10,8 @@ from rest_framework.views import APIView
 from accounts.models import User
 from accounts.serializers import build_response
 from authentication.admin_serializers import (
-    AdminPermissionSerializer,
-    AdminRoleSerializer,
+    DelegatablePermissionSerializer,
+    DelegatableRoleSerializer,
     SubordinateUserCreateSerializer,
     UserLifecycleSerializer,
 )
@@ -30,13 +30,13 @@ class AvailableRolesView(APIView):
     """Provides a list of roles the current administrator can delegate."""
 
     permission_classes = [permissions.IsAuthenticated, HasPermission]
-    serializer_class = AdminRoleSerializer
+    serializer_class = DelegatableRoleSerializer
     required_permissions = [
         "platform.users.manage",
         "club.users.manage",
     ]
 
-    @extend_schema(responses={200: AdminRoleSerializer(many=True)})
+    @extend_schema(responses={200: DelegatableRoleSerializer(many=True)})
     def get(self, request, *args, **kwargs):
         delegatable_roles = DelegationService.get_delegatable_roles(request.user)
         serializer = self.serializer_class(delegatable_roles, many=True)
@@ -49,13 +49,13 @@ class AvailablePermissionsView(APIView):
     """Provides a list of permissions the current administrator can delegate."""
 
     permission_classes = [permissions.IsAuthenticated, HasPermission]
-    serializer_class = AdminPermissionSerializer
+    serializer_class = DelegatablePermissionSerializer
     required_permissions = [
         "platform.users.manage",
         "club.users.manage",
     ]
 
-    @extend_schema(responses={200: AdminPermissionSerializer(many=True)})
+    @extend_schema(responses={200: DelegatablePermissionSerializer(many=True)})
     def get(self, request, *args, **kwargs):
         delegatable_permissions = DelegationService.get_delegatable_permissions(request.user)
         serializer = self.serializer_class(delegatable_permissions, many=True)

@@ -5,7 +5,7 @@ from authentication.models import Permission, Role, UserPermission, UserRole
 from clubs.models import ClubWorkspace, WorkspaceMembership
 
 
-class AdminRoleSerializer(serializers.ModelSerializer):
+class DelegatableRoleSerializer(serializers.ModelSerializer):
     """Serializer for listing delegatable roles."""
 
     class Meta:
@@ -13,7 +13,7 @@ class AdminRoleSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "display_name", "description", "scope"]
 
 
-class AdminPermissionSerializer(serializers.ModelSerializer):
+class DelegatablePermissionSerializer(serializers.ModelSerializer):
     """Serializer for listing delegatable permissions."""
 
     class Meta:
@@ -68,7 +68,7 @@ class UserLifecycleSerializer(serializers.Serializer):
 class UserPermissionAssignmentSerializer(serializers.ModelSerializer):
     """Read-only serializer for a user's direct permission assignment."""
 
-    permission = AdminPermissionSerializer(read_only=True)
+    permission = DelegatablePermissionSerializer(read_only=True)
 
     class Meta:
         model = UserPermission
@@ -78,7 +78,7 @@ class UserPermissionAssignmentSerializer(serializers.ModelSerializer):
 class UserRoleAssignmentSerializer(serializers.ModelSerializer):
     """Read-only serializer for a user's role assignment."""
 
-    role = AdminRoleSerializer(read_only=True)
+    role = DelegatableRoleSerializer(read_only=True)
 
     class Meta:
         model = UserRole
