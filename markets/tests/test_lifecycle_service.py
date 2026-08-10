@@ -257,7 +257,7 @@ class MarketLifecycleServiceTests(TestCase):
             3,
         )
 
-    def test_creator_cannot_approve_own_market(self):
+    def test_creator_with_approval_permission_can_approve_own_market(self):
         UserRoleFactory(
             user=self.operations_user,
             role=self.approval_role,
@@ -266,18 +266,24 @@ class MarketLifecycleServiceTests(TestCase):
         market = self.create_market()
         market = self.submit(market)
 
-        with self.assertRaises(PermissionDenied):
-            MarketLifecycleService.approve(
-                market_id=market.id,
-                actor=self.operations_user,
-                notes="Self approval attempt.",
-            )
-
-        market.refresh_from_db()
+        market = MarketLifecycleService.approve(
+            market_id=market.id,
+            actor=self.operations_user,
+            notes="Creator approval permitted.",
+        )
 
         self.assertEqual(
             market.status,
-            Market.Status.PENDING_APPROVAL,
+            Market.Status.APPROVED,
+        )
+
+        self.assertEqual(
+            market.approved_by,
+            self.operations_user,
+        )
+
+        self.assertIsNotNone(
+            market.approved_at,
         )
 
     def test_approve_records_approver_and_timestamp(self):

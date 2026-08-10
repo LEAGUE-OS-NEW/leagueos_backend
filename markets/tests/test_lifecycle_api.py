@@ -309,33 +309,53 @@ class MarketLifecycleAPITests(APITestCase):
             MarketStatusTransition.Action.APPROVE,
         )
 
-    def test_creator_cannot_approve_own_market(self):
+    def test_creator_with_approval_permission_can_approve_own_market(self):
         UserRoleFactory(
             user=self.operations_user,
             role=self.approval_role,
         )
 
         market = self.submit_market(self.create_market())
+
         self.authenticate(self.operations_user)
 
         response = self.client.post(
-            self.action_url(market, "approve"),
+            self.action_url(
+                market,
+                "approve",
+            ),
             {
-                "notes": "Self approval attempt.",
+                "notes": "Creator approval permitted.",
             },
             format="json",
         )
 
         self.assertEqual(
             response.status_code,
-            status.HTTP_403_FORBIDDEN,
+            status.HTTP_200_OK,
+            response.data,
+        )
+
+        self.assertEqual(
+            response.data["status"],
+            Market.Status.APPROVED,
+        )
+
+        self.assertEqual(
+            response.data["approved_by"]["id"],
+            str(self.operations_user.id),
         )
 
         market.refresh_from_db()
 
         self.assertEqual(
             market.status,
-            Market.Status.PENDING_APPROVAL,
+            Market.Status.APPROVED,
+        )
+
+        self.assertEqual(
+            market.approved_by,
+            self.operations_user,
         )
 
     def test_reject_requires_notes(self):
