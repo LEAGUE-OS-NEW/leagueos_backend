@@ -188,7 +188,7 @@ class AuditLog(models.Model):
         ("MARKET_ARCHIVED", "Market archived"),
         ("RESULT_VERIFIED", "Result verified"),
         ("RESULT_REVERIFIED", "Result re-verified"),
-("COMPLIANCE_ACTION", "Compliance action"),
+        ("COMPLIANCE_ACTION", "Compliance action"),
         ("FINANCIAL_RECONCILIATION", "Financial reconciliation"),
         ("PLATFORM_CONFIGURATION_CHANGED", "Platform configuration changed"),
         ("USER_CREATED", "User created"),

@@ -10,6 +10,4 @@ class Command(BaseCommand):
         self.stdout.write("Cleaning up expired tokens...")
 
         setup_expired = AccountSetupService.expire_old_tokens()
-        self.stdout.write(
-            self.style.SUCCESS(f"Expired {setup_expired} account setup tokens")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Expired {setup_expired} account setup tokens"))

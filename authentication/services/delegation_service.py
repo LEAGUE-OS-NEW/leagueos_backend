@@ -5,7 +5,7 @@ from accounts.models import User
 from authentication.models import Permission, Role
 from authentication.services.permission_service import PermissionService
 from authentication.services.role_service import RoleService
-from clubs.models import ClubWorkspace, WorkspaceMembership
+from clubs.models import ClubWorkspace
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,10 @@ class DelegationService:
         # For other admins (like Club Admin), they can manage workspaces they are members of.
         return ClubWorkspace.objects.filter(
             workspace_memberships__user=admin,
-            workspace_memberships__role__in=["ADMIN", "STAFF"],  # Assuming these roles grant management
+            workspace_memberships__role__in=[
+                "ADMIN",
+                "STAFF",
+            ],  # Assuming these roles grant management
         ).distinct()
 
     @staticmethod
@@ -120,7 +123,9 @@ class DelegationService:
             return True
 
         manageable_workspaces = DelegationService.get_manageable_workspaces(actor)
-        return target_user.workspace_memberships.filter(workspace__in=manageable_workspaces).exists()
+        return target_user.workspace_memberships.filter(
+            workspace__in=manageable_workspaces
+        ).exists()
 
     @staticmethod
     def get_delegatable_roles(admin: User) -> list[Role]:
@@ -133,12 +138,10 @@ class DelegationService:
         """Get a list of permissions an admin is allowed to delegate."""
         # Start with permissions the admin possesses.
         admin_perms = PermissionService.get_user_permissions(admin)
-        
+
         # An admin can only delegate permissions they have, which are active and delegatable.
         delegatable_perms = Permission.objects.filter(
-            code__in=admin_perms,
-            active=True,
-            delegatable=True
+            code__in=admin_perms, active=True, delegatable=True
         ).order_by("category", "name")
 
         admin_roles = RoleService.get_user_roles(admin)

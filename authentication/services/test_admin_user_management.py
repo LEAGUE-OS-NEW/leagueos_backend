@@ -5,7 +5,6 @@ from rest_framework.test import APIClient
 
 from accounts.models import User
 from authentication.models import Permission, Role, UserRole, WorkspaceMembership
-from clubs.models import ClubWorkspace
 
 pytestmark = pytest.mark.django_db
 
@@ -117,7 +116,12 @@ class TestSubordinateUserCreation:
         assert new_user.user_roles.filter(role=platform_admin_role).exists()
 
     def test_club_admin_can_create_club_user(
-        self, api_client, club_admin_a, club_content_manager_role, club_workspace_a, permission_factory
+        self,
+        api_client,
+        club_admin_a,
+        club_content_manager_role,
+        club_workspace_a,
+        permission_factory,
     ):
         """
         GIVEN a logged-in Club Admin for Workspace A
@@ -165,7 +169,12 @@ class TestSubordinateUserCreation:
         assert not User.objects.filter(email=data["email"]).exists()
 
     def test_club_admin_cannot_assign_to_unmanaged_workspace(
-        self, api_client, club_admin_a, club_content_manager_role, club_workspace_b, permission_factory
+        self,
+        api_client,
+        club_admin_a,
+        club_content_manager_role,
+        club_workspace_b,
+        permission_factory,
     ):
         """
         GIVEN a logged-in Club Admin for Workspace A
@@ -262,7 +271,6 @@ class TestSubordinateUserListingAndRetrieval:
         response = api_client.get(url)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
-        assert not User.objects.filter(email=data["email"]).exists()
 
     def test_unauthorized_user_cannot_create_user(self, api_client, user_factory):
         """

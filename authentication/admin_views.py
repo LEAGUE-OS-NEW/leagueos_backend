@@ -1,7 +1,6 @@
 import logging
 
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -57,14 +56,10 @@ class AvailablePermissionsView(APIView):
 
     @extend_schema(responses={200: AdminPermissionSerializer(many=True)})
     def get(self, request, *args, **kwargs):
-        delegatable_permissions = DelegationService.get_delegatable_permissions(
-            request.user
-        )
+        delegatable_permissions = DelegationService.get_delegatable_permissions(request.user)
         serializer = self.serializer_class(delegatable_permissions, many=True)
         return Response(
-            build_response(
-                True, "Available permissions fetched.", {"permissions": serializer.data}
-            )
+            build_response(True, "Available permissions fetched.", {"permissions": serializer.data})
         )
 
 
@@ -74,9 +69,7 @@ class SubordinateUserViewSet(viewsets.GenericViewSet):
     """
 
     permission_classes = [permissions.IsAuthenticated, HasPermission]
-    queryset = User.objects.filter(is_staff=True, is_superuser=False).order_by(
-        "-date_joined"
-    )
+    queryset = User.objects.filter(is_staff=True, is_superuser=False).order_by("-date_joined")
 
     def get_queryset(self):
         """
@@ -153,9 +146,7 @@ class SubordinateUserViewSet(viewsets.GenericViewSet):
                 workspaces=workspaces,
             )
         except (PermissionError, ValueError) as e:
-            return Response(
-                build_response(False, str(e)), status=status.HTTP_403_FORBIDDEN
-            )
+            return Response(build_response(False, str(e)), status=status.HTTP_403_FORBIDDEN)
 
         response_serializer = UserProfileSerializer(user)
         return Response(

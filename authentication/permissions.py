@@ -12,8 +12,8 @@ class HasPermission(BasePermission):
     def has_permission(self, request, view) -> bool:
         required_permissions = getattr(
             view,
-            "required_permission", # For backward compatibility with single permission
-            getattr(view, "required_permissions", None), # New: for multiple permissions
+            "required_permission",  # For backward compatibility with single permission
+            getattr(view, "required_permissions", None),  # New: for multiple permissions
         )
 
         if not required_permissions:
@@ -21,25 +21,11 @@ class HasPermission(BasePermission):
                 f"{view.__class__.__name__} must define "
                 "'required_permission' or 'required_permissions' when using HasPermission."
             )
-        
+
         if isinstance(required_permissions, str):
             required_permissions = [required_permissions]
 
         return PermissionService.has_any_permission(
             request.user,
             required_permissions,
-        )
-
-            None,
-        )
-
-        if not required_permission:
-            raise ImproperlyConfigured(
-                f"{view.__class__.__name__} must define "
-                "'required_permission' when using HasPermission."
-            )
-
-        return PermissionService.has_permission(
-            request.user,
-            required_permission,
         )

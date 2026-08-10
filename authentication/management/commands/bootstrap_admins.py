@@ -72,8 +72,7 @@ DEFAULT_CLUB_NAME = "League OS Development"
 
 class Command(BaseCommand):
     help = (
-        "Provision the initial Super Admin and Club Admin accounts "
-        "(idempotent; dev/demo only)."
+        "Provision the initial Super Admin and Club Admin accounts " "(idempotent; dev/demo only)."
     )
 
     def add_arguments(self, parser):
@@ -83,7 +82,7 @@ class Command(BaseCommand):
             help=(
                 "Name of the club to associate the Club Admin with. Defaults to "
                 "the CLUB_ADMIN_CLUB_NAME environment variable or the development "
-                "club '%s'." % DEFAULT_CLUB_NAME
+                f"club '{DEFAULT_CLUB_NAME}'."
             ),
         )
 
@@ -131,9 +130,7 @@ class Command(BaseCommand):
             if hasattr(user, field_name):
                 setattr(user, field_name, True)
 
-    def _ensure_role(
-        self, name: str, display_name: str, description: str, scope: str
-    ) -> Role:
+    def _ensure_role(self, name: str, display_name: str, description: str, scope: str) -> Role:
         role, _ = Role.objects.get_or_create(
             name=name,
             defaults={
@@ -184,7 +181,6 @@ class Command(BaseCommand):
         )
         return club, created
 
-
     # ------------------------------------------------------------------- handle
 
     @transaction.atomic
@@ -207,16 +203,10 @@ class Command(BaseCommand):
 
         # 1b. Idempotently link the appropriate database-backed permissions.
         all_active_permissions = Permission.objects.filter(active=True)
-        club_permissions = all_active_permissions.filter(
-            scope=Permission.Scope.CLUB
-        )
+        club_permissions = all_active_permissions.filter(scope=Permission.Scope.CLUB)
 
-        super_admin_links = self._sync_role_permissions(
-            super_admin_role, all_active_permissions
-        )
-        club_admin_links = self._sync_role_permissions(
-            club_admin_role, club_permissions
-        )
+        super_admin_links = self._sync_role_permissions(super_admin_role, all_active_permissions)
+        club_admin_links = self._sync_role_permissions(club_admin_role, club_permissions)
         self.stdout.write(
             f"  - Roles ensured: '{SUPER_ADMIN_ROLE_NAME}' "
             f"(+{super_admin_links} permission links), "
@@ -245,13 +235,10 @@ class Command(BaseCommand):
         )
         if super_admin_created:
             self._set_password_for(super_admin, "SUPER_ADMIN_INITIAL_PASSWORD")
-            self.stdout.write(
-                self.style.SUCCESS(f"  - Created Super Admin: {SUPER_ADMIN_EMAIL}")
-            )
+            self.stdout.write(self.style.SUCCESS(f"  - Created Super Admin: {SUPER_ADMIN_EMAIL}"))
         else:
             self.stdout.write(
-                "  - Super Admin already exists "
-                f"(password untouched): {SUPER_ADMIN_EMAIL}"
+                "  - Super Admin already exists " f"(password untouched): {SUPER_ADMIN_EMAIL}"
             )
 
         RoleService.assign_role(user=super_admin, role=super_admin_role)
@@ -270,13 +257,10 @@ class Command(BaseCommand):
         )
         if club_admin_created:
             self._set_password_for(club_admin, "CLUB_ADMIN_INITIAL_PASSWORD")
-            self.stdout.write(
-                self.style.SUCCESS(f"  - Created Club Admin: {CLUB_ADMIN_EMAIL}")
-            )
+            self.stdout.write(self.style.SUCCESS(f"  - Created Club Admin: {CLUB_ADMIN_EMAIL}"))
         else:
             self.stdout.write(
-                "  - Club Admin already exists "
-                f"(password untouched): {CLUB_ADMIN_EMAIL}"
+                "  - Club Admin already exists " f"(password untouched): {CLUB_ADMIN_EMAIL}"
             )
 
         RoleService.assign_role(user=club_admin, role=club_admin_role)
@@ -296,19 +280,15 @@ class Command(BaseCommand):
         if workspace_created:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"  - Linked Club Admin to workspace of "
-                    f"'{club.name}' ({club.slug})."
+                    f"  - Linked Club Admin to workspace of " f"'{club.name}' ({club.slug})."
                 )
             )
         else:
             self.stdout.write(
-                f"  - Club Admin workspace membership already exists "
-                f"for '{club.name}'."
+                f"  - Club Admin workspace membership already exists " f"for '{club.name}'."
             )
 
-        self.stdout.write(
-            self.style.SUCCESS("Administrator bootstrapping complete.")
-        )
+        self.stdout.write(self.style.SUCCESS("Administrator bootstrapping complete."))
 
     def _set_password_for(self, user: User, env_var: str) -> None:
         """Hash and store the user's initial password (dev fallback or env).
@@ -320,4 +300,3 @@ class Command(BaseCommand):
         user.set_password(password)
         self._mark_password_change_required(user)
         user.save()
-

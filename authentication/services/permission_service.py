@@ -21,16 +21,18 @@ class PermissionService:
 
         if user.is_superuser:
             return list(
-                Permission.objects.filter(active=True).order_by("code").values_list(
+                Permission.objects.filter(active=True)
+                .order_by("code")
+                .values_list(
                     "code",
                     flat=True,
                 )
             )
 
         now = timezone.now()
-        active_user_roles = UserRole.objects.filter(
-            user=user, is_active=True
-        ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+        active_user_roles = UserRole.objects.filter(user=user, is_active=True).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+        )
 
         role_perm_codes = set(
             Permission.objects.filter(
@@ -39,9 +41,7 @@ class PermissionService:
         )
 
         direct_perm_codes = set(
-            UserPermission.objects.filter(
-                user=user, is_active=True, permission__active=True
-            )
+            UserPermission.objects.filter(user=user, is_active=True, permission__active=True)
             .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
             .values_list("permission__code", flat=True)
         )
@@ -58,7 +58,7 @@ class PermissionService:
 
         if user.is_superuser:
             return True
-        
+
         now = timezone.now()
         role_perm = RolePermission.objects.filter(
             role__user_roles__user=user,
@@ -66,19 +66,22 @@ class PermissionService:
             permission__code=permission_code,
             permission__active=True,
         ).filter(
-            Q(role__user_roles__expires_at__isnull=True)
-            | Q(role__user_roles__expires_at__gt=now)
+            Q(role__user_roles__expires_at__isnull=True) | Q(role__user_roles__expires_at__gt=now)
         )
 
         if role_perm.exists():
             return True
 
-        return UserPermission.objects.filter(
-            user=user,
-            permission__code=permission_code,
-            permission__active=True,
-            is_active=True,
-        ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now)).exists()
+        return (
+            UserPermission.objects.filter(
+                user=user,
+                permission__code=permission_code,
+                permission__active=True,
+                is_active=True,
+            )
+            .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+            .exists()
+        )
 
     @staticmethod
     def has_any_permission(

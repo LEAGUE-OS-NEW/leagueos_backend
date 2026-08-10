@@ -47,9 +47,7 @@ class BootstrapAdminsCommandTests(TestCase):
         )
 
         # Club Admin is bound to a club workspace with the ADMIN role.
-        workspace = ClubWorkspace.objects.get(
-            user=club_admin, is_active=True
-        )
+        workspace = ClubWorkspace.objects.get(user=club_admin, is_active=True)
         self.assertEqual(workspace.role, ClubWorkspace.WorkspaceRole.ADMIN)
         self.assertIsInstance(workspace.club, Club)
 
@@ -77,12 +75,8 @@ class BootstrapAdminsCommandTests(TestCase):
     def test_uses_environment_passwords(self):
         call_command("bootstrap_admins", verbosity=0)
 
-        self.assertTrue(
-            User.objects.get(email=SUPER_ADMIN_EMAIL).check_password("EnvSuperPass!1")
-        )
-        self.assertTrue(
-            User.objects.get(email=CLUB_ADMIN_EMAIL).check_password("EnvClubPass!1")
-        )
+        self.assertTrue(User.objects.get(email=SUPER_ADMIN_EMAIL).check_password("EnvSuperPass!1"))
+        self.assertTrue(User.objects.get(email=CLUB_ADMIN_EMAIL).check_password("EnvClubPass!1"))
 
     @mock.patch.dict(os.environ, {}, clear=False)
     @override_settings(DEBUG=True)
@@ -109,17 +103,13 @@ class BootstrapAdminsCommandTests(TestCase):
         self.assertEqual(User.objects.count(), counts_before["users"])
         self.assertEqual(Role.objects.count(), counts_before["roles"])
         self.assertEqual(Permission.objects.count(), counts_before["permissions"])
-        self.assertEqual(
-            RolePermission.objects.count(), counts_before["role_permissions"]
-        )
+        self.assertEqual(RolePermission.objects.count(), counts_before["role_permissions"])
         self.assertEqual(UserRole.objects.count(), counts_before["user_roles"])
         self.assertEqual(ClubWorkspace.objects.count(), counts_before["workspaces"])
         self.assertEqual(Club.objects.count(), counts_before["clubs"])
 
         # Existing user's password must not be overwritten.
-        self.assertTrue(
-            User.objects.get(email=SUPER_ADMIN_EMAIL).check_password("ChangedPass!2")
-        )
+        self.assertTrue(User.objects.get(email=SUPER_ADMIN_EMAIL).check_password("ChangedPass!2"))
 
     @override_settings(DEBUG=False)
     def test_production_refuses_development_password(self):
@@ -143,21 +133,14 @@ class BootstrapAdminsCommandTests(TestCase):
     def test_production_accepts_environment_passwords(self):
         call_command("bootstrap_admins", verbosity=0)
 
-        self.assertTrue(
-            User.objects.get(email=SUPER_ADMIN_EMAIL).check_password("ProdSuperPass!9")
-        )
-        self.assertTrue(
-            User.objects.get(email=CLUB_ADMIN_EMAIL).check_password("ProdClubPass!9")
-        )
+        self.assertTrue(User.objects.get(email=SUPER_ADMIN_EMAIL).check_password("ProdSuperPass!9"))
+        self.assertTrue(User.objects.get(email=CLUB_ADMIN_EMAIL).check_password("ProdClubPass!9"))
 
     @mock.patch.dict(os.environ, {}, clear=False)
     @override_settings(DEBUG=True)
     def test_club_name_option_controls_workspace(self):
         call_command("bootstrap_admins", "--club-name", "Aston Villa", verbosity=0)
 
-        workspace = ClubWorkspace.objects.get(
-            user__email=CLUB_ADMIN_EMAIL, is_active=True
-        )
+        workspace = ClubWorkspace.objects.get(user__email=CLUB_ADMIN_EMAIL, is_active=True)
         self.assertEqual(workspace.club.name, "Aston Villa")
         self.assertEqual(workspace.club.slug, "aston-villa")
-

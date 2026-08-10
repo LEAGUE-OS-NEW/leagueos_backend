@@ -56,8 +56,8 @@ class Permission(models.Model):
         CLUB = "CLUB", "Club"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    code = models.CharField(max_length=100, unique=True) # code is the primary unique identifier
-    name = models.CharField(max_length=255) # name is human-readable, not unique
+    code = models.CharField(max_length=100, unique=True)  # code is the primary unique identifier
+    name = models.CharField(max_length=255)  # name is human-readable, not unique
     resource = models.CharField(max_length=100)
     action = models.CharField(max_length=100)
     description = models.TextField(blank=True)

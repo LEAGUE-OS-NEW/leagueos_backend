@@ -31,9 +31,7 @@ class SubordinateUserCreateSerializer(serializers.Serializer):
     permission_ids = serializers.ListField(
         child=serializers.UUIDField(), required=False, default=[]
     )
-    workspace_ids = serializers.ListField(
-        child=serializers.UUIDField(), required=False, default=[]
-    )
+    workspace_ids = serializers.ListField(child=serializers.UUIDField(), required=False, default=[])
 
     def validate_email(self, value):
         email = value.lower().strip()
@@ -64,9 +62,7 @@ class SubordinateUserCreateSerializer(serializers.Serializer):
 class UserLifecycleSerializer(serializers.Serializer):
     """Serializer for actions that might include a reason."""
 
-    reason = serializers.CharField(
-        max_length=500, required=True, allow_blank=False
-    )
+    reason = serializers.CharField(max_length=500, required=True, allow_blank=False)
 
 
 class UserPermissionAssignmentSerializer(serializers.ModelSerializer):

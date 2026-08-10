@@ -432,10 +432,3 @@ class PasswordResetConfirmView(APIView):
             build_response(success=False, message=result["message"]),
             status=status.HTTP_400_BAD_REQUEST,
         )
-
-
-def build_response(success: bool, message: str, data=None):
-    payload = {"success": success, "message": message}
-    if data is not None:
-        payload["data"] = data
-    return payload

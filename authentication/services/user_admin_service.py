@@ -64,9 +64,7 @@ class UserAdminService:
 
         if permissions:
             for perm in permissions:
-                UserPermission.objects.create(
-                    user=user, permission=perm, granted_by=actor
-                )
+                UserPermission.objects.create(user=user, permission=perm, granted_by=actor)
 
         if workspaces:
             for workspace in workspaces:
@@ -95,9 +93,7 @@ class UserAdminService:
         return user
 
     @staticmethod
-    def _change_account_status(
-        *, actor: User, user: User, new_status: str, action: str
-    ) -> None:
+    def _change_account_status(*, actor: User, user: User, new_status: str, action: str) -> None:
         """Generic method to change a user's account status."""
         if not DelegationService.can_manage_user(actor, user):
             raise PermissionError(

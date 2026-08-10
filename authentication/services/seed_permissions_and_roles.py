@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 import logging
 
 from django.core.management.base import BaseCommand, CommandError
@@ -105,7 +107,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Successfully seeded permissions and roles."))
 
         except Exception as e:
-            raise CommandError(f"An error occurred during seeding: {e}")
+            raise CommandError(f"An error occurred during seeding: {e}") from e
 
     def _seed_permissions(self):
         """Create or update all Permission objects."""
@@ -142,9 +144,7 @@ class Command(BaseCommand):
             else:
                 updated_count += 1
 
-        self.stdout.write(
-            f"    - Permissions: {created_count} created, {updated_count} updated."
-        )
+        self.stdout.write(f"    - Permissions: {created_count} created, {updated_count} updated.")
 
     def _seed_roles_and_associations(self):
         """Create or update Roles and their Permission associations."""
