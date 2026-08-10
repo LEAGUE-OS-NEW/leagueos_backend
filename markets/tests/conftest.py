@@ -68,7 +68,7 @@ def sporting_event(db, sport, competition):
     """Create a basic sporting event for tests."""
     from datetime import timedelta
     from django.utils import timezone
-    
+
     return SportingEvent.objects.create(
         sport=sport,
         competition=competition,

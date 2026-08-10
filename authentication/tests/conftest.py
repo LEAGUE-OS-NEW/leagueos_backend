@@ -60,6 +60,7 @@ def login_history_factory():
 def club_workspace_factory():
     """Provide the ClubWorkspaceFactory for tests."""
     from clubs.tests.factories import ClubWorkspaceFactory
+
     return ClubWorkspaceFactory
 
 

@@ -6,11 +6,11 @@ from django.db import migrations, models
 def fix_permission_codes(apps, schema_editor):
     """Update permission codes to use the name field value."""
     Permission = apps.get_model("authentication", "Permission")
-    
+
     for permission in Permission.objects.all():
         # Update code to match the name field
         permission.code = permission.name
-        permission.save(update_fields=['code'])
+        permission.save(update_fields=["code"])
 
 
 class Migration(migrations.Migration):
