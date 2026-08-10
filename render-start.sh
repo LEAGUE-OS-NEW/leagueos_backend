@@ -5,6 +5,9 @@ set -eu
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 
+echo "Ensuring core market catalogue..."
+python manage.py seed_market_catalog
+
 case "${RUN_STARTUP_SEEDS:-false}" in
   true|TRUE|1|yes|YES)
     echo "Running initial staging seed commands..."
