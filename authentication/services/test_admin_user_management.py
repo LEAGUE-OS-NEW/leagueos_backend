@@ -250,7 +250,10 @@ class TestSubordinateUserListingAndRetrieval:
         THEN the request is successful.
         """
         api_client.force_authenticate(user=club_admin_a)
-        url = reverse("admin_authentication:subordinate-user-detail", kwargs={"pk": user_in_workspace_a.id})
+        url = reverse(
+            "admin_authentication:subordinate-user-detail",
+            kwargs={"pk": user_in_workspace_a.id},
+        )
 
         response = api_client.get(url)
 
@@ -266,7 +269,10 @@ class TestSubordinateUserListingAndRetrieval:
         THEN the request fails with a 404 Not Found.
         """
         api_client.force_authenticate(user=club_admin_a)
-        url = reverse("admin_authentication:subordinate-user-detail", kwargs={"pk": user_in_workspace_b.id})
+        url = reverse(
+            "admin_authentication:subordinate-user-detail",
+            kwargs={"pk": user_in_workspace_b.id},
+        )
 
         response = api_client.get(url)
 
