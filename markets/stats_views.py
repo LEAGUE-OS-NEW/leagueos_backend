@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,6 +12,7 @@ from markets.models import (
 from markets.services.discovery_common import (
     visible_market_query,
 )
+from markets.stats_serializers import MarketStatsSerializer
 from sports.models import (
     Sport,
     SportingEvent,
@@ -21,7 +23,20 @@ class MarketStatsView(APIView):
     """Public statistics derived from real market records."""
 
     permission_classes = [AllowAny]
+    serializer_class = MarketStatsSerializer
 
+    @extend_schema(
+        operation_id="market_stats_retrieve",
+        responses={
+            200: MarketStatsSerializer,
+        },
+        tags=["Markets"],
+        description=(
+            "Return public market counts plus "
+            "fill-derived UGX volume and unique "
+            "trader counts, overall and by sport."
+        ),
+    )
     def get(self, request):
         sports = list(
             Sport.objects.filter(
