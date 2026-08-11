@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 """Quick test script to verify the ClubFactory fix."""
+
 import os
+
 import django
+from django.test.runner import DiscoverRunner
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 os.environ.setdefault("DATABASE_URL", "sqlite:///db_test.sqlite3")
 
 django.setup()
-
-from django.test.runner import DiscoverRunner
 
 runner = DiscoverRunner(verbosity=0)
 old_db_config = runner.setup_databases()
@@ -30,6 +31,7 @@ except Exception as e:
     print("=== FAILED ===")
     print(f"Error: {type(e).__name__}: {e}")
     import traceback
+
     traceback.print_exc()
 finally:
     runner.teardown_databases(old_db_config)
