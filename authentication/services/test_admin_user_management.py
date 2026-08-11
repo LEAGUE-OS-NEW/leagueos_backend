@@ -36,12 +36,12 @@ def club_admin_a(user_factory, role_factory, club_workspace_a):
 
 @pytest.fixture
 def club_workspace_a(club_workspace_factory):
-    return club_workspace_factory(name="Club Workspace A")
+    return club_workspace_factory(club__name="Club Workspace A")
 
 
 @pytest.fixture
 def club_workspace_b(club_workspace_factory):
-    return club_workspace_factory(name="Club Workspace B")
+    return club_workspace_factory(club__name="Club Workspace B")
 
 
 @pytest.fixture
