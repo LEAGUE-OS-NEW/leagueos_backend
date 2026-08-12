@@ -88,7 +88,7 @@ class UserRoleAssignmentSerializer(serializers.ModelSerializer):
 class UserWorkspaceMembershipSerializer(serializers.ModelSerializer):
     """Read-only serializer for a user's workspace membership."""
 
-    workspace_name = serializers.CharField(source="workspace.name", read_only=True)
+    workspace_name = serializers.CharField(source="workspace.club.name", read_only=True)
 
     class Meta:
         model = WorkspaceMembership

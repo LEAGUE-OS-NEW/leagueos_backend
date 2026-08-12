@@ -15,7 +15,6 @@ class ClubFactory(factory.django.DjangoModelFactory):
 
     name = factory.Sequence(lambda n: f"Club {n}")
     slug = factory.Sequence(lambda n: f"club-{n}")
-    is_active = True
 
 
 class ClubWorkspaceFactory(factory.django.DjangoModelFactory):

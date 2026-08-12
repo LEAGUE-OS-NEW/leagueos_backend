@@ -2,7 +2,8 @@ import logging
 
 from django.db import transaction
 
-from accounts.models import AuditLog, User
+from accounts.models import User
+from accounts.services.audit_service import AuditService
 from accounts.services.email_service import EmailService
 from authentication.models import Permission, Role, UserPermission
 from authentication.services.account_setup_service import AccountSetupService
@@ -47,7 +48,7 @@ class UserAdminService:
         for workspace in workspaces or []:
             if not DelegationService.can_delegate_to_workspace(actor, workspace):
                 raise PermissionError(
-                    f"Admin {actor.email} cannot assign users to workspace {workspace.name}."
+                    f"Admin {actor.email} cannot assign users to workspace {workspace.club.name}."
                 )
 
         # 2. Create user in PENDING_INVITATION state
@@ -77,15 +78,17 @@ class UserAdminService:
         EmailService.send_account_setup_email(user, setup_token.token)
 
         # 5. Audit log
-        AuditLog.objects.create(
+        AuditService.record(
             actor=actor,
-            user=user,
-            action="SUBORDINATE_USER_CREATED",
+            action="USER_CREATED",
+            resource_type="user",
+            resource_id=user.id,
             metadata={
-                "email": user.email,
+                "target_user_id": str(user.id),
+                "target_email": user.email,
                 "role": role.name,
                 "permissions": [p.code for p in permissions or []],
-                "workspaces": [w.id for w in workspaces or []],
+                "workspaces": [str(w.id) for w in workspaces or []],
             },
         )
 
@@ -114,12 +117,21 @@ class UserAdminService:
         ]:
             SessionService.invalidate_user_sessions(user)
 
-        AuditLog.objects.create(
+        AuditService.record(
             actor=actor,
-            user=user,
             action=action,
-            previous_state={"account_status": old_status},
-            new_state={"account_status": new_status},
+            resource_type="user",
+            resource_id=user.id,
+            metadata={
+                "target_user_id": str(user.id),
+                "target_email": user.email,
+            },
+            previous_state={
+                "account_status": old_status,
+            },
+            new_state={
+                "account_status": new_status,
+            },
         )
         logger.info(
             "User %s status changed from %s to %s by %s",
@@ -138,7 +150,7 @@ class UserAdminService:
             actor=actor,
             user=user,
             new_status=User.AccountStatus.SUSPENDED,
-            action="USER_SUSPENDED",
+            action="ACCOUNT_SUSPENDED",
         )
 
     @staticmethod
@@ -150,7 +162,7 @@ class UserAdminService:
             actor=actor,
             user=user,
             new_status=User.AccountStatus.DEACTIVATED,
-            action="USER_DEACTIVATED",
+            action="ACCOUNT_DEACTIVATED",
         )
 
     @staticmethod
@@ -160,5 +172,5 @@ class UserAdminService:
             actor=actor,
             user=user,
             new_status=User.AccountStatus.ACTIVE,
-            action="USER_ACTIVATED",
+            action="ACCOUNT_REACTIVATED",
         )

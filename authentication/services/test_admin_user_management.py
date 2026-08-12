@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import User
-from authentication.models import Permission, Role, UserRole
+from authentication.models import Permission, Role, UserPermission, UserRole
 from clubs.models import WorkspaceMembership
 
 pytestmark = pytest.mark.django_db
@@ -82,10 +82,22 @@ def user_in_both_workspaces(user_factory, club_workspace_a, club_workspace_b):
 # Grant necessary permissions for the test classes
 @pytest.fixture(autouse=True)
 def grant_permissions(super_admin, club_admin_a, permission_factory):
-    platform_perm = permission_factory(code="platform.users.manage")
-    club_perm = permission_factory(code="club.users.manage", scope=Permission.Scope.CLUB)
-    super_admin.user_permissions.add(platform_perm)
-    club_admin_a.user_permissions.add(club_perm)
+    platform_perm = permission_factory(
+        code="platform.users.manage",
+    )
+    club_perm = permission_factory(
+        code="club.users.manage",
+        scope=Permission.Scope.CLUB,
+    )
+
+    UserPermission.objects.create(
+        user=super_admin,
+        permission=platform_perm,
+    )
+    UserPermission.objects.create(
+        user=club_admin_a,
+        permission=club_perm,
+    )
 
 
 class TestSubordinateUserCreation:

@@ -89,3 +89,79 @@ class EmailService:
 
         email.send(fail_silently=False)
         logger.info("Password reset email sent to %s", user.email)
+
+    @staticmethod
+    def send_account_setup_email(
+        user,
+        setup_token: str,
+    ) -> None:
+        subject = "Set Up Your League OS Account"
+
+        account_setup_url = getattr(
+            settings,
+            "ACCOUNT_SETUP_URL",
+            "",
+        ).strip()
+
+        setup_url = None
+
+        if account_setup_url:
+            separator = "&" if "?" in account_setup_url else "?"
+            setup_url = f"{account_setup_url}" f"{separator}" f"token={setup_token}"
+
+        context = {
+            "first_name": (user.first_name or "League OS User"),
+            "setup_token": setup_token,
+            "setup_url": setup_url,
+            "expiry_days": 7,
+            "support_email": getattr(
+                settings,
+                "SUPPORT_EMAIL",
+                "support@leagueos.com",
+            ),
+            "website": getattr(
+                settings,
+                "WEBSITE_URL",
+                "https://leagueos.com",
+            ),
+            "current_year": timezone.now().year,
+        }
+
+        if setup_url:
+            text_content = (
+                f"Hello {context['first_name']},\n\n"
+                "Your League OS administrator account "
+                "has been created.\n\n"
+                "Complete your account setup using this link:\n"
+                f"{setup_url}\n\n"
+                "This invitation expires in 7 days.\n\n"
+                "If you were not expecting this invitation, "
+                "you can ignore this email.\n"
+            )
+        else:
+            text_content = (
+                f"Hello {context['first_name']},\n\n"
+                "Your League OS administrator account "
+                "has been created.\n\n"
+                "Use the following account setup token:\n\n"
+                f"{setup_token}\n\n"
+                "This invitation expires in 7 days.\n\n"
+                "If you were not expecting this invitation, "
+                "you can ignore this email.\n"
+            )
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[user.email],
+        )
+
+        email.send(
+            fail_silently=False,
+        )
+
+        logger.info(
+            "Account setup email sent to %s",
+            user.email,
+        )

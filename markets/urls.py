@@ -128,6 +128,7 @@ from markets.result_dispute_views import (
     ParticipantMarketResultDisputeListView,
 )
 from markets.settlement_views import MarketSettlementView
+from markets.stats_views import MarketStatsView
 from markets.views import (
     MarketCategoryListView,
     MarketDetailView,
@@ -550,6 +551,11 @@ urlpatterns = [
         "markets/categories/",
         MarketCategoryListView.as_view(),
         name="category-list",
+    ),
+    path(
+        "markets/stats/",
+        MarketStatsView.as_view(),
+        name="market-stats",
     ),
     path(
         "markets/",
