@@ -43,4 +43,5 @@ urlpatterns = [
         include("sports.urls"),
     ),
     path("api/v1/system/", include("system.urls")),
+    path("api/v1/", include("kyc.urls")),
 ]

@@ -34,3 +34,7 @@ media/
 # Operating systems
 .DS_Store
 Thumbs.db
+
+# Kilo config/state
+.kilo/
+.kilocode/

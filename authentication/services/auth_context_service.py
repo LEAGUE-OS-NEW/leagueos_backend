@@ -24,6 +24,9 @@ class AuthContextService:
             }
             for role in roles
         ]
+        kyc = getattr(user, "kyc_verification", None)
+        kyc_status = kyc.status if kyc else "NOT_STARTED"
+
         return {
             "id": str(user.id),
             "username": user.username,
@@ -32,6 +35,7 @@ class AuthContextService:
             "last_name": user.last_name,
             "phone_number": user.phone_number,
             "is_verified": user.is_verified,
+            "kyc_status": kyc_status,
             "roles": [role.name for role in roles],
             "permissions": permissions,
             "dashboard_access": {
