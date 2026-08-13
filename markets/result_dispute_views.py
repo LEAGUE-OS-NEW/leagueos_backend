@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from markets.models import Market, MarketResultDispute
-from markets.permissions import HasApproveMarketPermission
+from markets.permissions import HasResultVerificationPermission
 from markets.result_dispute_serializers import (
     MarketResultDisputeAdminSerializer,
     MarketResultDisputeParticipantSerializer,
@@ -146,7 +146,7 @@ class ParticipantMarketResultDisputeDetailView(RetrieveAPIView):
 class AdminMarketResultDisputeMixin:
     permission_classes = [
         IsAuthenticated,
-        HasApproveMarketPermission,
+        HasResultVerificationPermission,
     ]
 
     @staticmethod

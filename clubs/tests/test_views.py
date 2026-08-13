@@ -79,6 +79,34 @@ class TestClubWorkspaceViewSet:
         assert response.status_code == 201
         assert ClubWorkspace.objects.count() == 2
 
+    def test_create_workspace_denied_for_non_admin(self, api_client, user, club):
+        # No admin_workspace fixture here — `user` has no workspace at all
+        # for this club, so this must be rejected before an object even
+        # exists to check `has_object_permission` against.
+        api_client.force_authenticate(user=user)
+        new_user = User.objects.create_user(
+            username="staffuser2",
+            email="staff2@example.com",
+            password="staffpass123",
+            first_name="Staff",
+            last_name="User",
+        )
+        url = reverse("clubs:club-workspace-list", kwargs={"club_pk": club.id})
+        data = {
+            "user": new_user.id,
+            "role": ClubWorkspace.WorkspaceRole.STAFF,
+            "permissions": ["memberships.read"],
+        }
+        response = api_client.post(url, data, format="json")
+        assert response.status_code == 403
+        assert ClubWorkspace.objects.count() == 0
+
+    def test_list_workspaces_denied_for_non_admin(self, api_client, user, club):
+        api_client.force_authenticate(user=user)
+        url = reverse("clubs:club-workspace-list", kwargs={"club_pk": club.id})
+        response = api_client.get(url)
+        assert response.status_code == 403
+
 
 class TestClubProfileVersionViewSet:
     def test_create_profile(self, api_client, user, club, admin_workspace):

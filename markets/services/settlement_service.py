@@ -26,7 +26,11 @@ from wallets.services.wallet_service import WalletService
 
 
 class MarketSettlementService:
-    APPROVE_PERMISSION = "approve_market"
+    RESULT_VERIFICATION_PERMISSIONS = (
+        "approve_market",
+        "verify_results",
+        "reject_result",
+    )
     MARKET_CURRENCY = "UGX"
     PAYOUT_PER_UNIT = Decimal("1.0000")
     QUANTITY_QUANTUM = Decimal("0.0001")
@@ -192,8 +196,8 @@ class MarketSettlementService:
 
     @classmethod
     def _require_permission(cls, actor):
-        if not PermissionService.has_permission(actor, cls.APPROVE_PERMISSION):
-            raise PermissionDenied("You do not have the approve_market permission.")
+        if not PermissionService.has_any_permission(actor, cls.RESULT_VERIFICATION_PERMISSIONS):
+            raise PermissionDenied("You do not have permission to verify or reject results.")
 
     @staticmethod
     def _require_settleable_market(market):

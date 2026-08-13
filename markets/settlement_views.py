@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from markets.models import Market
-from markets.permissions import HasApproveMarketPermission
+from markets.permissions import HasResultVerificationPermission
 from markets.services.settlement_service import MarketSettlementService
 from markets.settlement_serializers import (
     MarketSettlementRequestSerializer,
@@ -16,7 +16,7 @@ from markets.settlement_serializers import (
 
 
 class MarketSettlementView(APIView):
-    permission_classes = [IsAuthenticated, HasApproveMarketPermission]
+    permission_classes = [IsAuthenticated, HasResultVerificationPermission]
 
     @extend_schema(
         request=MarketSettlementRequestSerializer,
