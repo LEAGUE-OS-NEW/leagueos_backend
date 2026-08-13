@@ -34,3 +34,10 @@ class KYCConfig(AppConfig):
                 config.save(update_fields=list(updates.keys()))
         except Exception:
             pass
+
+        try:
+            from config.celery import discover_kyc_tasks
+
+            discover_kyc_tasks()
+        except Exception:
+            pass
