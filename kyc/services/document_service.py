@@ -73,9 +73,9 @@ class DocumentService:
             stat = ImageStat.Stat(img)
             contrast_stddev = stat.stddev[0] if stat.stddev else 0.0
 
-            is_sharp = blur_score >= 12.0 or (np is None and contrast_stddev >= 15.0)
-            is_glare_free = glare_ratio <= 0.20
-            is_contrast_ok = contrast_stddev >= 15.0
+            is_sharp = bool(blur_score >= 12.0 or (np is None and contrast_stddev >= 15.0))
+            is_glare_free = bool(glare_ratio <= 0.20)
+            is_contrast_ok = bool(contrast_stddev >= 15.0)
 
             passed = is_sharp and is_glare_free and is_contrast_ok
 
