@@ -20,9 +20,7 @@ def discover_kyc_tasks():
 
     @app.on_after_configure.connect
     def setup_periodic_tasks(sender, **kwargs):
-        sender.add_periodic_task(
-            86400, retention_cleanup_task.s(), name="kyc-retention-cleanup"
-        )
+        sender.add_periodic_task(86400, retention_cleanup_task.s(), name="kyc-retention-cleanup")
 
     @app.task
     def retention_cleanup_task():
