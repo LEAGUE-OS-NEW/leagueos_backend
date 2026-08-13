@@ -54,6 +54,7 @@ LOCAL_APPS = [
     "clubs",
     "dashboard",
     "discovery",
+    "kyc",
     "fantasy",
     "markets",
     "notifications",
@@ -227,6 +228,31 @@ SPECTACULAR_SETTINGS = {
             ("STAFF", "Club Staff"),
         ],
         "KYCVerificationStatusEnum": [
+            ("NOT_STARTED", "Not Started"),
+            ("PENDING", "Pending"),
+            ("PROCESSING", "Processing"),
+            ("VERIFIED", "Verified"),
+            ("RETRY_REQUIRED", "Retry Required"),
+            ("REJECTED", "Rejected"),
+            ("REVIEW", "Review"),
+            ("EXPIRED", "Expired"),
+        ],
+        "KYCVerificationAttemptStatusEnum": [
+            ("PENDING", "Pending"),
+            ("PROCESSING", "Processing"),
+            ("COMPLETED", "Completed"),
+            ("FAILED", "Failed"),
+            ("CANCELLED", "Cancelled"),
+        ],
+        "KYCCheckResultStatusEnum": [
+            ("NOT_RUN", "Not Run"),
+            ("PROCESSING", "Processing"),
+            ("PASSED", "Passed"),
+            ("FAILED", "Failed"),
+            ("UNCERTAIN", "Uncertain"),
+            ("NOT_APPLICABLE", "Not Applicable"),
+        ],
+        "Status272Enum": [
             ("CREATED", "Created"),
             ("PENDING", "Pending"),
             ("IN_REVIEW", "In review"),
@@ -452,3 +478,52 @@ AWS_DEFAULT_ACL = "private"
 AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="")
 AWS_MEDIA_LOCATION = "media"
 MEDIA_URL = env("MEDIA_URL", default="/media/")
+
+# =============================================================================
+# Automated KYC & Identity Verification Settings
+# =============================================================================
+KYC_ENABLED = env.bool("KYC_ENABLED", default=True)
+KYC_MAX_ATTEMPTS = env.int("KYC_MAX_ATTEMPTS", default=3)
+KYC_MAX_DOCUMENT_SIZE_MB = env.int("KYC_MAX_DOCUMENT_SIZE_MB", default=10)
+KYC_MIN_IMAGE_DIMENSION = env.int("KYC_MIN_IMAGE_DIMENSION", default=300)
+KYC_MAX_IMAGE_DIMENSION = env.int("KYC_MAX_IMAGE_DIMENSION", default=6000)
+KYC_FACE_MATCH_PASS_THRESHOLD = env.float("KYC_FACE_MATCH_PASS_THRESHOLD", default=0.70)
+KYC_FACE_MATCH_REVIEW_THRESHOLD = env.float("KYC_FACE_MATCH_REVIEW_THRESHOLD", default=0.50)
+KYC_RISK_REVIEW_THRESHOLD = env.float("KYC_RISK_REVIEW_THRESHOLD", default=0.40)
+KYC_RISK_REJECT_THRESHOLD = env.float("KYC_RISK_REJECT_THRESHOLD", default=0.75)
+KYC_DOCUMENT_RETENTION_DAYS = env.int("KYC_DOCUMENT_RETENTION_DAYS", default=30)
+KYC_SELFIE_RETENTION_DAYS = env.int("KYC_SELFIE_RETENTION_DAYS", default=30)
+KYC_PROCESSING_MODE = env("KYC_PROCESSING_MODE", default="internal")
+
+# =============================================================================
+# Celery / Redis Settings
+# =============================================================================
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://redis:6379/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://redis:6379/0")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+
+# =============================================================================
+# Cache Settings
+# =============================================================================
+try:
+    import redis
+
+    redis.StrictRedis.from_url(env("REDIS_URL", default="redis://redis:6379/1")).ping()
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": env("REDIS_URL", default="redis://redis:6379/1"),
+        }
+    }
+except Exception:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+        }
+    }
