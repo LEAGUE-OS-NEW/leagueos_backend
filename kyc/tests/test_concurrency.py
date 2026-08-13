@@ -70,12 +70,12 @@ def test_task_idempotency_and_duplicate_job_execution():
         ),
     ):
         # First task run
-        process_kyc_attempt.delay(str(attempt.id))
+        process_kyc_attempt.apply(args=[str(attempt.id)])
         attempt.refresh_from_db()
         assert attempt.status == KYCVerificationAttempt.Status.COMPLETED
 
         # Second task run on same completed attempt
-        process_kyc_attempt.delay(str(attempt.id))
+        process_kyc_attempt.apply(args=[str(attempt.id)])
         attempt.refresh_from_db()
         assert attempt.status == KYCVerificationAttempt.Status.COMPLETED
         assert verification.attempts.count() == 1

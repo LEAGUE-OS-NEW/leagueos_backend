@@ -9,13 +9,28 @@ except ImportError:
         bind = kwargs.get("bind", False)
 
         def decorator(func):
+            def bound_func(self, *a, **kw):
+                return func(self, *a, **kw)
+
+            def unbound_func(*a, **kw):
+                return func(*a, **kw)
+
             def delay_func(*a, **kw):
                 if bind:
                     return func(None, *a, **kw)
                 return func(*a, **kw)
 
-            func.delay = delay_func
-            return func
+            def apply(args=(), kwargs=None, **kw):
+                if kwargs is None:
+                    kwargs = {}
+                if bind:
+                    return func(None, *args, **{**kwargs, **kw})
+                return func(*args, **{**kwargs, **kw})
+
+            wrapped = bound_func if bind else unbound_func
+            wrapped.delay = delay_func
+            wrapped.apply = apply
+            return wrapped
 
         if len(args) == 1 and callable(args[0]):
             return decorator(args[0])

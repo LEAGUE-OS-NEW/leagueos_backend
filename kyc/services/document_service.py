@@ -159,7 +159,7 @@ class DocumentService:
             max_std, min_std = max(stds), min(stds)
             std_ratio = (max_std / (min_std + 1e-5)) if min_std > 0 else 1.0
 
-            tampered = std_ratio > 10.0
+            tampered = bool(std_ratio > 10.0)
 
             check_result.status = (
                 KYCCheckResult.Status.FAILED if tampered else KYCCheckResult.Status.PASSED
@@ -170,7 +170,7 @@ class DocumentService:
                 "tampering_detected" if tampered else "no_manipulation_detected"
             )
             check_result.details = {
-                "quadrant_std_ratio": round(std_ratio, 2),
+                "quadrant_std_ratio": round(float(std_ratio), 2),
                 "tampering_flagged": tampered,
             }
             check_result.save()
