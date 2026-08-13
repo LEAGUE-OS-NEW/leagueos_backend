@@ -444,7 +444,10 @@ SYSTEM_PERMISSIONS = [
         "name": "admin.clubs.manage",
         "resource": "admin",
         "action": "clubs.manage",
-        "description": "Create clubs and act as a club admin on any club, independent of individual club workspace membership.",
+        "description": (
+            "Create clubs and act as a club admin on any club, "
+            "independent of individual club workspace membership."
+        ),
     },
 ]
 

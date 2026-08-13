@@ -200,8 +200,11 @@ class EmailService:
             text_content = (
                 f"{context['invited_by_name']} has invited you to join {context['club_name']} "
                 f"on League OS as a {context['role_label']}.\n\n"
-                + (f"Accept your invitation using this link:\n{accept_url}\n\n" if accept_url
-                   else f"Use the following invitation token to accept:\n\n{invitation.token}\n\n")
+                + (
+                    f"Accept your invitation using this link:\n{accept_url}\n\n"
+                    if accept_url
+                    else f"Use the following invitation token to accept:\n\n{invitation.token}\n\n"
+                )
                 + f"This invitation expires in {context['expiry_days']} days.\n"
             )
 
@@ -216,7 +219,11 @@ class EmailService:
             email.attach_alternative(html_content, "text/html")
 
         email.send(fail_silently=False)
-        logger.info("Staff invitation email sent to %s for club %s", invitation.email, invitation.club.name)
+        logger.info(
+            "Staff invitation email sent to %s for club %s",
+            invitation.email,
+            invitation.club.name,
+        )
 
     @staticmethod
     def send_admin_invitation_email(invitation) -> None:
@@ -252,8 +259,11 @@ class EmailService:
             text_content = (
                 f"{context['invited_by_name']} has invited you to League OS administration "
                 f"as {context['role_names']}.\n\n"
-                + (f"Accept your invitation using this link:\n{accept_url}\n\n" if accept_url
-                   else f"Use the following invitation token to accept:\n\n{invitation.token}\n\n")
+                + (
+                    f"Accept your invitation using this link:\n{accept_url}\n\n"
+                    if accept_url
+                    else f"Use the following invitation token to accept:\n\n{invitation.token}\n\n"
+                )
                 + f"This invitation expires in {context['expiry_days']} days.\n"
             )
 

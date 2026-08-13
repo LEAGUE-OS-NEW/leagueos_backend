@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -29,6 +30,7 @@ from clubs.serializers.club_serializers import (
     ClubWorkspaceSerializer,
     MembershipPlanSerializer,
     MerchandiseProductSerializer,
+    StaffInvitationAcceptSerializer,
     StaffInvitationSerializer,
     StoreOrderSerializer,
     TicketProductSerializer,
@@ -205,6 +207,11 @@ class StaffInvitationAcceptView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=StaffInvitationAcceptSerializer,
+        responses={200: ClubWorkspaceSerializer},
+        tags=["Clubs"],
+    )
     def post(self, request):
         token = request.data.get("token")
         if not token:
