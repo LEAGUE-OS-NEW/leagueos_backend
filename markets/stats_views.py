@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from drf_spectacular.utils import extend_schema
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -9,10 +9,15 @@ from markets.models import (
     Market,
     MarketFill,
 )
+from markets.permissions import HasMarketAdminAccess
 from markets.services.discovery_common import (
     visible_market_query,
 )
-from markets.stats_serializers import MarketStatsSerializer
+from markets.stats_serializers import (
+    MarketAdminStatsQuerySerializer,
+    MarketAdminStatsSerializer,
+    MarketStatsSerializer,
+)
 from sports.models import (
     Sport,
     SportingEvent,
@@ -199,5 +204,97 @@ class MarketStatsView(APIView):
                     all_trader_ids,
                 ),
                 "sports": sport_payload,
+            }
+        )
+
+
+class MarketAdminStatsView(APIView):
+    """Admin-only per-market volume and fill counts, keyed by market id."""
+
+    permission_classes = [
+        IsAuthenticated,
+        HasMarketAdminAccess,
+    ]
+    serializer_class = MarketAdminStatsSerializer
+
+    @extend_schema(
+        operation_id="market_admin_stats_retrieve",
+        parameters=[
+            MarketAdminStatsQuerySerializer,
+        ],
+        responses={
+            200: MarketAdminStatsSerializer,
+        },
+        tags=["Market Administration"],
+        description=(
+            "Return fill-derived UGX volume and fill counts "
+            "for the requested market ids, for admin use. "
+            "No public-visibility filtering is applied — "
+            "markets in any status are eligible."
+        ),
+    )
+    def get(self, request):
+        query = MarketAdminStatsQuerySerializer(
+            data=request.query_params,
+        )
+        query.is_valid(raise_exception=True)
+        requested_market_ids = query.validated_data["market_ids"]
+
+        markets = Market.objects.filter(
+            id__in=requested_market_ids,
+        )
+
+        stats_by_market = {
+            market.id: {
+                "market_id": str(market.id),
+                "total_volume_ugx": Decimal("0"),
+                "fill_count": 0,
+            }
+            for market in markets
+        }
+
+        if stats_by_market:
+            fills = (
+                MarketFill.objects.filter(
+                    market_id__in=stats_by_market.keys(),
+                )
+                .values(
+                    "market_id",
+                    "quantity",
+                    "price",
+                )
+                .iterator()
+            )
+
+            for fill in fills:
+                market_stats = stats_by_market.get(
+                    fill["market_id"],
+                )
+
+                if market_stats is None:
+                    continue
+
+                quantity = Decimal(str(fill["quantity"]))
+                price = Decimal(str(fill["price"]))
+
+                market_stats["total_volume_ugx"] += quantity * price
+                market_stats["fill_count"] += 1
+
+        markets_payload = [
+            {
+                "market_id": item["market_id"],
+                "total_volume_ugx": str(
+                    item["total_volume_ugx"].quantize(
+                        Decimal("0.01"),
+                    )
+                ),
+                "fill_count": item["fill_count"],
+            }
+            for item in stats_by_market.values()
+        ]
+
+        return Response(
+            {
+                "markets": markets_payload,
             }
         )
