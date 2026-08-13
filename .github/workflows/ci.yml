@@ -13,15 +13,20 @@ on:
 permissions:
   contents: read
 
+# Preserve completed validation on protected/base branches.
+# New commits to an open PR may cancel an obsolete PR run, but pushes to
+# develop/main are allowed to finish so long-running full suites are not lost.
 concurrency:
   group: backend-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     name: Lint, format, validate and test
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Full backend validation includes a growing integration/financial suite.
+    # Three hours provides substantial growth headroom without hiding hangs.
+    timeout-minutes: 180
 
     services:
       postgres:
@@ -90,6 +95,7 @@ jobs:
           --cov=accounts
           --cov=authentication
           --cov=discovery
+          --cov=fantasy
           --cov=markets
           --cov=sports
           --cov=system
