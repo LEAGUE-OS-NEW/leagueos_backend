@@ -128,7 +128,7 @@ from markets.result_dispute_views import (
     ParticipantMarketResultDisputeListView,
 )
 from markets.settlement_views import MarketSettlementView
-from markets.stats_views import MarketStatsView
+from markets.stats_views import MarketAdminStatsView, MarketStatsView
 from markets.views import (
     MarketCategoryListView,
     MarketDetailView,
@@ -496,6 +496,11 @@ urlpatterns = [
         "market-admin/markets/<uuid:market_id>/",
         MarketAdminDetailView.as_view(),
         name="admin-market-detail",
+    ),
+    path(
+        "market-admin/markets/stats/",
+        MarketAdminStatsView.as_view(),
+        name="admin-market-stats",
     ),
     path(
         ("market-admin/markets/" "<uuid:market_id>/submit/"),
