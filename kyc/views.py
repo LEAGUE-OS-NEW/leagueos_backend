@@ -4,7 +4,7 @@ from django.core.signing import TimestampSigner
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter
-from rest_framework import permissions, status, throttling
+from rest_framework import permissions, serializers, status, throttling
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -177,7 +177,13 @@ class FanKYCRetryView(APIView):
     received RETRY_REQUIRED."""
 
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = serializers.Serializer
 
+    @extend_schema(
+        request=None,
+        responses={200: dict, 400: dict},
+        tags=["KYC"],
+    )
     def post(self, request):
         user = request.user
         config = KYCConfiguration.load()
@@ -289,7 +295,16 @@ class AdminKYCDocumentUrlView(APIView):
     """Generates a temporary signed access URL for viewing private document or selfie images."""
 
     permission_classes = [permissions.IsAdminUser]
+    serializer_class = serializers.Serializer
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("verification_id", type={"type": "string", "format": "uuid"}),
+            OpenApiParameter("target", type=str, description="document or selfie"),
+        ],
+        responses={200: dict, 404: dict},
+        tags=["KYC"],
+    )
     def get(self, request, verification_id):
         verification = KYCVerification.objects.filter(id=verification_id).first()
         if not verification:
