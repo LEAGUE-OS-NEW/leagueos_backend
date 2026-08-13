@@ -55,6 +55,7 @@ LOCAL_APPS = [
     "dashboard",
     "discovery",
     "kyc",
+    "fantasy",
     "markets",
     "notifications",
     "onboarding",

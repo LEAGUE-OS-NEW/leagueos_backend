@@ -602,6 +602,20 @@ class Command(BaseCommand):
                     permission=permissions[permission_name],
                 )
 
+        # Super Admin is intentionally permission-complete.
+        #
+        # Permissions can be introduced by other apps/migrations (for example,
+        # Fantasy) and therefore may not appear in this command's legacy
+        # SYSTEM_PERMISSIONS catalogue. Always synchronize Super Admin against
+        # the complete current Permission table.
+        super_admin = Role.objects.get(name="Super Admin")
+
+        for permission in Permission.objects.all():
+            RolePermission.objects.get_or_create(
+                role=super_admin,
+                permission=permission,
+            )
+
         self.stdout.write(
             self.style.SUCCESS("Successfully seeded roles, permissions " "and role mappings.")
         )
