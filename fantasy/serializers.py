@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import Sum
 from rest_framework import serializers
 
 from django.utils import timezone
@@ -42,6 +43,10 @@ class CleanModelSerializer(serializers.ModelSerializer):
 class FantasyPlayerSerializer(CleanModelSerializer):
     player_name = serializers.CharField(source="player.name", read_only=True)
     club = serializers.SerializerMethodField()
+    ownership = serializers.SerializerMethodField()
+    total_points = serializers.SerializerMethodField()
+    current_gameweek_points = serializers.SerializerMethodField()
+    form = serializers.SerializerMethodField()
 
     class Meta:
         model = FantasyPlayer
@@ -55,11 +60,38 @@ class FantasyPlayerSerializer(CleanModelSerializer):
             "price",
             "eligible",
             "availability",
+            "ownership",
+            "total_points",
+            "current_gameweek_points",
+            "form",
         ]
 
     def get_club(self, obj) -> dict | None:
         team = obj.real_team
         return {"id": str(team.id), "name": team.name} if team else None
+
+    def get_ownership(self, obj) -> float | None:
+        total = obj.fantasy_competition.teams.count()
+        if not total:
+            return None
+        selected = obj.team_selections.values("team_id").distinct().count()
+        return round(selected * 100 / total, 2)
+
+    def get_total_points(self, obj) -> float | None:
+        value = obj.gameweek_points.aggregate(value=Sum("total_points"))["value"]
+        return float(value) if value is not None else None
+
+    def get_current_gameweek_points(self, obj) -> float | None:
+        gameweek = (
+            obj.fantasy_competition.gameweeks.exclude(status="DRAFT").order_by("number").last()
+        )
+        if not gameweek:
+            return None
+        record = obj.gameweek_points.filter(gameweek=gameweek).first()
+        return float(record.total_points) if record else None
+
+    def get_form(self, obj) -> float | None:
+        return None
 
 
 class ScoringRuleSerializer(CleanModelSerializer):
@@ -135,8 +167,11 @@ class GameweekSerializer(CleanModelSerializer):
 
 class CompetitionSerializer(CleanModelSerializer):
     sport = serializers.CharField(source="competition.sport.slug", read_only=True)
+    season_name = serializers.CharField(source="season.name", read_only=True)
     scoring_rules = ScoringRuleSerializer(many=True, read_only=True)
     current_gameweek = serializers.SerializerMethodField()
+    entries = serializers.SerializerMethodField()
+    total_gameweeks = serializers.SerializerMethodField()
 
     class Meta:
         model = FantasyCompetition
@@ -146,6 +181,12 @@ class CompetitionSerializer(CleanModelSerializer):
     def get_current_gameweek(self, obj) -> dict | None:
         gw = obj.gameweeks.exclude(status="DRAFT").order_by("number").last()
         return GameweekSerializer(gw).data if gw else None
+
+    def get_entries(self, obj) -> int:
+        return obj.teams.count()
+
+    def get_total_gameweeks(self, obj) -> int:
+        return obj.gameweeks.count()
 
     def validate_tie_break_rules(self, value):
         supported = {"total_points", "fewer_transfer_penalties", "earlier_registration"}

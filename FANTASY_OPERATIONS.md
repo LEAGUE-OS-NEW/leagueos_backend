@@ -13,6 +13,11 @@ docker compose exec -T web python manage.py transition_fantasy_gameweeks --dry-r
 docker compose exec -T web python manage.py transition_fantasy_gameweeks
 ```
 
+The Fantasy seed is restricted to `DEBUG=True` local development. Its
+deterministic player prices and 1-point statistic rules are LOCAL DEMO
+configuration defaults for exercising workflows; they are not approved
+production pricing or scoring policy.
+
 The transition command safely opens drafts, locks at deadline, moves started gameweeks live, and moves completed-fixture gameweeks to scoring. Finalization is explicit. Run it every minute with a Render cron/worker scheduler. Recalculation rebuilds player and team scores from authoritative statistics, preserves the latest audited correction, and applies the stored gameweek transfer penalty once.
 
 Draft gameweeks open only when `starts_at` has arrived. The command is idempotent and `--dry-run` reports without writing. It never finalizes a gameweek.
