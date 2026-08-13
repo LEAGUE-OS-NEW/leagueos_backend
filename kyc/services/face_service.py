@@ -303,8 +303,8 @@ class FaceService:
                 r_stat, g_stat, b_stat = ImageStat.Stat(img).stddev
                 color_variance = (r_stat + g_stat + b_stat) / 3.0
 
-                is_screen_replay = high_freq_energy > 180.0
-                is_flat_photo = color_variance < 15.0
+                is_screen_replay = bool(high_freq_energy > 180.0)
+                is_flat_photo = bool(color_variance < 15.0)
 
                 liveness_score = float(
                     max(0.0, min(1.0, (color_variance / 50.0) * (1.0 - (high_freq_energy / 250.0))))
@@ -313,7 +313,7 @@ class FaceService:
                 stat = ImageStat.Stat(img)
                 color_variance = float(sum(stat.stddev) / len(stat.stddev)) if stat.stddev else 20.0
                 is_screen_replay = False
-                is_flat_photo = color_variance < 10.0
+                is_flat_photo = bool(color_variance < 10.0)
                 liveness_score = float(max(0.0, min(1.0, color_variance / 50.0)))
                 high_freq_energy = 50.0
 
@@ -332,10 +332,10 @@ class FaceService:
             check_result.confidence = 0.88
             check_result.result_code = result_code
             check_result.details = {
-                "high_freq_energy": round(high_freq_energy, 2),
-                "color_variance": round(color_variance, 2),
-                "is_screen_replay": is_screen_replay,
-                "is_flat_photo": is_flat_photo,
+                "high_freq_energy": round(float(high_freq_energy), 2),
+                "color_variance": round(float(color_variance), 2),
+                "is_screen_replay": bool(is_screen_replay),
+                "is_flat_photo": bool(is_flat_photo),
             }
             check_result.save()
 
