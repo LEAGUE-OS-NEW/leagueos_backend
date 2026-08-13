@@ -144,12 +144,12 @@ class ImageValidationService:
         Raises:
             ValidationError: If the image is corrupted or invalid.
         """
-        from PIL import Image, UnidentifiedImageFile
+        from PIL import Image, UnidentifiedImageError
 
         try:
             image = Image.open(io.BytesIO(file_data))
             image.verify()  # Verify image integrity
-        except UnidentifiedImageFile as exc:
+        except UnidentifiedImageError as exc:
             raise ValidationError("Uploaded file is not a valid image.") from exc
         except Exception as exc:
             raise ValidationError(f"Image validation failed: {exc}") from exc

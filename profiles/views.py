@@ -10,6 +10,7 @@ from __future__ import annotations
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -20,6 +21,7 @@ from profiles.models import Club, Country, Gender, Language, Profile, Timezone
 from profiles.permissions import IsProfileOwner
 from profiles.serializers import (
     AvatarSerializer,
+    AvatarUploadSerializer,
     ClubCreateSerializer,
     ClubSerializer,
     CountrySerializer,
@@ -187,6 +189,7 @@ class AvatarView(APIView):
     GET    /api/v1/profile/avatar/ — Retrieve avatar metadata and URL
     """
 
+    parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAuthenticated, IsProfileOwner]
 
     def get_object(self) -> Profile:
@@ -207,7 +210,7 @@ class AvatarView(APIView):
             "Accepts multipart/form-data with an 'avatar' image file. "
             "Supported formats: JPG, PNG, WebP. Max size: 5MB."
         ),
-        request=AvatarSerializer,
+        request=AvatarUploadSerializer,
         responses={
             200: OpenApiResponse(
                 description="Avatar uploaded/replaced successfully",
