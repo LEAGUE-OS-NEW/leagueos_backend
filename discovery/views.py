@@ -392,7 +392,7 @@ class NewsListView(ListAPIView):
 
     permission_classes = [AllowAny]
     serializer_class = NewsSerializer
-    pagination_class = SystemPagination
+    pagination_class = None
 
     def get_queryset(self):
         query = NewsListQuerySerializer(data=self.request.query_params)
@@ -408,6 +408,29 @@ class NewsListView(ListAPIView):
             search=params.get("search"),
             ordering=params.get("ordering", "-published_at"),
         )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=NewsSerializer,
+        tags=["Discovery"],
+    )
+)
+class NewsDetailView(RetrieveAPIView):
+    """Public news article detail."""
+
+    permission_classes = [AllowAny]
+    serializer_class = NewsSerializer
+    lookup_url_kwarg = "news_id"
+
+    def get_object(self):
+        from django.http import Http404
+
+        news_id = self.kwargs[self.lookup_url_kwarg]
+        article = news_service.get_public_news_detail(news_id)
+        if article is None:
+            raise Http404("News article not found.")
+        return article
 
 
 # =============================================================================
