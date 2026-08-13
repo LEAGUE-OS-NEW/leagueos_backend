@@ -1,8 +1,10 @@
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
-from rest_framework.generics import ListAPIView
-from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.generics import ListAPIView, ListCreateAPIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
+from authentication.services.permission_service import PermissionService
 from sports.models import (
     Competition,
     Participant,
@@ -10,10 +12,12 @@ from sports.models import (
     SportingEvent,
 )
 from sports.serializers import (
+    CompetitionCreateSerializer,
     CompetitionListQuerySerializer,
     CompetitionPublicSerializer,
     ParticipantListQuerySerializer,
     ParticipantPublicSerializer,
+    SportCreateSerializer,
     SportingEventListQuerySerializer,
     SportingEventPublicSerializer,
     SportPublicSerializer,
@@ -21,13 +25,31 @@ from sports.serializers import (
 from system.pagination import PublicCatalogPagination
 
 
-class SportListView(ListAPIView):
-    permission_classes = [AllowAny]
-    serializer_class = SportPublicSerializer
+class _AdminManagedCreateMixin:
+    """Shared create-permission gate for admin.clubs.manage-permissioned
+    sports-data creation (Sport, Competition)."""
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
+    def perform_create(self, serializer):
+        if not PermissionService.has_permission(self.request.user, "admin.clubs.manage"):
+            raise PermissionDenied("You do not have permission to manage sports data.")
+        serializer.save()
+
+
+class SportListView(_AdminManagedCreateMixin, ListCreateAPIView):
     pagination_class = PublicCatalogPagination
     queryset = Sport.objects.filter(
         is_active=True,
     ).order_by("name")
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return SportCreateSerializer
+        return SportPublicSerializer
 
     @extend_schema(tags=["Sports"])
     def get(self, request, *args, **kwargs):
@@ -38,10 +60,13 @@ class SportListView(ListAPIView):
         )
 
 
-class CompetitionListView(ListAPIView):
-    permission_classes = [AllowAny]
-    serializer_class = CompetitionPublicSerializer
+class CompetitionListView(_AdminManagedCreateMixin, ListCreateAPIView):
     pagination_class = PublicCatalogPagination
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return CompetitionCreateSerializer
+        return CompetitionPublicSerializer
 
     @extend_schema(
         parameters=[

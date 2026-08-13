@@ -13,6 +13,7 @@ from clubs.views import (
     ClubWorkspaceViewSet,
     MembershipPlanViewSet,
     MerchandiseProductViewSet,
+    StaffInvitationAcceptView,
     StaffInvitationViewSet,
     StoreOrderViewSet,
     TicketProductViewSet,
@@ -33,6 +34,11 @@ router.register(r"staff-invitations", StaffInvitationViewSet, basename="staff-in
 app_name = "clubs"
 
 urlpatterns = [
+    path(
+        "staff-invitations/accept/",
+        StaffInvitationAcceptView.as_view(),
+        name="staff-invitation-accept",
+    ),
     path(
         "<uuid:club_pk>/workspaces/",
         ClubWorkspaceViewSet.as_view({"get": "list", "post": "create"}),

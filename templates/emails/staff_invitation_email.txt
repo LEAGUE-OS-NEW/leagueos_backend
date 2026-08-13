@@ -1,0 +1,25 @@
+Hello,
+
+{{ invited_by_name }} has invited you to join {{ club_name }} on League OS as a {{ role_label }}.
+{% if accept_url %}
+Accept your invitation using this link:
+{{ accept_url }}
+{% else %}
+Use the following invitation token to accept:
+
+{{ token }}
+{% endif %}
+This invitation expires in {{ expiry_days }} days.
+
+If you were not expecting this invitation, you can safely ignore this email.
+
+Kind regards,
+The League OS Team
+
+---
+League OS
+Empowering Sports Through Technology
+Support: {{ support_email }}
+Website: {{ website }}
+
+© {{ current_year }} League OS. All rights reserved.
