@@ -205,6 +205,18 @@ class AuditLog(models.Model):
         ("WORKSPACE_REMOVED", "Workspace removed"),
         ("USER_ROLE_CHANGED", "User role changed"),
         ("USER_PERMISSIONS_UPDATED", "User permissions updated"),
+        ("KYC_SUBMITTED", "KYC submitted"),
+        ("KYC_PROCESSING_STARTED", "KYC processing started"),
+        ("KYC_DOCUMENT_ANALYZED", "KYC document analyzed"),
+        ("KYC_SELFIE_ANALYZED", "KYC selfie analyzed"),
+        ("KYC_FACE_MATCH_COMPLETED", "KYC face match completed"),
+        ("KYC_LIVENESS_COMPLETED", "KYC liveness completed"),
+        ("KYC_VERIFIED", "KYC verified"),
+        ("KYC_REJECTED", "KYC rejected"),
+        ("KYC_RETRY_REQUESTED", "KYC retry requested"),
+        ("KYC_REVIEW_REQUIRED", "KYC review required"),
+        ("KYC_DOCUMENT_ACCESSED", "KYC document accessed"),
+        ("KYC_DATA_EXPORTED", "KYC data exported"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

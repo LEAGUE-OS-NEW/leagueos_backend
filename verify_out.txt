@@ -1,0 +1,9 @@
+
+=== SUCCESS ===
+Workspace: user0@example.com -> Club Workspace A (ADMIN)
+Club name: Club Workspace A
+Club slug: club-0
+Club is_active: True
+Has description field: False
+
+Done.
