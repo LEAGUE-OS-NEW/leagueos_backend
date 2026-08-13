@@ -54,6 +54,7 @@ LOCAL_APPS = [
     "clubs",
     "dashboard",
     "discovery",
+    "fantasy",
     "markets",
     "notifications",
     "onboarding",
