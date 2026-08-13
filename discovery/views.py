@@ -392,7 +392,7 @@ class NewsListView(ListAPIView):
 
     permission_classes = [AllowAny]
     serializer_class = NewsSerializer
-    pagination_class = None
+    pagination_class = SystemPagination
 
     def get_queryset(self):
         query = NewsListQuerySerializer(data=self.request.query_params)
