@@ -207,6 +207,27 @@ class MarketSettlementModelTests(SettlementFixtureMixin, TestCase):
 
 
 class MarketSettlementServiceTests(SettlementFixtureMixin, TestCase):
+    def test_full_10000_ugx_share_uses_settlement_value_units(self):
+        market = self.resolve_market()
+        market.face_value_ugx = 10000
+        market.save(update_fields=["face_value_ugx", "updated_at"])
+        winner = self.create_position(market=market, quantity="10000.0000", cost="6000.0000")
+        loser = self.create_position(
+            market=market,
+            outcome=market.outcomes.exclude(id=market.winning_outcome_id).get(),
+            quantity="10000.0000",
+            cost="4000.0000",
+        )
+
+        settlement = MarketSettlementService.settle_market(market_id=market.id, actor=self.actor)
+
+        winning_record = settlement.position_settlements.get(market_position=winner)
+        losing_record = settlement.position_settlements.get(market_position=loser)
+        self.assertEqual(winning_record.payout_amount, Decimal("10000.0000"))
+        self.assertEqual(winning_record.realized_pnl_delta, Decimal("4000.0000"))
+        self.assertEqual(losing_record.payout_amount, Decimal("0.0000"))
+        self.assertEqual(losing_record.realized_pnl_delta, Decimal("-4000.0000"))
+
     def test_requires_resolved_market_with_valid_winner_and_permission(self):
         market = self.create_market()
         with self.assertRaises(ValidationError):

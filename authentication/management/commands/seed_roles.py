@@ -485,6 +485,7 @@ ROLE_PERMISSIONS = {
         "manage_support",
     ],
     "Sports Data & Statistics Admin": [
+        "admin.dashboard.view",
         "view_sports",
         "create_sports",
         "update_sports",
@@ -492,6 +493,7 @@ ROLE_PERMISSIONS = {
         "manage_sports",
     ],
     "Market Operations & Approval Admin": [
+        "admin.dashboard.view",
         "view_market",
         "manage_market",
         "edit_market",
@@ -509,24 +511,28 @@ ROLE_PERMISSIONS = {
         "view_market_audit",
     ],
     "Result Verification Admin": [
+        "admin.dashboard.view",
         "view_result",
         "verify_results",
         "reject_result",
         "reverify_result",
     ],
     "Compliance Admin": [
+        "admin.dashboard.view",
         "view_compliance",
         "manage_compliance",
         "review_compliance",
         "apply_restriction",
     ],
     "Finance Admin": [
+        "admin.dashboard.view",
         "view_finance",
         "manage_finance",
         "reconcile_finance",
         "review_withdrawal",
     ],
     "Customer Support Admin": [
+        "admin.dashboard.view",
         "view_support",
         "manage_support_cases",
     ],

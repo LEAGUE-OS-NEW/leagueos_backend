@@ -127,6 +127,10 @@ from markets.result_dispute_views import (
     ParticipantMarketResultDisputeDetailView,
     ParticipantMarketResultDisputeListView,
 )
+from markets.result_verification_views import (
+    MarketResultDevelopmentAcceleratorView,
+    MarketResultVerificationQueueView,
+)
 from markets.settlement_views import MarketSettlementView
 from markets.stats_views import MarketAdminStatsView, MarketStatsView
 from markets.views import (
@@ -134,11 +138,27 @@ from markets.views import (
     MarketDetailView,
     MarketListView,
 )
+from markets.admin_views import MarketOpeningPricingView
 from markets.void_refund_views import MarketVoidRefundView
 
 app_name = "markets"
 
 urlpatterns = [
+    path(
+        "market-admin/markets/<uuid:market_id>/opening-pricing/",
+        MarketOpeningPricingView.as_view(),
+        name="admin-market-opening-pricing",
+    ),
+    path(
+        "market-admin/result-verification/",
+        MarketResultVerificationQueueView.as_view(),
+        name="admin-result-verification-queue",
+    ),
+    path(
+        "market-admin/result-verification/<uuid:market_id>/dev-end-dispute-window/",
+        MarketResultDevelopmentAcceleratorView.as_view(),
+        name="admin-result-verification-dev-end-window",
+    ),
     path(
         "admin/compliance/kyc-sessions/", AdminKYCSessionListView.as_view(), name="admin-kyc-list"
     ),

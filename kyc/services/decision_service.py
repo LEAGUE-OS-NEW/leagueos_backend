@@ -4,6 +4,7 @@ from django.utils import timezone
 from typing import TYPE_CHECKING
 
 from kyc.models import KYCCheckResult, KYCConfiguration, KYCVerification
+from kyc.services.market_compliance_sync import KYCMarketComplianceSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,10 @@ class KYCDecisionService:
             verification.rejection_reason = reason_code
 
         verification.save()
+        KYCMarketComplianceSyncService.sync(
+            verification=verification,
+            reason=f"Automated KYC decision: {final_status} ({reason_code or 'no reason code'}).",
+        )
 
         logger.info(
             "KYC verification %s for user %s transition to %s (reason: %s).",

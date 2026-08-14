@@ -54,6 +54,7 @@ class KYCStatusResponseSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "status",
+            "verification_source",
             "document_type",
             "document_country",
             "can_retry",
@@ -109,6 +110,7 @@ class AdminKYCVerificationDetailSerializer(serializers.ModelSerializer):
             "user_id",
             "user_email",
             "status",
+            "verification_source",
             "document_type",
             "document_country",
             "document_number_last4",

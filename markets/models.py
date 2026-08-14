@@ -796,6 +796,7 @@ class Market(TimeStampedUUIDModel):
     resolution_criteria = models.TextField(
         blank=True,
     )
+    face_value_ugx = models.PositiveIntegerField(default=10000)
     status = models.CharField(
         max_length=30,
         choices=Status.choices,
@@ -1341,6 +1342,7 @@ class MarketOutcome(TimeStampedUUIDModel):
     description = models.TextField(
         blank=True,
     )
+    opening_price = models.DecimalField(max_digits=6, decimal_places=5, null=True, blank=True)
 
     class Meta:
         ordering = [
@@ -1374,6 +1376,13 @@ class MarketOutcome(TimeStampedUUIDModel):
             models.CheckConstraint(
                 condition=((Q(side="YES") & Q(position=1)) | (Q(side="NO") & Q(position=2))),
                 name="market_outcome_side_matches_position",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(opening_price__isnull=True)
+                    | (Q(opening_price__gt=0) & Q(opening_price__lt=1))
+                ),
+                name="market_outcome_opening_price_between_zero_and_one",
             ),
         ]
 
@@ -1496,6 +1505,34 @@ class MarketProvisionalResult(TimeStampedUUIDModel):
 
         if errors:
             raise ValidationError(errors)
+
+
+class MarketResultDevelopmentAcceleration(TimeStampedUUIDModel):
+    """Immutable marker ending a synthetic local market's dispute window for testing."""
+
+    provisional_result = models.OneToOneField(
+        MarketProvisionalResult,
+        on_delete=models.PROTECT,
+        related_name="development_acceleration",
+    )
+    accelerated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="result_development_accelerations",
+    )
+    accelerated_at = models.DateTimeField(default=timezone.now)
+    reason = models.CharField(max_length=255, default="Development testing only")
+
+    def __str__(self):
+        return f"Development result acceleration for {self.provisional_result_id}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Development acceleration records are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Development acceleration records cannot be deleted.")
 
 
 class MarketProvisionalEvidence(TimeStampedUUIDModel):
