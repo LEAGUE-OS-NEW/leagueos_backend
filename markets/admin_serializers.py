@@ -17,6 +17,7 @@ from markets.serializers import MarketPublicSerializer
 from markets.services.catalog_service import (
     MarketCatalogService,
 )
+from markets.services.opening_pricing_service import MarketOpeningPricingService
 from sports.models import (
     Competition,
     Participant,
@@ -208,6 +209,10 @@ class MarketAdminWriteSerializer(serializers.Serializer):
         default="No",
         max_length=120,
     )
+    face_value_ugx = serializers.IntegerField(required=False, min_value=1, default=10000)
+    yes_probability = serializers.DecimalField(
+        required=False, max_digits=7, decimal_places=5, min_value=0, max_value=100, default="50"
+    )
 
     def validate(self, attrs):
         unknown_fields = set(self.initial_data) - set(self.fields)
@@ -225,6 +230,8 @@ class MarketAdminWriteSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
+        face_value_ugx = validated_data.pop("face_value_ugx", 10000)
+        yes_probability = validated_data.pop("yes_probability", 50)
         yes_label = validated_data.pop(
             "yes_label",
             "Yes",
@@ -242,11 +249,18 @@ class MarketAdminWriteSerializer(serializers.Serializer):
         )
 
         try:
-            return MarketCatalogService.create_market(
-                yes_label=yes_label,
-                no_label=no_label,
-                **validated_data,
-            )
+            with transaction.atomic():
+                market = MarketCatalogService.create_market(
+                    yes_label=yes_label,
+                    no_label=no_label,
+                    **validated_data,
+                )
+                return MarketOpeningPricingService.configure(
+                    market=market,
+                    actor=self.context["request"].user,
+                    face_value_ugx=face_value_ugx,
+                    yes_probability=yes_probability,
+                )
         except DjangoValidationError as error:
             self._raise_serializer_validation_error(error)
 
@@ -263,6 +277,8 @@ class MarketAdminWriteSerializer(serializers.Serializer):
                 {"status": ("Only draft or rejected " "markets can be edited.")}
             )
 
+        face_value_ugx = validated_data.pop("face_value_ugx", None)
+        yes_probability = validated_data.pop("yes_probability", None)
         yes_label = validated_data.pop(
             "yes_label",
             None,
@@ -294,6 +310,18 @@ class MarketAdminWriteSerializer(serializers.Serializer):
                     MarketOutcome.Side.NO,
                     no_label,
                 )
+                if face_value_ugx is not None or yes_probability is not None:
+                    yes_outcome = instance.outcomes.get(side=MarketOutcome.Side.YES)
+                    MarketOpeningPricingService.configure(
+                        market=instance,
+                        actor=self.context["request"].user,
+                        face_value_ugx=face_value_ugx or instance.face_value_ugx,
+                        yes_probability=(
+                            yes_probability
+                            if yes_probability is not None
+                            else yes_outcome.opening_price * 100
+                        ),
+                    )
         except DjangoValidationError as error:
             self._raise_serializer_validation_error(error)
 
@@ -338,6 +366,22 @@ class MarketAdminWriteSerializer(serializers.Serializer):
                 "non_field_errors": (error.messages),
             }
         ) from error
+
+
+class MarketOpeningPricingSerializer(serializers.Serializer):
+    face_value_ugx = serializers.IntegerField(min_value=1)
+    yes_probability = serializers.DecimalField(max_digits=7, decimal_places=5)
+
+    def save(self, **kwargs):
+        try:
+            return MarketOpeningPricingService.configure(
+                market=self.context["market"],
+                actor=self.context["request"].user,
+                **self.validated_data,
+            )
+        except DjangoValidationError as error:
+            detail = getattr(error, "message_dict", {"detail": error.messages})
+            raise serializers.ValidationError(detail) from error
 
 
 class MarketLifecycleActionSerializer(serializers.Serializer):

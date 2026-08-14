@@ -5,6 +5,7 @@ from kyc.views import (
     AdminKYCListView,
     AdminKYCReviewActionView,
     FanKYCRetryView,
+    FanKYCDevelopmentBypassView,
     FanKYCStatusView,
     FanKYCSubmitView,
 )
@@ -16,6 +17,7 @@ urlpatterns = [
     path("fans/kyc/", FanKYCSubmitView.as_view(), name="fan-kyc-submit"),
     path("fans/kyc/status/", FanKYCStatusView.as_view(), name="fan-kyc-status"),
     path("fans/kyc/retry/", FanKYCRetryView.as_view(), name="fan-kyc-retry"),
+    path("fans/kyc/dev-bypass/", FanKYCDevelopmentBypassView.as_view(), name="fan-kyc-dev-bypass"),
     # Admin endpoints
     path("admin/kyc/verifications/", AdminKYCListView.as_view(), name="admin-kyc-list"),
     path(
