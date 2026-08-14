@@ -19,6 +19,8 @@ from kyc.serializers import (
     KYCSubmissionSerializer,
 )
 from kyc.tasks import process_kyc_attempt
+from markets.services.compliance_service import MarketComplianceService
+from markets.services.kyc_service import KYCService
 from kyc.services.market_compliance_sync import KYCMarketComplianceSyncService
 from markets.permissions import HasManageCompliancePermission
 
@@ -476,6 +478,13 @@ class AdminKYCReviewActionView(APIView):
         notes = serializer.validated_data.get("notes", "")
 
         with transaction.atomic():
+            # 1. Update the canonical KYC record (kyc app).
+            verification.status = decision
+            if decision == KYCVerification.Status.VERIFIED:
+                verification.verified_at = timezone.now()
+                user = verification.user
+                user.is_verified = True
+                user.save(update_fields=["is_verified", "updated_at"])
             verification = (
                 KYCVerification.objects.select_for_update()
                 .select_related("user")
@@ -504,6 +513,40 @@ class AdminKYCReviewActionView(APIView):
                     f"Manual admin rejection: {notes}" if notes else "Manual admin rejection"
                 )
             verification.save()
+ 
+            # 2. Map the decision to the markets compliance kyc_status and
+            #    persist it on MarketParticipantCompliance so that
+            #    MarketEligibilityService.evaluate() sees the updated state.
+            #    REVIEW stays as PENDING in the compliance system — the
+            #    participant is not yet verified but not blocked either.
+            _COMPLIANCE_STATUS_MAP = {
+                KYCVerification.Status.VERIFIED: "VERIFIED",
+                KYCVerification.Status.REJECTED: "REJECTED",
+                KYCVerification.Status.REVIEW: "PENDING",
+            }
+            compliance_kyc_status = _COMPLIANCE_STATUS_MAP.get(decision)
+            if compliance_kyc_status:
+                MarketComplianceService.update(
+                    participant=verification.user,
+                    actor=request.user,
+                    source="ADMIN",
+                    changes={"kyc_status": compliance_kyc_status},
+                    reason=notes or f"Admin KYC review decision: {decision}",
+                )
+
+            # 3. Transition any open KYCVerificationSession (markets app) to
+            #    the same terminal state so the admin queue and session list
+            #    reflect the manual decision.
+            if decision in (
+                KYCVerification.Status.VERIFIED,
+                KYCVerification.Status.REJECTED,
+            ):
+                KYCService.admin_decide(
+                    participant=verification.user,
+                    decision=decision,
+                    actor=request.user,
+                    notes=notes,
+                )
             KYCMarketComplianceSyncService.sync(
                 verification=verification,
                 actor=request.user,
