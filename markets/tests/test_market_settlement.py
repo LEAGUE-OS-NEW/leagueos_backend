@@ -621,6 +621,29 @@ class MarketSettlementAPITests(SettlementFixtureMixin, APITestCase):
         self.client.force_authenticate(self.actor)
         self.assertEqual(self.client.post(self.url(uuid4()), {}, format="json").status_code, 404)
 
+    def test_result_verification_admin_can_settle(self):
+        # A Result Verification Admin (verify_results/reject_result only,
+        # no approve_market) must be able to reach settlement — this was
+        # previously 403 for the whole role.
+        verify_permission = PermissionFactory(
+            name="verify_results", resource="results", action="verify"
+        )
+        reject_permission = PermissionFactory(
+            name="reject_result", resource="result", action="reject"
+        )
+        result_verification_role = RoleFactory(
+            name="Result Verification Admin", display_name="Result Verification Admin"
+        )
+        RolePermissionFactory(role=result_verification_role, permission=verify_permission)
+        RolePermissionFactory(role=result_verification_role, permission=reject_permission)
+        verifier = UserFactory()
+        UserRoleFactory(user=verifier, role=result_verification_role)
+
+        market = self.resolve_market()
+        self.client.force_authenticate(verifier)
+        response = self.client.post(self.url(market.id), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_success_replay_contract_rejects_client_values_and_exposes_no_pii(self):
         market = self.resolve_market()
         self.create_position(market=market, quantity="2.0000", cost="1.0000")

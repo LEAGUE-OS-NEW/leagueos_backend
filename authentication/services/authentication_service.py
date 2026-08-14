@@ -63,9 +63,11 @@ class AuthenticationService:
     def record_failed_attempt(user, ip_address, user_agent=""):
         user.failed_attempts = (user.failed_attempts or 0) + 1
         user.last_failed_attempt = timezone.now()
+        just_locked = False
         if user.failed_attempts >= getattr(settings, "LOGIN_MAX_FAILED_ATTEMPTS", 5):
             lock_minutes = getattr(settings, "LOGIN_LOCK_MINUTES", 15)
             user.locked_until = timezone.now() + timedelta(minutes=lock_minutes)
+            just_locked = True
         user.save(update_fields=["failed_attempts", "last_failed_attempt", "locked_until"])
         AuthenticationService.record_login_attempt(
             user,
@@ -73,6 +75,32 @@ class AuthenticationService:
             ip_address=ip_address,
             user_agent=user_agent,
             failure_reason="Invalid credentials",
+        )
+        if just_locked:
+            AuthenticationService._alert_account_locked(user, ip_address)
+
+    @staticmethod
+    def _alert_account_locked(user, ip_address):
+        from notifications.services.operational_alert_service import (
+            OperationalAlertService,
+        )
+
+        OperationalAlertService.create(
+            permissions=("manage_compliance", "view_audit"),
+            event_type="ACCOUNT_LOCKED_FAILED_LOGINS",
+            title="Account locked after repeated failed logins",
+            message=(
+                f"{user.email} was locked out after "
+                f"{user.failed_attempts} failed login attempts."
+            ),
+            source_key=f"account-lockout:{user.id}:{user.last_failed_attempt.isoformat()}",
+            data={
+                "user_id": str(user.id),
+                "email": user.email,
+                "failed_attempts": user.failed_attempts,
+                "ip_address": ip_address,
+                "locked_until": user.locked_until.isoformat() if user.locked_until else None,
+            },
         )
 
     @staticmethod

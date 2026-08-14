@@ -41,6 +41,13 @@ class InvitationService:
         )
         invitation.assigned_roles.set(roles)
 
+        from accounts.services.email_service import EmailService
+
+        try:
+            EmailService.send_admin_invitation_email(invitation)
+        except Exception:
+            logger.exception("Failed to send admin invitation email to %s", email)
+
         logger.info(
             "Admin invitation created for %s by %s",
             email,

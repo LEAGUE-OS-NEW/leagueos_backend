@@ -9,7 +9,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from markets.models import Market, MarketProvisionalResult
-from markets.permissions import HasApproveMarketPermission
+from markets.permissions import HasResultVerificationPermission
 from markets.provisional_result_serializers import (
     MarketProvisionalResultPublishSerializer,
     MarketProvisionalResultReadSerializer,
@@ -23,7 +23,7 @@ from markets.services.provisional_result_service import (
 class MarketProvisionalResultPublishView(GenericAPIView):
     permission_classes = [
         IsAuthenticated,
-        HasApproveMarketPermission,
+        HasResultVerificationPermission,
     ]
     serializer_class = MarketProvisionalResultPublishSerializer
 

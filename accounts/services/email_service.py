@@ -165,3 +165,117 @@ class EmailService:
             "Account setup email sent to %s",
             user.email,
         )
+
+    @staticmethod
+    def send_staff_invitation_email(invitation) -> None:
+        """Emails the invite link for a clubs.StaffInvitation."""
+        subject = f"You've Been Invited to {invitation.club.name} on League OS"
+
+        staff_invite_url = getattr(settings, "STAFF_INVITE_URL", "").strip()
+        accept_url = None
+        if staff_invite_url:
+            separator = "&" if "?" in staff_invite_url else "?"
+            accept_url = f"{staff_invite_url}{separator}token={invitation.token}"
+
+        context = {
+            "club_name": invitation.club.name,
+            "role_label": invitation.get_role_display(),
+            "invited_by_name": invitation.invited_by.get_full_name() or invitation.invited_by.email,
+            "token": invitation.token,
+            "accept_url": accept_url,
+            "expiry_days": max((invitation.expires_at - timezone.now()).days, 1),
+            "support_email": getattr(settings, "SUPPORT_EMAIL", "support@leagueos.com"),
+            "website": getattr(settings, "WEBSITE_URL", "https://leagueos.com"),
+            "current_year": timezone.now().year,
+        }
+
+        try:
+            html_content = render_to_string("emails/staff_invitation_email.html", context)
+        except Exception:
+            html_content = None
+
+        try:
+            text_content = render_to_string("emails/staff_invitation_email.txt", context)
+        except Exception:
+            text_content = (
+                f"{context['invited_by_name']} has invited you to join {context['club_name']} "
+                f"on League OS as a {context['role_label']}.\n\n"
+                + (
+                    f"Accept your invitation using this link:\n{accept_url}\n\n"
+                    if accept_url
+                    else f"Use the following invitation token to accept:\n\n{invitation.token}\n\n"
+                )
+                + f"This invitation expires in {context['expiry_days']} days.\n"
+            )
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[invitation.email],
+        )
+
+        if html_content:
+            email.attach_alternative(html_content, "text/html")
+
+        email.send(fail_silently=False)
+        logger.info(
+            "Staff invitation email sent to %s for club %s",
+            invitation.email,
+            invitation.club.name,
+        )
+
+    @staticmethod
+    def send_admin_invitation_email(invitation) -> None:
+        """Emails the invite link for an authentication.AdminInvitation."""
+        subject = "You've Been Invited to League OS Administration"
+
+        admin_invite_url = getattr(settings, "ADMIN_INVITE_URL", "").strip()
+        accept_url = None
+        if admin_invite_url:
+            separator = "&" if "?" in admin_invite_url else "?"
+            accept_url = f"{admin_invite_url}{separator}token={invitation.token}"
+
+        role_names = list(invitation.assigned_roles.values_list("display_name", flat=True))
+        context = {
+            "role_names": ", ".join(role_names) if role_names else "Administrator",
+            "invited_by_name": invitation.invited_by.get_full_name() or invitation.invited_by.email,
+            "token": invitation.token,
+            "accept_url": accept_url,
+            "expiry_days": max((invitation.token_expires_at - timezone.now()).days, 1),
+            "support_email": getattr(settings, "SUPPORT_EMAIL", "support@leagueos.com"),
+            "website": getattr(settings, "WEBSITE_URL", "https://leagueos.com"),
+            "current_year": timezone.now().year,
+        }
+
+        try:
+            html_content = render_to_string("emails/admin_invitation_email.html", context)
+        except Exception:
+            html_content = None
+
+        try:
+            text_content = render_to_string("emails/admin_invitation_email.txt", context)
+        except Exception:
+            text_content = (
+                f"{context['invited_by_name']} has invited you to League OS administration "
+                f"as {context['role_names']}.\n\n"
+                + (
+                    f"Accept your invitation using this link:\n{accept_url}\n\n"
+                    if accept_url
+                    else f"Use the following invitation token to accept:\n\n{invitation.token}\n\n"
+                )
+                + f"This invitation expires in {context['expiry_days']} days.\n"
+            )
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[invitation.email],
+        )
+
+        if html_content:
+            email.attach_alternative(html_content, "text/html")
+
+        email.send(fail_silently=False)
+        logger.info("Admin invitation email sent to %s", invitation.email)

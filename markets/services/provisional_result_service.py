@@ -17,7 +17,11 @@ from markets.services.market_notification_service import MarketNotificationServi
 
 
 class MarketProvisionalResultService:
-    APPROVE_PERMISSION = "approve_market"
+    RESULT_VERIFICATION_PERMISSIONS = (
+        "approve_market",
+        "verify_results",
+        "reject_result",
+    )
 
     DEFAULT_DISPUTE_WINDOW_HOURS = 48
     MIN_DISPUTE_WINDOW_HOURS = 1
@@ -140,11 +144,11 @@ class MarketProvisionalResultService:
 
     @classmethod
     def _require_permission(cls, actor) -> None:
-        if not PermissionService.has_permission(
+        if not PermissionService.has_any_permission(
             actor,
-            cls.APPROVE_PERMISSION,
+            cls.RESULT_VERIFICATION_PERMISSIONS,
         ):
-            raise PermissionDenied("You do not have the approve_market permission.")
+            raise PermissionDenied("You do not have permission to verify or reject results.")
 
     @staticmethod
     def _require_independent_actor(market, actor) -> None:

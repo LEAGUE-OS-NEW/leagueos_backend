@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -65,6 +67,26 @@ class AuthenticationTests(APITestCase):
             self.client.post(url, {"email": user.email, "password": "WrongPass123!"})
         response = self.client.post(url, {"email": user.email, "password": "StrongPass123!"})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_login_lockout_raises_operational_alert(self):
+        user = UserFactory(password="StrongPass123!")
+        url = reverse("authentication:login")
+
+        with patch(
+            "notifications.services.operational_alert_service.OperationalAlertService.create"
+        ) as mock_alert:
+            for _attempt in range(4):
+                self.client.post(url, {"email": user.email, "password": "WrongPass123!"})
+                mock_alert.assert_not_called()
+
+            self.client.post(url, {"email": user.email, "password": "WrongPass123!"})
+
+        mock_alert.assert_called_once()
+        self.assertEqual(
+            mock_alert.call_args.kwargs["event_type"],
+            "ACCOUNT_LOCKED_FAILED_LOGINS",
+        )
+        self.assertEqual(mock_alert.call_args.kwargs["data"]["email"], user.email)
 
 
 class LogoutTests(APITestCase):

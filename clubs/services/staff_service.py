@@ -39,6 +39,13 @@ class StaffService:
             metadata={"email": email, "role": role},
         )
 
+        from accounts.services.email_service import EmailService
+
+        try:
+            EmailService.send_staff_invitation_email(invitation)
+        except Exception:
+            logger.exception("Failed to send staff invitation email to %s", email)
+
         return invitation
 
     @staticmethod
@@ -89,6 +96,18 @@ class StaffService:
                 entity_id=workspace.id,
                 metadata={"role": invitation.role},
             )
+
+            if invitation.role == ClubWorkspace.WorkspaceRole.ADMIN:
+                from authentication.models import Role
+                from authentication.services.role_service import RoleService
+
+                platform_role = Role.objects.filter(name="Club Admin").first()
+                if platform_role:
+                    RoleService.assign_role(
+                        user=user,
+                        role=platform_role,
+                        assigned_by=invitation.invited_by,
+                    )
 
         return workspace
 
