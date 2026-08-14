@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from profiles.models import Gender
 from kyc.models import KYCVerification, KYCCheckResult, KYCConfiguration
 from kyc.services.image_validation_service import KYCImageValidationService, KYCValidationError
 
@@ -8,6 +9,12 @@ class KYCSubmissionSerializer(serializers.Serializer):
     document_country = serializers.CharField(max_length=3, default="UGA")
     document_image = serializers.FileField(required=True)
     selfie_image = serializers.FileField(required=True)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.PrimaryKeyRelatedField(
+        queryset=Gender.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
 
     def validate_document_country(self, value):
         val = value.upper().strip()
