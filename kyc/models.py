@@ -132,6 +132,7 @@ class KYCVerification(models.Model):
     risk_score = models.FloatField(default=0.0)
     rejection_reason = models.CharField(max_length=100, blank=True, default="")
     retry_reason = models.CharField(max_length=100, blank=True, default="")
+    auto_verified = models.BooleanField(default=False)
 
     verification_started_at = models.DateTimeField(null=True, blank=True)
     verification_completed_at = models.DateTimeField(null=True, blank=True)

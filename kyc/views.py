@@ -24,6 +24,13 @@ logger = logging.getLogger(__name__)
 signer = TimestampSigner()
 
 
+def get_client_ip(request):
+    x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded:
+        return x_forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
+
+
 def log_kyc_audit(user, action, resource_id=None, metadata=None, request=None):
     ip_address = None
     user_agent = ""
@@ -153,15 +160,27 @@ class FanKYCSubmitView(APIView):
             )
             process_kyc_attempt(str(attempt.id))
 
+        from authentication.services.auth_context_service import AuthContextService
+        from authentication.services.token_service import TokenService
+        from authentication.services.session_service import SessionService
+
+        access, refresh = TokenService.generate_tokens(user)
+        SessionService.create_session(
+            user, refresh, get_client_ip(request), request.META.get("HTTP_USER_AGENT", "")
+        )
+
+        response_data = {
+            "status": KYCVerification.Status.PROCESSING,
+            "kyc_id": str(verification.id),
+            "attempt_id": str(attempt.id),
+            **AuthContextService.authenticated_data(user, access, refresh),
+        }
+
         return Response(
             build_response(
                 True,
                 "KYC verification submitted successfully and processing started.",
-                data={
-                    "status": KYCVerification.Status.PROCESSING,
-                    "kyc_id": str(verification.id),
-                    "attempt_id": str(attempt.id),
-                },
+                data=response_data,
             ),
             status=status.HTTP_202_ACCEPTED,
         )
@@ -179,12 +198,17 @@ class FanKYCStatusView(APIView):
             defaults={"status": KYCVerification.Status.NOT_STARTED},
         )
 
+        from authentication.services.auth_context_service import AuthContextService
+
         serializer = KYCStatusResponseSerializer(verification)
         return Response(
             build_response(
                 True,
                 "KYC status fetched successfully.",
-                data=serializer.data,
+                data={
+                    **serializer.data,
+                    "user": AuthContextService.user_context(request.user),
+                },
             ),
             status=status.HTTP_200_OK,
         )
@@ -226,6 +250,8 @@ class FanKYCRetryView(APIView):
             request=request,
         )
 
+        from authentication.services.auth_context_service import AuthContextService
+
         return Response(
             build_response(
                 True,
@@ -233,6 +259,7 @@ class FanKYCRetryView(APIView):
                 data={
                     "can_retry": True,
                     "attempts_remaining": config.max_attempts - verification.attempts.count(),
+                    "user": AuthContextService.user_context(user),
                 },
             ),
             status=status.HTTP_200_OK,
