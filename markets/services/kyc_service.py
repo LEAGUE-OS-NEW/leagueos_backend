@@ -145,6 +145,45 @@ class KYCService:
         return session
 
     @classmethod
+    @transaction.atomic
+    def admin_decide(cls, *, participant, decision, actor, notes=""):
+        """Transitions the participant's current non-terminal KYC session
+        (if any) to reflect a compliance admin's manual decision, mirroring
+        the event-logging pattern _apply_event uses for provider webhooks.
+
+        This keeps KYCVerificationSession (what the admin queue list reads)
+        in sync with MarketParticipantCompliance.kyc_status (what actually
+        gates eligibility), which a manual compliance decision otherwise
+        only ever updates directly.
+        """
+        session = (
+            KYCVerificationSession.objects.select_for_update()
+            .filter(participant=participant)
+            .exclude(status__in=cls.TERMINAL)
+            .order_by("-initiated_at")
+            .first()
+        )
+        if session is None:
+            return None
+        previous = session.status
+        session.status = decision
+        session.completed_at = timezone.now()
+        session.save()
+        KYCVerificationEvent.objects.create(
+            session=session,
+            event_type=f"ADMIN_{decision}",
+            previous_status=previous,
+            new_status=decision,
+            payload_digest=hashlib.sha256(
+                f"admin:{session.id}:{decision}:{timezone.now().timestamp()}".encode()
+            ).hexdigest(),
+            source=KYCVerificationEvent.Source.ADMIN,
+            actor=actor,
+            metadata={"notes": notes} if notes else {},
+        )
+        return session
+
+    @classmethod
     def verify_signature(cls, *, body, timestamp, signature):
         secret = getattr(settings, "MARKET_KYC_WEBHOOK_SECRET", "")
         if not secret:

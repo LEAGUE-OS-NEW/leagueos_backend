@@ -16,6 +16,7 @@ from markets.models import MarketComplianceReview, MarketParticipantCompliance
 from markets.permissions import HasManageCompliancePermission
 from markets.services.compliance_service import MarketComplianceService
 from markets.services.eligibility_service import MarketEligibilityService
+from markets.services.kyc_service import KYCService
 from system.pagination import PublicCatalogPagination
 
 
@@ -79,6 +80,13 @@ class AdminParticipantComplianceDetailView(APIView):
         MarketComplianceService.update(
             participant=participant, actor=request.user, changes=serializer.validated_data
         )
+        new_kyc_status = serializer.validated_data.get("kyc_status")
+        if new_kyc_status in ("VERIFIED", "REJECTED"):
+            KYCService.admin_decide(
+                participant=participant,
+                decision=new_kyc_status,
+                actor=request.user,
+            )
         participant = self.participant(user_id)
         return Response(self.response_data(participant))
 
