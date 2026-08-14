@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.models import AuditLog
 from accounts.serializers import build_response
+from profiles.models import Profile
 from kyc.models import KYCVerification, KYCVerificationAttempt, KYCConfiguration
 from kyc.serializers import (
     AdminKYCReviewActionSerializer,
@@ -20,9 +21,22 @@ from kyc.serializers import (
 from kyc.tasks import process_kyc_attempt
 from markets.services.compliance_service import MarketComplianceService
 from markets.services.kyc_service import KYCService
+from kyc.services.market_compliance_sync import KYCMarketComplianceSyncService
+from markets.permissions import HasManageCompliancePermission
 
 logger = logging.getLogger(__name__)
 signer = TimestampSigner()
+
+
+class KYCEmptyRequestSerializer(serializers.Serializer):
+    pass
+
+
+def get_client_ip(request):
+    x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded:
+        return x_forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
 
 
 def log_kyc_audit(user, action, resource_id=None, metadata=None, request=None):
@@ -119,6 +133,26 @@ class FanKYCSubmitView(APIView):
             verification.document_type = serializer.validated_data["document_type"]
             verification.document_country = serializer.validated_data["document_country"]
             verification.save()
+            KYCMarketComplianceSyncService.sync(
+                verification=verification, reason="Fan submitted canonical KYC files."
+            )
+
+            profile, _ = Profile.objects.get_or_create(user=user)
+            if "date_of_birth" in serializer.validated_data:
+                profile.date_of_birth = serializer.validated_data["date_of_birth"]
+            if "gender" in serializer.validated_data:
+                profile.gender = serializer.validated_data["gender"]
+            profile.save(update_fields=["date_of_birth", "gender", "updated_at"])
+
+            from markets.services.compliance_service import MarketComplianceService
+            from markets.models import MarketParticipantCompliance
+
+            MarketComplianceService.update(
+                participant=user,
+                actor=None,
+                source="SYSTEM",
+                changes={"kyc_status": MarketParticipantCompliance.KYCStatus.PENDING},
+            )
 
         log_kyc_audit(
             user=user,
@@ -137,17 +171,81 @@ class FanKYCSubmitView(APIView):
             )
             process_kyc_attempt(str(attempt.id))
 
+        from authentication.services.auth_context_service import AuthContextService
+        from authentication.services.token_service import TokenService
+        from authentication.services.session_service import SessionService
+
+        access, refresh = TokenService.generate_tokens(user)
+        SessionService.create_session(
+            user, refresh, get_client_ip(request), request.META.get("HTTP_USER_AGENT", "")
+        )
+
+        response_data = {
+            "status": KYCVerification.Status.PROCESSING,
+            "kyc_id": str(verification.id),
+            "attempt_id": str(attempt.id),
+            **AuthContextService.authenticated_data(user, access, refresh),
+        }
+
         return Response(
             build_response(
                 True,
                 "KYC verification submitted successfully and processing started.",
-                data={
-                    "status": KYCVerification.Status.PROCESSING,
-                    "kyc_id": str(verification.id),
-                    "attempt_id": str(attempt.id),
-                },
+                data=response_data,
             ),
             status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class FanKYCDevelopmentBypassView(APIView):
+    """Verify only the authenticated synthetic fan in an enabled local build."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = KYCEmptyRequestSerializer
+
+    def post(self, request):
+        local_enabled = settings.DEBUG and getattr(settings, "DEV_KYC_BYPASS_ENABLED", False)
+        review_enabled = getattr(settings, "REVIEW_WORKFLOW_TOOLS_ENABLED", False)
+        synthetic_actor = request.user.email.lower().endswith("@leagueos.test")
+        if not ((local_enabled or review_enabled) and synthetic_actor):
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        now = timezone.now()
+        with transaction.atomic():
+            verification, _ = KYCVerification.objects.select_for_update().get_or_create(
+                user=request.user
+            )
+            verification.status = KYCVerification.Status.VERIFIED
+            verification.verification_source = KYCVerification.VerificationSource.DEVELOPMENT_BYPASS
+            verification.verification_started_at = verification.verification_started_at or now
+            verification.verification_completed_at = now
+            verification.verified_at = now
+            verification.rejection_reason = ""
+            verification.retry_reason = ""
+            verification.save()
+            KYCMarketComplianceSyncService.sync(
+                verification=verification,
+                actor=request.user,
+                reason="REVIEW TOOL DEVELOPMENT BYPASS: synthetic fan verification.",
+            )
+            log_kyc_audit(
+                user=request.user,
+                action="KYC_VERIFIED",
+                resource_id=verification.id,
+                metadata={
+                    "verification_source": "DEVELOPMENT_BYPASS",
+                    "development_only": True,
+                    "review_workflow_tool": True,
+                },
+                request=request,
+            )
+
+        return Response(
+            build_response(
+                True,
+                "Verified for synthetic workflow review.",
+                data=KYCStatusResponseSerializer(verification).data,
+            )
         )
 
 
@@ -163,12 +261,17 @@ class FanKYCStatusView(APIView):
             defaults={"status": KYCVerification.Status.NOT_STARTED},
         )
 
+        from authentication.services.auth_context_service import AuthContextService
+
         serializer = KYCStatusResponseSerializer(verification)
         return Response(
             build_response(
                 True,
                 "KYC status fetched successfully.",
-                data=serializer.data,
+                data={
+                    **serializer.data,
+                    "user": AuthContextService.user_context(request.user),
+                },
             ),
             status=status.HTTP_200_OK,
         )
@@ -179,7 +282,7 @@ class FanKYCRetryView(APIView):
     received RETRY_REQUIRED."""
 
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = serializers.Serializer
+    serializer_class = KYCEmptyRequestSerializer
 
     @extend_schema(
         request=None,
@@ -210,6 +313,8 @@ class FanKYCRetryView(APIView):
             request=request,
         )
 
+        from authentication.services.auth_context_service import AuthContextService
+
         return Response(
             build_response(
                 True,
@@ -217,6 +322,7 @@ class FanKYCRetryView(APIView):
                 data={
                     "can_retry": True,
                     "attempts_remaining": config.max_attempts - verification.attempts.count(),
+                    "user": AuthContextService.user_context(user),
                 },
             ),
             status=status.HTTP_200_OK,
@@ -226,7 +332,7 @@ class FanKYCRetryView(APIView):
 class AdminKYCListView(APIView):
     """Admin endpoint to list and filter KYC verifications."""
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [HasManageCompliancePermission]
 
     @extend_schema(
         parameters=[
@@ -270,7 +376,7 @@ class AdminKYCListView(APIView):
 class AdminKYCDetailView(APIView):
     """Admin endpoint to view detailed check results for a single KYC verification."""
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [HasManageCompliancePermission]
 
     @extend_schema(responses={200: AdminKYCVerificationDetailSerializer})
     def get(self, request, verification_id):
@@ -296,8 +402,8 @@ class AdminKYCDetailView(APIView):
 class AdminKYCDocumentUrlView(APIView):
     """Generates a temporary signed access URL for viewing private document or selfie images."""
 
-    permission_classes = [permissions.IsAdminUser]
-    serializer_class = serializers.Serializer
+    permission_classes = [HasManageCompliancePermission]
+    serializer_class = KYCEmptyRequestSerializer
 
     @extend_schema(
         parameters=[
@@ -360,18 +466,11 @@ class AdminKYCDocumentUrlView(APIView):
 class AdminKYCReviewActionView(APIView):
     """Admin endpoint to perform manual review decision override on REVIEW state verifications."""
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [HasManageCompliancePermission]
     serializer_class = AdminKYCReviewActionSerializer
 
     @extend_schema(request=AdminKYCReviewActionSerializer, responses={200: dict})
     def post(self, request, verification_id):
-        verification = KYCVerification.objects.filter(id=verification_id).first()
-        if not verification:
-            return Response(
-                build_response(False, "KYC verification record not found."),
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
         serializer = AdminKYCReviewActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -386,12 +485,35 @@ class AdminKYCReviewActionView(APIView):
                 user = verification.user
                 user.is_verified = True
                 user.save(update_fields=["is_verified", "updated_at"])
+            verification = (
+                KYCVerification.objects.select_for_update()
+                .select_related("user")
+                .filter(id=verification_id)
+                .first()
+            )
+            if not verification:
+                return Response(
+                    build_response(False, "KYC verification record not found."),
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            verification.status = decision
+            verification.verification_source = KYCVerification.VerificationSource.MANUAL
+            verification.verification_completed_at = timezone.now()
+            if decision == KYCVerification.Status.VERIFIED:
+                verification.verified_at = timezone.now()
+                verification.rejection_reason = ""
+                verification.retry_reason = ""
+                user = verification.user
+                if not user.is_verified:
+                    user.is_verified = True
+                    user.save(update_fields=["is_verified", "updated_at"])
             elif decision == KYCVerification.Status.REJECTED:
                 verification.rejection_reason = (
                     f"Manual admin rejection: {notes}" if notes else "Manual admin rejection"
                 )
             verification.save()
-
+ 
             # 2. Map the decision to the markets compliance kyc_status and
             #    persist it on MarketParticipantCompliance so that
             #    MarketEligibilityService.evaluate() sees the updated state.
@@ -425,6 +547,28 @@ class AdminKYCReviewActionView(APIView):
                     actor=request.user,
                     notes=notes,
                 )
+            KYCMarketComplianceSyncService.sync(
+                verification=verification,
+                actor=request.user,
+                reason=f"Manual KYC decision: {decision}. {notes}".strip(),
+            )
+
+        from markets.services.compliance_service import MarketComplianceService
+        from markets.models import MarketParticipantCompliance
+
+        market_status = {
+            KYCVerification.Status.VERIFIED: MarketParticipantCompliance.KYCStatus.VERIFIED,
+            KYCVerification.Status.REJECTED: MarketParticipantCompliance.KYCStatus.REJECTED,
+            KYCVerification.Status.REVIEW: MarketParticipantCompliance.KYCStatus.PENDING,
+        }.get(decision, MarketParticipantCompliance.KYCStatus.PENDING)
+
+        MarketComplianceService.update(
+            participant=verification.user,
+            actor=request.user,
+            source="ADMIN",
+            changes={"kyc_status": market_status},
+            reason=f"Admin review: {notes}" if notes else "Admin review",
+        )
 
         log_kyc_audit(
             user=request.user,

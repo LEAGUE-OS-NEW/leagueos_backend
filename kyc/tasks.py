@@ -49,6 +49,7 @@ from kyc.services.duplicate_service import DuplicateService
 from kyc.services.face_service import FaceService
 from kyc.services.ocr_service import OCRService
 from kyc.services.risk_engine import KYCRiskEngine
+from kyc.services.market_compliance_sync import KYCMarketComplianceSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,9 @@ def process_kyc_attempt(self, attempt_id_str: str):
             verification.status = KYCVerification.Status.PROCESSING
             verification.verification_started_at = timezone.now()
             verification.save(update_fields=["status", "verification_started_at", "updated_at"])
+            KYCMarketComplianceSyncService.sync(
+                verification=verification, reason="Canonical KYC processing started."
+            )
 
         logger.info("Started internal automated KYC processing for attempt %s.", attempt_id)
 

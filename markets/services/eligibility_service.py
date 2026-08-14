@@ -116,7 +116,14 @@ class MarketEligibilityService:
             jurisdiction_eligible = True
         elif override == MarketParticipantCompliance.JurisdictionOverride.BLOCK:
             jurisdiction_eligible = False
-        kyc_eligible = kyc == MarketParticipantCompliance.KYCStatus.VERIFIED
+
+        kyc_verification = getattr(participant, "kyc_verification", None)
+        internal_kyc_verified = bool(
+            kyc_verification and getattr(kyc_verification, "status", None) == "VERIFIED"
+        )
+        kyc_eligible = (
+            kyc == MarketParticipantCompliance.KYCStatus.VERIFIED or internal_kyc_verified
+        )
         restriction_clear = restriction == MarketParticipantCompliance.RestrictionStatus.CLEAR
         reasons = []
         if not dob:

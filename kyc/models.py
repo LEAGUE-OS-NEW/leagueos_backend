@@ -45,6 +45,11 @@ class KYCVerification(models.Model):
         HIGH = "HIGH", "High"
         CRITICAL = "CRITICAL", "Critical"
 
+    class VerificationSource(models.TextChoices):
+        PROVIDER = "PROVIDER", "Provider"
+        MANUAL = "MANUAL", "Manual"
+        DEVELOPMENT_BYPASS = "DEVELOPMENT_BYPASS", "Development bypass"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -55,6 +60,12 @@ class KYCVerification(models.Model):
         max_length=20,
         choices=Status.choices,
         default=Status.NOT_STARTED,
+        db_index=True,
+    )
+    verification_source = models.CharField(
+        max_length=24,
+        choices=VerificationSource.choices,
+        default=VerificationSource.PROVIDER,
         db_index=True,
     )
     document_type = models.CharField(
@@ -132,6 +143,7 @@ class KYCVerification(models.Model):
     risk_score = models.FloatField(default=0.0)
     rejection_reason = models.CharField(max_length=100, blank=True, default="")
     retry_reason = models.CharField(max_length=100, blank=True, default="")
+    auto_verified = models.BooleanField(default=False)
 
     verification_started_at = models.DateTimeField(null=True, blank=True)
     verification_completed_at = models.DateTimeField(null=True, blank=True)

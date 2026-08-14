@@ -125,6 +125,30 @@ class MarketCatalogueModelTests(TestCase):
         with self.assertRaises(ValidationError):
             market.full_clean()
 
+    def test_settles_by_equal_to_closes_at_is_valid(self):
+        closes_at = self.now + timedelta(days=1)
+        market = Market(**self.market_values(closes_at=closes_at, settles_by=closes_at))
+
+        market.full_clean()
+
+    def test_settles_by_after_closes_at_is_valid(self):
+        market = Market(**self.market_values(settles_by=self.now + timedelta(days=1, hours=1)))
+
+        market.full_clean()
+
+    def test_settles_by_before_closes_at_is_rejected(self):
+        market = Market(**self.market_values(settles_by=self.now + timedelta(hours=23)))
+
+        with self.assertRaises(ValidationError) as context:
+            market.full_clean()
+
+        self.assertIn("settles_by", context.exception.message_dict)
+
+    def test_null_settles_by_remains_valid(self):
+        market = Market(**self.market_values(settles_by=None))
+
+        market.full_clean()
+
     def test_custom_market_requires_custom_subject(self):
         market = Market(
             **self.market_values(

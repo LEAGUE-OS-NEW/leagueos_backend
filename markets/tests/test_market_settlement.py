@@ -207,6 +207,27 @@ class MarketSettlementModelTests(SettlementFixtureMixin, TestCase):
 
 
 class MarketSettlementServiceTests(SettlementFixtureMixin, TestCase):
+    def test_full_10000_ugx_share_uses_settlement_value_units(self):
+        market = self.resolve_market()
+        market.face_value_ugx = 10000
+        market.save(update_fields=["face_value_ugx", "updated_at"])
+        winner = self.create_position(market=market, quantity="10000.0000", cost="6000.0000")
+        loser = self.create_position(
+            market=market,
+            outcome=market.outcomes.exclude(id=market.winning_outcome_id).get(),
+            quantity="10000.0000",
+            cost="4000.0000",
+        )
+
+        settlement = MarketSettlementService.settle_market(market_id=market.id, actor=self.actor)
+
+        winning_record = settlement.position_settlements.get(market_position=winner)
+        losing_record = settlement.position_settlements.get(market_position=loser)
+        self.assertEqual(winning_record.payout_amount, Decimal("10000.0000"))
+        self.assertEqual(winning_record.realized_pnl_delta, Decimal("4000.0000"))
+        self.assertEqual(losing_record.payout_amount, Decimal("0.0000"))
+        self.assertEqual(losing_record.realized_pnl_delta, Decimal("-4000.0000"))
+
     def test_requires_resolved_market_with_valid_winner_and_permission(self):
         market = self.create_market()
         with self.assertRaises(ValidationError):
@@ -607,6 +628,31 @@ class MarketSettlementServiceTests(SettlementFixtureMixin, TestCase):
         settlement = MarketSettlementService.settle_market(market_id=market.id, actor=self.actor)
         entry = settlement.position_settlements.get().wallet_ledger_entry
         self.assertEqual(entry.idempotency_reference, expected)
+
+    def test_settlement_before_settles_by_is_blocked(self):
+        market = self.resolve_market()
+        market.settles_by = timezone.now() + timedelta(hours=1)
+        market.save(update_fields=["settles_by", "updated_at"])
+        with self.assertRaises(ValidationError) as context:
+            MarketSettlementService.settle_market(market_id=market.id, actor=self.actor)
+        self.assertIn("settles_by", context.exception.message_dict)
+
+    def test_settlement_at_settles_by_is_allowed(self):
+        market = self.resolve_market()
+        target = timezone.now() + timedelta(hours=1)
+        market.settles_by = target
+        market.save(update_fields=["settles_by", "updated_at"])
+        with patch("markets.services.settlement_service.timezone.now", return_value=target):
+            settlement = MarketSettlementService.settle_market(
+                market_id=market.id, actor=self.actor
+            )
+        self.assertEqual(settlement.market_id, market.id)
+
+    def test_null_settles_by_preserves_historical_behavior(self):
+        market = self.resolve_market()
+        self.assertIsNone(market.settles_by)
+        settlement = MarketSettlementService.settle_market(market_id=market.id, actor=self.actor)
+        self.assertEqual(settlement.market_id, market.id)
 
 
 class MarketSettlementAPITests(SettlementFixtureMixin, APITestCase):

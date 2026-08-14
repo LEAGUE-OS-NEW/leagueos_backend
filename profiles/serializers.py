@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any
+from uuid import UUID
 
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from profiles.models import Club, Country, Gender, Language, Profile, Timezone
@@ -145,6 +147,8 @@ class ProfileSerializer(serializers.ModelSerializer):
     preferred_language = LanguageSerializer(read_only=True)
     timezone = TimezoneSerializer(read_only=True)
     favourite_club = ClubSerializer(read_only=True)
+    favourite_sports = serializers.SerializerMethodField()
+    favourite_competitions = serializers.SerializerMethodField()
     first_name = serializers.SerializerMethodField()
     last_name = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
@@ -167,6 +171,8 @@ class ProfileSerializer(serializers.ModelSerializer):
             "timezone",
             "biography",
             "favourite_club",
+            "favourite_sports",
+            "favourite_competitions",
             "avatar",
             "avatar_url",
             "avatar_updated_at",
@@ -188,6 +194,18 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     def get_avatar_url(self, obj: Profile) -> str | None:
         return obj.get_avatar_url()
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_favourite_sports(self, obj: Profile):
+        from onboarding.services.preference_service import PreferenceService
+
+        return PreferenceService.get_user_sports(obj.user)
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_favourite_competitions(self, obj: Profile):
+        from onboarding.services.preference_service import PreferenceService
+
+        return PreferenceService.get_user_competitions(obj.user)
 
 
 class ProfileUpdateSerializer(serializers.Serializer):
@@ -222,6 +240,16 @@ class ProfileUpdateSerializer(serializers.Serializer):
         queryset=Club.objects.filter(is_active=True),
         required=False,
         allow_null=True,
+    )
+    favourite_sports = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+    )
+    favourite_competitions = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
     )
     preferred_language = serializers.PrimaryKeyRelatedField(
         queryset=Language.objects.filter(is_active=True),
@@ -260,6 +288,24 @@ class ProfileUpdateSerializer(serializers.Serializer):
         """Validate date of birth is not in the future and meets minimum age."""
         if value is not None:
             ProfileService.validate_date_of_birth(value)
+        return value
+
+    def validate_favourite_sports(self, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("Duplicate sport selections are not allowed.")
+        sports = Sport.objects.filter(pk__in=value, is_active=True)
+        if sports.count() != len(value):
+            raise serializers.ValidationError("One or more sports do not exist or are inactive.")
+        return value
+
+    def validate_favourite_competitions(self, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("Duplicate competition selections are not allowed.")
+        competitions = Competition.objects.filter(pk__in=value, is_active=True)
+        if competitions.count() != len(value):
+            raise serializers.ValidationError(
+                "One or more competitions do not exist or are inactive."
+            )
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:

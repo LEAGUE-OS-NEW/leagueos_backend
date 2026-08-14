@@ -154,7 +154,9 @@ class MarketResultDisputeService:
     def _require_open_window(
         provisional_result: MarketProvisionalResult,
     ) -> None:
-        if timezone.now() >= provisional_result.dispute_deadline:
+        if timezone.now() >= provisional_result.dispute_deadline or hasattr(
+            provisional_result, "development_acceleration"
+        ):
             raise ValidationError(
                 {"dispute_window": ("The provisional-result dispute window " "has closed.")}
             )

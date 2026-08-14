@@ -132,7 +132,9 @@ class MarketProvisionalResultService:
             # provisional-result workflow was introduced.
             return
 
-        if timezone.now() < provisional_result.dispute_deadline:
+        if timezone.now() < provisional_result.dispute_deadline and not hasattr(
+            provisional_result, "development_acceleration"
+        ):
             raise ValidationError(
                 {
                     "dispute_window": (

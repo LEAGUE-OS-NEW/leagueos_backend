@@ -346,6 +346,125 @@ class MarketAdminAPITests(APITestCase):
             ],
         )
 
+    def test_future_scheduled_event_market_is_accepted(self):
+        self.authenticate(self.operations_user)
+
+        response = self.client.post(
+            reverse("markets:admin-market-list"),
+            self.create_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_past_scheduled_event_market_is_rejected(self):
+        self.event.starts_at = self.now - timedelta(minutes=1)
+        self.event.save(update_fields=["starts_at", "updated_at"])
+        self.authenticate(self.operations_user)
+
+        response = self.client.post(
+            reverse("markets:admin-market-list"),
+            self.create_payload(closes_at=(self.now - timedelta(hours=1)).isoformat()),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("sporting_event_id", response.data)
+
+    def test_non_scheduled_event_market_is_rejected(self):
+        self.authenticate(self.operations_user)
+
+        for event_status in (
+            SportingEvent.Status.COMPLETED,
+            SportingEvent.Status.LIVE,
+            SportingEvent.Status.CANCELLED,
+            SportingEvent.Status.ABANDONED,
+            SportingEvent.Status.DRAFT,
+        ):
+            with self.subTest(event_status=event_status):
+                self.event.status = event_status
+                self.event.save(update_fields=["status", "updated_at"])
+                response = self.client.post(
+                    reverse("markets:admin-market-list"),
+                    self.create_payload(question=f"Market for {event_status}"),
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+                self.assertIn("sporting_event_id", response.data)
+
+    def test_unverified_event_market_is_rejected(self):
+        self.event.is_verified = False
+        self.event.save(update_fields=["is_verified", "updated_at"])
+        self.authenticate(self.operations_user)
+
+        response = self.client.post(
+            reverse("markets:admin-market-list"),
+            self.create_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("sporting_event_id", response.data)
+
+    def test_event_market_cannot_close_after_event_starts(self):
+        self.authenticate(self.operations_user)
+
+        response = self.client.post(
+            reverse("markets:admin-market-list"),
+            self.create_payload(
+                closes_at=(self.event.starts_at + timedelta(seconds=1)).isoformat()
+            ),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("closes_at", response.data)
+
+    def test_settles_by_persists_through_create_read_and_update(self):
+        self.authenticate(self.operations_user)
+        initial_settles_by = self.now + timedelta(days=1, hours=2)
+
+        created = self.client.post(
+            reverse("markets:admin-market-list"),
+            self.create_payload(settles_by=initial_settles_by.isoformat()),
+            format="json",
+        )
+
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        self.assertEqual(
+            timezone.datetime.fromisoformat(created.data["settles_by"]),
+            initial_settles_by,
+        )
+        market = Market.objects.get(id=created.data["id"])
+        self.assertEqual(market.settles_by, initial_settles_by)
+
+        updated_settles_by = self.now + timedelta(days=1, hours=3)
+        updated = self.client.patch(
+            reverse("markets:admin-market-detail", kwargs={"market_id": market.id}),
+            {"settles_by": updated_settles_by.isoformat()},
+            format="json",
+        )
+
+        self.assertEqual(updated.status_code, status.HTTP_200_OK, updated.data)
+        market.refresh_from_db()
+        self.assertEqual(market.settles_by, updated_settles_by)
+        self.assertEqual(
+            timezone.datetime.fromisoformat(updated.data["settles_by"]),
+            updated_settles_by,
+        )
+
+    def test_create_rejects_settles_by_before_closes_at(self):
+        self.authenticate(self.operations_user)
+
+        response = self.client.post(
+            reverse("markets:admin-market-list"),
+            self.create_payload(settles_by=self.now.isoformat()),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("settles_by", response.data)
+
     def test_create_rejects_lifecycle_owned_status(self):
         self.authenticate(self.operations_user)
 

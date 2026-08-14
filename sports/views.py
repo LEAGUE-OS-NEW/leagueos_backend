@@ -232,6 +232,12 @@ class SportingEventListView(ListAPIView):
                 event_type=event_type,
             )
 
+        if starts_after := filters.get("starts_after"):
+            queryset = queryset.filter(starts_at__gte=starts_after)
+
+        if starts_before := filters.get("starts_before"):
+            queryset = queryset.filter(starts_at__lte=starts_before)
+
         if search := filters.get("search"):
             queryset = queryset.filter(
                 Q(name__icontains=search)

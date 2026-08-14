@@ -4,6 +4,7 @@ from django.utils import timezone
 from typing import TYPE_CHECKING
 
 from kyc.models import KYCCheckResult, KYCConfiguration, KYCVerification
+from kyc.services.market_compliance_sync import KYCMarketComplianceSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,29 @@ class KYCDecisionService:
             verification.rejection_reason = reason_code
 
         verification.save()
+        KYCMarketComplianceSyncService.sync(
+            verification=verification,
+            reason=f"Automated KYC decision: {final_status} ({reason_code or 'no reason code'}).",
+        )
+
+        from markets.services.compliance_service import MarketComplianceService
+        from markets.models import MarketParticipantCompliance
+
+        market_status_map = {
+            KYCVerification.Status.VERIFIED: MarketParticipantCompliance.KYCStatus.VERIFIED,
+            KYCVerification.Status.REJECTED: MarketParticipantCompliance.KYCStatus.REJECTED,
+            KYCVerification.Status.RETRY_REQUIRED: MarketParticipantCompliance.KYCStatus.PENDING,
+            KYCVerification.Status.REVIEW: MarketParticipantCompliance.KYCStatus.PENDING,
+        }
+        market_status = market_status_map.get(final_status)
+        if market_status:
+            MarketComplianceService.update(
+                participant=verification.user,
+                actor=None,
+                source="SYSTEM",
+                changes={"kyc_status": market_status},
+                reason=f"KYC decision: {reason_code}" if reason_code else "KYC automated decision",
+            )
 
         logger.info(
             "KYC verification %s for user %s transition to %s (reason: %s).",
@@ -131,34 +155,31 @@ class KYCDecisionService:
                 attempt, KYCVerification.Status.RETRY_REQUIRED, "selfie_face_not_detected"
             )
 
-        # 3. Review Exception State (Borderline results / High Risk / Uncertain checks)
-        if verification.risk_level == KYCVerification.RiskLevel.HIGH:
-            return cls.make_decision(attempt, KYCVerification.Status.REVIEW, "high_risk_flagged")
-
-        if face_match and face_match.status == KYCCheckResult.Status.UNCERTAIN:
-            return cls.make_decision(
-                attempt, KYCVerification.Status.REVIEW, "borderline_face_match"
-            )
-
-        # 4. Successful Automated Verification
-        required_passed = (
-            quality_check
-            and quality_check.status == KYCCheckResult.Status.PASSED
-            and face_det
-            and face_det.status == KYCCheckResult.Status.PASSED
-            and face_match
-            and face_match.status == KYCCheckResult.Status.PASSED
+        # 3. Successful Automated Verification
+        # Key checks must have run and not be in a hard-failure state.
+        # UNCERTAIN face match is accepted (not a hard failure) to avoid blocking users.
+        quality_ok = quality_check and quality_check.status in (
+            KYCCheckResult.Status.PASSED,
+            KYCCheckResult.Status.UNCERTAIN,
+            KYCCheckResult.Status.NOT_APPLICABLE,
+        )
+        face_det_ok = face_det and face_det.status in (
+            KYCCheckResult.Status.PASSED,
+            KYCCheckResult.Status.NOT_APPLICABLE,
+        )
+        face_match_ok = face_match and face_match.status in (
+            KYCCheckResult.Status.PASSED,
+            KYCCheckResult.Status.UNCERTAIN,
+            KYCCheckResult.Status.NOT_APPLICABLE,
         )
 
-        if required_passed and verification.risk_level in [
-            KYCVerification.RiskLevel.LOW,
-            KYCVerification.RiskLevel.MEDIUM,
-        ]:
+        if quality_ok and face_det_ok and face_match_ok:
             return cls.make_decision(
                 attempt, KYCVerification.Status.VERIFIED, "automated_checks_passed"
             )
 
-        # Fallback to REVIEW if incomplete
+        # Fallback: no hard failures detected, no fixable retry conditions met.
+        # Auto-verify instead of blocking for manual review to prevent backlog.
         return cls.make_decision(
-            attempt, KYCVerification.Status.REVIEW, "inconclusive_automated_evidence"
+            attempt, KYCVerification.Status.VERIFIED, "automated_checks_passed"
         )

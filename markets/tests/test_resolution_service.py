@@ -16,6 +16,8 @@ from markets.models import (
     Market,
     MarketCategory,
     MarketOutcome,
+    MarketProvisionalResult,
+    MarketResultDispute,
     MarketScope,
     MarketStatusTransition,
 )
@@ -193,6 +195,18 @@ class MarketResolutionServiceTests(TestCase):
             **values,
         )
 
+    def create_provisional(self, market, *, deadline, winner=None):
+        winner = winner or market.outcomes.get(side=MarketOutcome.Side.YES)
+        return MarketProvisionalResult.objects.create(
+            market=market,
+            winning_outcome=winner,
+            notes="Official provisional result.",
+            published_by=self.approver_user,
+            publisher_email=self.approver_user.email,
+            published_at=self.now - timedelta(hours=1),
+            dispute_deadline=deadline,
+        )
+
     def void_market(
         self,
         market,
@@ -302,6 +316,37 @@ class MarketResolutionServiceTests(TestCase):
         self.assertIsNone(
             market.winning_outcome,
         )
+
+    def test_direct_resolve_cannot_bypass_active_dispute_window(self):
+        market = self.close_market(self.create_market())
+        self.create_provisional(market, deadline=self.now + timedelta(hours=1))
+        with self.assertRaises(ValidationError) as context:
+            self.resolve_market(market)
+        self.assertIn("dispute_window", context.exception.message_dict)
+
+    def test_direct_resolve_cannot_bypass_open_dispute(self):
+        market = self.close_market(self.create_market())
+        provisional = self.create_provisional(market, deadline=self.now - timedelta(minutes=1))
+        participant = UserFactory()
+        MarketResultDispute.objects.create(
+            provisional_result=provisional,
+            participant=participant,
+            participant_email=participant.email,
+            category=MarketResultDispute.Category.INCORRECT_OUTCOME,
+            explanation="The official source conflicts.",
+            submitted_at=self.now - timedelta(minutes=30),
+        )
+        with self.assertRaises(ValidationError) as context:
+            self.resolve_market(market)
+        self.assertIn("disputes", context.exception.message_dict)
+
+    def test_direct_resolve_must_match_provisional_winner(self):
+        market = self.close_market(self.create_market())
+        self.create_provisional(market, deadline=self.now - timedelta(minutes=1))
+        wrong_winner = market.outcomes.get(side=MarketOutcome.Side.NO)
+        with self.assertRaises(ValidationError) as context:
+            self.resolve_market(market, winning_outcome_id=wrong_winner.id)
+        self.assertIn("winning_outcome", context.exception.message_dict)
 
     def test_resolve_requires_closed_market(self):
         market = self.open_market(self.create_market())

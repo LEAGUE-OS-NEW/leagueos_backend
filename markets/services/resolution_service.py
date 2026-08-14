@@ -11,6 +11,7 @@ from authentication.services.permission_service import (
 from markets.models import (
     Market,
     MarketOutcome,
+    MarketProvisionalResult,
     MarketStatusTransition,
 )
 
@@ -39,6 +40,7 @@ class MarketResolutionService:
         winning_outcome_id,
         notes: str,
         evidence: str,
+        _trusted_dispute_decision: bool = False,
     ) -> Market:
         cls._require_permission(actor)
 
@@ -81,6 +83,9 @@ class MarketResolutionService:
                 }
             ) from error
 
+        if not _trusted_dispute_decision:
+            cls._require_provisional_workflow_ready(market=market, winner=winner)
+
         return cls._apply_terminal_transition(
             market=market,
             actor=actor,
@@ -95,6 +100,23 @@ class MarketResolutionService:
                 "evidence": clean_evidence,
             },
         )
+
+    @staticmethod
+    def _require_provisional_workflow_ready(*, market, winner) -> None:
+        try:
+            provisional = MarketProvisionalResult.objects.select_for_update().get(market=market)
+        except MarketProvisionalResult.DoesNotExist:
+            return
+
+        from markets.services.provisional_result_service import MarketProvisionalResultService
+        from markets.services.result_dispute_service import MarketResultDisputeService
+
+        MarketProvisionalResultService.require_dispute_window_closed(market)
+        MarketResultDisputeService.require_no_open_disputes(market)
+        if winner.id != provisional.winning_outcome_id:
+            raise ValidationError(
+                {"winning_outcome": "The winner must match the authoritative provisional result."}
+            )
 
     @classmethod
     @transaction.atomic

@@ -1,6 +1,7 @@
 import io
 import logging
 import re
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
 from PIL import Image, ImageEnhance, ImageFilter
@@ -112,11 +113,12 @@ class OCRService:
             if extracted.get("full_name"):
                 verification.extracted_full_name = extracted["full_name"]
             if extracted.get("date_of_birth"):
-                # Normalize date string to YYYY-MM-DD if possible
                 dob_match = re.search(r"(\d{4})[/-](\d{2})[/-](\d{2})", extracted["date_of_birth"])
                 if dob_match:
-                    verification.extracted_date_of_birth = (
-                        f"{dob_match.group(1)}-{dob_match.group(2)}-{dob_match.group(3)}"
+                    verification.extracted_date_of_birth = date(
+                        int(dob_match.group(1)),
+                        int(dob_match.group(2)),
+                        int(dob_match.group(3)),
                     )
             if extracted.get("nationality"):
                 verification.extracted_nationality = extracted["nationality"][:3].upper()

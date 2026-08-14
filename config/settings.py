@@ -9,6 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
+    JWT_ACCESS_TOKEN_MINUTES=(int, 60),
+    JWT_REFRESH_TOKEN_DAYS=(int, 14),
 )
 
 environ.Env.read_env(BASE_DIR / ".env")
@@ -211,8 +213,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env.int("JWT_ACCESS_TOKEN_MINUTES")),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=env.int("JWT_REFRESH_TOKEN_DAYS")),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
@@ -498,6 +500,9 @@ MEDIA_URL = env("MEDIA_URL", default="/media/")
 # Automated KYC & Identity Verification Settings
 # =============================================================================
 KYC_ENABLED = env.bool("KYC_ENABLED", default=True)
+REVIEW_WORKFLOW_TOOLS_ENABLED = env.bool("REVIEW_WORKFLOW_TOOLS_ENABLED", default=False)
+DEV_KYC_BYPASS_ENABLED = env.bool("DEV_KYC_BYPASS_ENABLED", default=False)
+DEV_RESULT_ACCELERATOR_ENABLED = env.bool("DEV_RESULT_ACCELERATOR_ENABLED", default=False)
 KYC_MAX_ATTEMPTS = env.int("KYC_MAX_ATTEMPTS", default=3)
 KYC_MAX_DOCUMENT_SIZE_MB = env.int("KYC_MAX_DOCUMENT_SIZE_MB", default=10)
 KYC_MIN_IMAGE_DIMENSION = env.int("KYC_MIN_IMAGE_DIMENSION", default=300)
