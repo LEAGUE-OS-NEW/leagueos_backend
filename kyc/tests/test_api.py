@@ -129,7 +129,7 @@ def test_kyc_submission_persists_dob_and_gender():
 
 
 @pytest.mark.django_db
-def test_kyc_submission_syncs_market_participant_compliance():
+def test_kyc_submission_creates_compliance_record():
     user = User.objects.create_user(
         username="fan_market", email="fan_market@example.com", password="Pass123!Password"
     )
@@ -153,7 +153,6 @@ def test_kyc_submission_syncs_market_participant_compliance():
 
     compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
     assert compliance is not None
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.PENDING
 
 
 @pytest.mark.django_db
@@ -192,11 +191,10 @@ def test_kyc_multistep_preserves_earlier_information():
 
     compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
     assert compliance is not None
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.PENDING
 
 
 @pytest.mark.django_db
-def test_kyc_admin_review_syncs_market_compliance():
+def test_kyc_admin_review_verifies_user():
     user = User.objects.create_user(
         username="fan_admin", email="fan_admin@example.com", password="Pass123!Password"
     )
@@ -224,15 +222,12 @@ def test_kyc_admin_review_syncs_market_compliance():
     )
     assert response.status_code == status.HTTP_200_OK
 
-    compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
-    assert compliance is not None
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.VERIFIED
     user.refresh_from_db()
     assert user.is_verified is True
 
 
 @pytest.mark.django_db
-def test_kyc_decision_service_syncs_market_compliance():
+def test_kyc_decision_service_verifies_user():
     from kyc.services.decision_service import KYCDecisionService
 
     user = User.objects.create_user(
@@ -251,8 +246,5 @@ def test_kyc_decision_service_syncs_market_compliance():
 
     KYCDecisionService.make_decision(attempt, KYCVerification.Status.VERIFIED, "automated_checks_passed")
 
-    compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
-    assert compliance is not None
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.VERIFIED
     user.refresh_from_db()
     assert user.is_verified is True

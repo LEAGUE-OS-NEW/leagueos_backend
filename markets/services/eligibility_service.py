@@ -4,6 +4,7 @@ from datetime import date
 from django.conf import settings
 from django.utils import timezone
 
+from kyc.models import KYCVerification
 from markets.models import MarketParticipantCompliance, MarketRiskProfile
 from profiles.models import Profile
 
@@ -90,16 +91,15 @@ class MarketEligibilityService:
                 .select_related("participant__market_risk_profile")
                 .first()
             )
-        kyc = (
-            compliance.kyc_status
-            if compliance
-            else MarketParticipantCompliance.KYCStatus.NOT_STARTED
-        )
+        kyc_verification = getattr(participant, "kyc_verification", None)
+        kyc = kyc_verification.status if kyc_verification else KYCVerification.Status.NOT_STARTED
+        kyc_eligible = kyc == KYCVerification.Status.VERIFIED
         restriction = (
             compliance.restriction_status
             if compliance
             else MarketParticipantCompliance.RestrictionStatus.CLEAR
         )
+        restriction_clear = restriction == MarketParticipantCompliance.RestrictionStatus.CLEAR
         override = (
             compliance.jurisdiction_override
             if compliance
@@ -117,14 +117,6 @@ class MarketEligibilityService:
         elif override == MarketParticipantCompliance.JurisdictionOverride.BLOCK:
             jurisdiction_eligible = False
 
-        kyc_verification = getattr(participant, "kyc_verification", None)
-        internal_kyc_verified = bool(
-            kyc_verification and getattr(kyc_verification, "status", None) == "VERIFIED"
-        )
-        kyc_eligible = (
-            kyc == MarketParticipantCompliance.KYCStatus.VERIFIED or internal_kyc_verified
-        )
-        restriction_clear = restriction == MarketParticipantCompliance.RestrictionStatus.CLEAR
         reasons = []
         if not dob:
             reasons.append("DATE_OF_BIRTH_REQUIRED")

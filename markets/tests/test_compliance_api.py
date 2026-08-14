@@ -59,7 +59,6 @@ class MarketComplianceAPITests(APITestCase):
         response = self.client.patch(
             url,
             {
-                "kyc_status": "VERIFIED",
                 "jurisdiction_override": "ALLOW",
                 "jurisdiction_override_reason": "Approved residence evidence.",
             },
@@ -70,7 +69,7 @@ class MarketComplianceAPITests(APITestCase):
         self.assertEqual(compliance.reviewed_by, self.admin)
         self.assertIsNotNone(compliance.reviewed_at)
         self.assertEqual(MarketComplianceReview.objects.count(), 1)
-        self.client.patch(url, {"kyc_status": "VERIFIED"}, format="json")
+        self.client.patch(url, {"jurisdiction_override": "ALLOW"}, format="json")
         self.assertEqual(MarketComplianceReview.objects.count(), 1)
         self.assertEqual(
             MarketParticipantCompliance.objects.filter(participant=self.participant).count(), 1
@@ -101,7 +100,7 @@ class MarketComplianceAPITests(APITestCase):
             "markets:admin-participant-compliance-reviews", kwargs={"user_id": self.participant.id}
         )
         self.client.force_authenticate(self.admin)
-        self.client.patch(detail, {"kyc_status": "PENDING"}, format="json")
+        self.client.patch(detail, {"restriction_status": "PENDING"}, format="json")
         response = self.client.get(reviews)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(set(response.data), {"count", "next", "previous", "results"})
@@ -130,7 +129,7 @@ class MarketComplianceAPITests(APITestCase):
             result = MarketComplianceService.update(
                 participant=self.participant,
                 actor=self.admin,
-                changes={"kyc_status": "PENDING"},
+                changes={"restriction_status": "CLEAR"},
             )
         self.assertEqual(result.pk, compliance.pk)
         self.assertEqual(MarketComplianceReview.objects.count(), 1)
@@ -144,8 +143,6 @@ class MarketComplianceAPITests(APITestCase):
             "markets:admin-participant-compliance-reviews", kwargs={"user_id": self.participant.id}
         )
         self.client.force_authenticate(self.admin)
-        self.client.patch(detail, {"kyc_status": "PENDING"}, format="json")
-        self.client.patch(detail, {"kyc_status": "VERIFIED"}, format="json")
         first, second = MarketComplianceReview.objects.all()
         self.assertGreaterEqual(first.created_at, second.created_at)
         first.reason = "changed"
@@ -179,8 +176,8 @@ class MarketComplianceAPITests(APITestCase):
         reviews = reverse(
             "markets:admin-participant-compliance-reviews", kwargs={"user_id": self.participant.id}
         )
-        for status in ("PENDING", "REJECTED", "VERIFIED"):
-            self.client.patch(detail, {"kyc_status": status}, format="json")
+        for status in ("CLEAR", "RESTRICTED", "SUSPENDED"):
+            self.client.patch(detail, {"restriction_status": status}, format="json")
         with CaptureQueriesContext(connection) as queries:
             self.client.get(reviews)
         self.assertLessEqual(len(queries), 7)

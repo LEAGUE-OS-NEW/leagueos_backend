@@ -29,9 +29,6 @@ class IneligibleOrderResponseSerializer(serializers.Serializer):
 
 
 class ComplianceUpdateSerializer(serializers.Serializer):
-    kyc_status = serializers.ChoiceField(
-        choices=MarketParticipantCompliance.KYCStatus.choices, required=False
-    )
     restriction_status = serializers.ChoiceField(
         choices=MarketParticipantCompliance.RestrictionStatus.choices, required=False
     )
@@ -73,8 +70,6 @@ class ComplianceReviewSerializer(serializers.ModelSerializer):
             "id",
             "participant",
             "actor",
-            "previous_kyc_status",
-            "new_kyc_status",
             "previous_restriction_status",
             "new_restriction_status",
             "previous_jurisdiction_override",

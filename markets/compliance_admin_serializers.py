@@ -2,44 +2,10 @@ from rest_framework import serializers
 
 from markets.models import (
     ComplianceDecisionProposal,
-    KYCVerificationEvent,
-    KYCVerificationSession,
     MarketComplianceReview,
     MarketRiskAssessment,
     MarketRiskProfile,
 )
-
-
-class AdminKYCSessionSerializer(serializers.ModelSerializer):
-    participant_id = serializers.UUIDField(read_only=True)
-
-    class Meta:
-        model = KYCVerificationSession
-        fields = (
-            "id",
-            "participant_id",
-            "provider_code",
-            "status",
-            "verification_level",
-            "initiated_at",
-            "expires_at",
-            "completed_at",
-            "last_event_at",
-            "failure_code",
-        )
-
-
-class SafeKYCEventSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = KYCVerificationEvent
-        fields = ("id", "event_type", "previous_status", "new_status", "source", "occurred_at")
-
-
-class AdminKYCSessionDetailSerializer(AdminKYCSessionSerializer):
-    events = SafeKYCEventSerializer(many=True, read_only=True)
-
-    class Meta(AdminKYCSessionSerializer.Meta):
-        fields = AdminKYCSessionSerializer.Meta.fields + ("events",)
 
 
 class RiskProfileSerializer(serializers.ModelSerializer):

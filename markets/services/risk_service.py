@@ -4,6 +4,7 @@ import json
 from django.db import transaction
 from django.utils import timezone
 
+from kyc.models import KYCVerification
 from markets.models import (
     MarketParticipantCompliance,
     MarketResponsibleParticipation,
@@ -27,10 +28,12 @@ class MarketRiskService:
         except MarketResponsibleParticipation.DoesNotExist:
             responsible = None
         score, reasons = 0, []
-        if compliance.kyc_status == "REJECTED":
+        kyc_verification = getattr(participant, "kyc_verification", None)
+        kyc_status = kyc_verification.status if kyc_verification else KYCVerification.Status.NOT_STARTED
+        if kyc_status == KYCVerification.Status.REJECTED:
             score += 35
             reasons.append("KYC_REJECTED")
-        elif compliance.kyc_status == "EXPIRED":
+        elif kyc_status == KYCVerification.Status.EXPIRED:
             score += 20
             reasons.append("KYC_EXPIRED")
         if compliance.restriction_status == "RESTRICTED":
@@ -65,7 +68,7 @@ class MarketRiskService:
             else "REVIEW" if band == "HIGH" else "MONITOR" if band == "MEDIUM" else "NONE"
         )
         summary = {
-            "kyc_status": compliance.kyc_status,
+            "kyc_status": kyc_status,
             "restriction_status": compliance.restriction_status,
             "jurisdiction_override": compliance.jurisdiction_override,
             "responsible_block": "RESPONSIBLE_PARTICIPATION_BLOCK" in reasons,

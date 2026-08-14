@@ -17,7 +17,6 @@ def make_market_eligible(user, *, date_of_birth=None, country_code="UG"):
     compliance, _ = MarketParticipantCompliance.objects.update_or_create(
         participant=user,
         defaults={
-            "kyc_status": MarketParticipantCompliance.KYCStatus.VERIFIED,
             "restriction_status": MarketParticipantCompliance.RestrictionStatus.CLEAR,
             "jurisdiction_override": MarketParticipantCompliance.JurisdictionOverride.NONE,
         },

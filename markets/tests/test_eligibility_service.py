@@ -3,6 +3,7 @@ from datetime import date
 from django.test import TestCase, override_settings
 
 from authentication.tests.factories import UserFactory
+from kyc.models import KYCVerification
 from markets.models import MarketParticipantCompliance
 from markets.services.eligibility_service import MarketEligibilityService
 from markets.tests.eligibility_test_support import make_market_eligible
@@ -77,11 +78,17 @@ class MarketEligibilityServiceTests(TestCase):
         participant = UserFactory()
         compliance = make_market_eligible(participant)
         for status in ("NOT_STARTED", "PENDING", "REJECTED", "EXPIRED"):
-            compliance.kyc_status = status
-            compliance.restriction_status = "CLEAR"
+            KYCVerification.objects.update_or_create(
+                user=participant,
+                defaults={"status": status},
+            )
+            compliance.restriction_status = MarketParticipantCompliance.RestrictionStatus.CLEAR
             compliance.save()
             self.assertIn(f"KYC_{status}", self.evaluate(participant).reason_codes)
-        compliance.kyc_status = "VERIFIED"
+        KYCVerification.objects.update_or_create(
+            user=participant,
+            defaults={"status": KYCVerification.Status.VERIFIED},
+        )
         for status in ("RESTRICTED", "SUSPENDED"):
             compliance.restriction_status = status
             compliance.save()

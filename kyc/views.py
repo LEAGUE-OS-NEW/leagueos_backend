@@ -133,16 +133,6 @@ class FanKYCSubmitView(APIView):
                 profile.gender = serializer.validated_data["gender"]
             profile.save(update_fields=["date_of_birth", "gender", "updated_at"])
 
-            from markets.services.compliance_service import MarketComplianceService
-            from markets.models import MarketParticipantCompliance
-
-            MarketComplianceService.update(
-                participant=user,
-                actor=None,
-                source="SYSTEM",
-                changes={"kyc_status": MarketParticipantCompliance.KYCStatus.PENDING},
-            )
-
         log_kyc_audit(
             user=user,
             action="KYC_SUBMITTED",
@@ -433,23 +423,6 @@ class AdminKYCReviewActionView(APIView):
             )
 
         verification.save()
-
-        from markets.services.compliance_service import MarketComplianceService
-        from markets.models import MarketParticipantCompliance
-
-        market_status = {
-            KYCVerification.Status.VERIFIED: MarketParticipantCompliance.KYCStatus.VERIFIED,
-            KYCVerification.Status.REJECTED: MarketParticipantCompliance.KYCStatus.REJECTED,
-            KYCVerification.Status.REVIEW: MarketParticipantCompliance.KYCStatus.PENDING,
-        }.get(decision, MarketParticipantCompliance.KYCStatus.PENDING)
-
-        MarketComplianceService.update(
-            participant=verification.user,
-            actor=request.user,
-            source="ADMIN",
-            changes={"kyc_status": market_status},
-            reason=f"Admin review: {notes}" if notes else "Admin review",
-        )
 
         log_kyc_audit(
             user=request.user,
