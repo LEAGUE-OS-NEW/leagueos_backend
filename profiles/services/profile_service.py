@@ -16,7 +16,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import AuditLog
-from profiles.models import Profile
+from onboarding.services.preference_service import PreferenceService
+from profiles.models import Club, Profile
+from sports.models import Competition, Sport
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -142,6 +144,38 @@ class ProfileService:
                     updated_fields.append(field_name)
 
             profile.save()
+
+            # Sync sports, competitions, and clubs to onboarding preference tables
+            favourite_sports = data.get("favourite_sports")
+            favourite_competitions = data.get("favourite_competitions")
+            favourite_club = data.get("favourite_club")
+
+            if (
+                favourite_sports is not None
+                or favourite_competitions is not None
+                or favourite_club is not None
+            ):
+                sport_objs = (
+                    list(Sport.objects.filter(pk__in=favourite_sports, is_active=True))
+                    if favourite_sports
+                    else []
+                )
+                competition_objs = (
+                    list(Competition.objects.filter(pk__in=favourite_competitions, is_active=True))
+                    if favourite_competitions
+                    else []
+                )
+                club_objs = (
+                    [favourite_club] if favourite_club is not None else []
+                )
+
+                PreferenceService.update_preferences_from_profile(
+                    user=user,
+                    sports=sport_objs if sport_objs else None,
+                    competitions=competition_objs if competition_objs else None,
+                    clubs=club_objs if club_objs else None,
+                    ip_address=ip_address,
+                )
 
             # Record PROFILE_UPDATED audit log
             ProfileService.record_audit_log(

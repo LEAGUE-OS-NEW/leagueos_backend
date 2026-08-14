@@ -47,6 +47,8 @@ def test_fan_kyc_submission_success():
         KYCVerification.Status.PROCESSING,
         KYCVerification.Status.VERIFIED,
     ]
+    assert "user" in response.data["data"]
+    assert response.data["data"]["user"]["email"] == user.email
 
     # Verify database record
     verification = KYCVerification.objects.get(user=user)
@@ -65,6 +67,8 @@ def test_fan_kyc_status_endpoint():
     assert response.status_code == status.HTTP_200_OK
     assert response.data["data"]["status"] == KYCVerification.Status.NOT_STARTED
     assert response.data["data"]["can_retry"] is True
+    assert "user" in response.data["data"]
+    assert response.data["data"]["user"]["email"] == user.email
 
 
 @pytest.mark.django_db
