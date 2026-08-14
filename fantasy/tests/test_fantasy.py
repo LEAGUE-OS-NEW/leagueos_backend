@@ -149,6 +149,47 @@ def test_public_and_owner_scoping_api(domain):
     assert client.post("/api/v1/fantasy/competitions/", {}).status_code == 403
 
 
+def test_public_aggregates_are_authoritative_and_nullable(domain):
+    fantasy, players, gameweek = domain
+    competition = APIClient().get(f"/api/v1/fantasy/competitions/{fantasy.id}/").data
+    assert str(competition["season"]) == str(fantasy.season_id)
+    assert competition["season_name"] == "2026"
+    assert competition["entries"] == 0
+    assert competition["total_gameweeks"] == 1
+    player = next(
+        row
+        for row in APIClient().get("/api/v1/fantasy/players/").data
+        if row["id"] == str(players[0].id)
+    )
+    assert player["ownership"] is None
+    assert player["total_points"] is None
+    assert player["current_gameweek_points"] is None
+    assert player["form"] is None
+
+    user = get_user_model().objects.create_user(username="aggregate", email="aggregate@example.com")
+    team = FantasyTeam.objects.create(
+        owner=user, fantasy_competition=fantasy, name="Aggregate XI", budget_remaining=10
+    )
+    FantasyTeamPlayer.objects.create(
+        team=team, fantasy_player=players[0], is_starter=True, purchase_price=5
+    )
+    FantasyPlayerGameweekPoints.objects.create(
+        gameweek=gameweek,
+        fantasy_player=players[0],
+        base_points=3,
+        total_points=3,
+        statistics_available=True,
+    )
+    player = next(
+        row
+        for row in APIClient().get("/api/v1/fantasy/players/").data
+        if row["id"] == str(players[0].id)
+    )
+    assert player["ownership"] == 100.0
+    assert player["total_points"] == 3.0
+    assert player["current_gameweek_points"] == 3.0
+
+
 def _selection_payload(players):
     return [
         {

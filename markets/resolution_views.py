@@ -20,7 +20,7 @@ from markets.admin_views import (
 )
 from markets.models import Market
 from markets.permissions import (
-    HasApproveMarketPermission,
+    HasResultVerificationPermission,
 )
 from markets.services.resolution_service import (
     MarketResolutionService,
@@ -33,7 +33,7 @@ class MarketResolutionActionView(
 ):
     permission_classes = [
         IsAuthenticated,
-        HasApproveMarketPermission,
+        HasResultVerificationPermission,
     ]
 
     def get_market_response(

@@ -10,11 +10,13 @@ from datetime import date
 from typing import Any
 
 from django.contrib.auth import get_user_model
+from django.utils.text import slugify
 from rest_framework import serializers
 
 from profiles.models import Club, Country, Gender, Language, Profile, Timezone
 from profiles.services.profile_service import ProfileService
 from profiles.validators import sanitize_text
+from sports.models import Competition, Sport
 
 User = get_user_model()
 
@@ -67,6 +69,53 @@ class ClubSerializer(serializers.ModelSerializer):
         model = Club
         fields = ["id", "name", "slug", "founded", "is_active"]
         read_only_fields = fields
+
+
+class ClubCreateSerializer(serializers.ModelSerializer):
+    """Writable serializer for creating a Club (Super Admin / admin.clubs.manage only).
+
+    slug is auto-derived from name (with a numeric suffix on collision)
+    when omitted.
+    """
+
+    slug = serializers.SlugField(required=False)
+    sport = serializers.PrimaryKeyRelatedField(queryset=Sport.objects.filter(is_active=True))
+    competition = serializers.PrimaryKeyRelatedField(
+        queryset=Competition.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = Club
+        fields = ["id", "name", "slug", "sport", "competition", "founded", "is_active"]
+        read_only_fields = ["id", "is_active"]
+
+    def validate_name(self, value: str) -> str:
+        value = sanitize_text(value).strip()
+        if not value:
+            raise serializers.ValidationError("Club name is required.")
+        return value
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        competition = attrs.get("competition")
+        sport = attrs.get("sport")
+        if competition and sport and competition.sport_id != sport.id:
+            raise serializers.ValidationError(
+                {"competition": "Competition must belong to the selected sport."}
+            )
+        return attrs
+
+    def create(self, validated_data: dict[str, Any]) -> Club:
+        if not validated_data.get("slug"):
+            base_slug = slugify(validated_data["name"])
+            slug = base_slug
+            suffix = 1
+            while Club.objects.filter(slug=slug).exists():
+                suffix += 1
+                slug = f"{base_slug}-{suffix}"
+            validated_data["slug"] = slug
+        return super().create(validated_data)
 
 
 # =============================================================================

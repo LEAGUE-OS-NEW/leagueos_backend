@@ -304,7 +304,11 @@ class NewsListQuerySerializer(serializers.Serializer):
     sport = serializers.UUIDField(required=False)
     competition = serializers.UUIDField(required=False)
     club = serializers.UUIDField(required=False)
-    featured = serializers.BooleanField(required=False)
+    featured = serializers.BooleanField(
+        required=False,
+        allow_null=True,
+        default=None,
+    )
     search = serializers.CharField(required=False, allow_blank=True, max_length=180)
     ordering = serializers.ChoiceField(
         choices=["-published_at", "published_at", "-created_at"],

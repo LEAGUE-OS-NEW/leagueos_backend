@@ -45,3 +45,9 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_display = ("action", "user", "ip_address", "timestamp")
     list_filter = ("action", "timestamp")
     search_fields = ("user__email", "user__username", "ip_address", "action")
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

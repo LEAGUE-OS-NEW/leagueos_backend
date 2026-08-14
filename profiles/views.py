@@ -9,17 +9,20 @@ from __future__ import annotations
 
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from authentication.services.permission_service import PermissionService
 from profiles.models import Club, Country, Gender, Language, Profile, Timezone
 from profiles.permissions import IsProfileOwner
 from profiles.serializers import (
     AvatarSerializer,
     AvatarUploadSerializer,
+    ClubCreateSerializer,
     ClubSerializer,
     CountrySerializer,
     GenderSerializer,
@@ -152,12 +155,25 @@ class GenderListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
 
-class ClubListView(generics.ListAPIView):
-    """List all active clubs for favourite club selection."""
+class ClubListView(generics.ListCreateAPIView):
+    """List all active clubs for favourite club selection.
 
-    serializer_class = ClubSerializer
+    POST is restricted to Super Admin / holders of admin.clubs.manage
+    (see StaffService for how a Club Admin is then invited onto it).
+    """
+
     queryset = Club.objects.filter(is_active=True)
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return ClubCreateSerializer
+        return ClubSerializer
+
+    def perform_create(self, serializer):
+        if not PermissionService.has_permission(self.request.user, "admin.clubs.manage"):
+            raise PermissionDenied("You do not have permission to create clubs.")
+        serializer.save()
 
 
 # =============================================================================

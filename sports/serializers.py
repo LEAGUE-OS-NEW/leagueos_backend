@@ -98,6 +98,29 @@ class SportingEventPublicSerializer(serializers.ModelSerializer):
         ]
 
 
+class SportCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Sport
+        fields = ["id", "name", "code", "slug", "is_active"]
+        read_only_fields = ["id"]
+        extra_kwargs = {"slug": {"required": False}}
+
+
+class CompetitionCreateSerializer(serializers.ModelSerializer):
+    sport = serializers.PrimaryKeyRelatedField(queryset=Sport.objects.filter(is_active=True))
+
+    class Meta:
+        model = Competition
+        fields = ["id", "sport", "name", "slug", "country_code", "is_active", "is_verified"]
+        read_only_fields = ["id"]
+        extra_kwargs = {
+            "slug": {"required": False},
+            # Admin-authored competitions are verified on creation — unlike the
+            # scraped/seeded pipeline, there's no separate review step here.
+            "is_verified": {"default": True},
+        }
+
+
 class CompetitionListQuerySerializer(serializers.Serializer):
     sport = serializers.UUIDField(
         required=False,

@@ -56,6 +56,20 @@ class HasApproveMarketPermission(BasePermission):
         )
 
 
+class HasResultVerificationPermission(BasePermission):
+    message = "You do not have permission to verify or reject results."
+
+    def has_permission(self, request, view) -> bool:
+        return PermissionService.has_any_permission(
+            request.user,
+            (
+                "approve_market",
+                "verify_results",
+                "reject_result",
+            ),
+        )
+
+
 class HasManageCompliancePermission(BasePermission):
     message = "You do not have the manage_compliance permission."
 

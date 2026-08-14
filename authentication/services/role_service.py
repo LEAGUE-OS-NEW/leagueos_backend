@@ -53,7 +53,7 @@ class RoleService:
         assigned_by=None,
         expires_at=None,
     ) -> UserRole:
-        user_role, _ = UserRole.objects.get_or_create(
+        user_role, created = UserRole.objects.get_or_create(
             user=user,
             role=role,
             defaults={
@@ -61,6 +61,22 @@ class RoleService:
                 "expires_at": expires_at,
             },
         )
+
+        if not created and not user_role.is_active:
+            user_role.is_active = True
+            user_role.assigned_by = assigned_by
+            user_role.expires_at = expires_at
+            user_role.revoked_at = None
+            user_role.revoked_by = None
+            user_role.save(
+                update_fields=[
+                    "is_active",
+                    "assigned_by",
+                    "expires_at",
+                    "revoked_at",
+                    "revoked_by",
+                ]
+            )
 
         return user_role
 

@@ -75,7 +75,7 @@ class MarketResultDisputeService:
         from notifications.services.operational_alert_service import OperationalAlertService
 
         OperationalAlertService.create(
-            permissions=("manage_market", "approve_market"),
+            permissions=("manage_market", "approve_market", "verify_results"),
             event_type="RESULT_DISPUTE_SUBMITTED",
             title="Result dispute submitted",
             message="A market result dispute requires review.",

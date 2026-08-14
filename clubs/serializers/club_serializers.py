@@ -312,6 +312,10 @@ class StaffInvitationSerializer(serializers.ModelSerializer):
         ]
 
 
+class StaffInvitationAcceptSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+
 class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory

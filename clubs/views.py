@@ -10,6 +10,11 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
+from drf_spectacular.utils import extend_schema
+from rest_framework import status, viewsets
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from clubs.models import (
     ClubAuditLog,
@@ -25,6 +30,7 @@ from clubs.models import (
     TicketProduct,
 )
 from clubs.permissions import IsClubAdmin, IsClubStaff
+from clubs.services.staff_service import StaffService
 from clubs.serializers.club_serializers import (
     ClubAuditLogSerializer,
     ClubMediaSerializer,
@@ -34,6 +40,7 @@ from clubs.serializers.club_serializers import (
     MembershipPlanSerializer,
     MerchandiseProductSerializer,
     ProductCategorySerializer,
+    StaffInvitationAcceptSerializer,
     StaffInvitationSerializer,
     StoreOrderSerializer,
     TicketProductSerializer,
@@ -329,9 +336,39 @@ class StaffInvitationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
-        serializer.save(
+        # Goes through StaffService.invite_staff rather than a plain
+        # serializer.save() so the audit log entry and invitation email
+        # (see StaffService.invite_staff) both actually happen.
+        invitation = StaffService.invite_staff(
             club=club,
+            email=serializer.validated_data["email"],
+            role=serializer.validated_data["role"],
             invited_by=self.request.user,
-            token=uuid.uuid4().hex,
-            expires_at=timezone.now() + timezone.timedelta(days=7),
+            permissions=serializer.validated_data.get("permissions"),
         )
+        serializer.instance = invitation
+
+
+class StaffInvitationAcceptView(APIView):
+    """Accepts a StaffInvitation by token, granting the requesting user a
+    ClubWorkspace (and, for ADMIN invitations, the platform Club Admin
+    role — see StaffService.accept_invitation)."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=StaffInvitationAcceptSerializer,
+        responses={200: ClubWorkspaceSerializer},
+        tags=["Clubs"],
+    )
+    def post(self, request):
+        token = request.data.get("token")
+        if not token:
+            return Response({"detail": "token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            workspace = StaffService.accept_invitation(token=token, user=request.user)
+        except ValueError as err:
+            return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(ClubWorkspaceSerializer(workspace).data, status=status.HTTP_200_OK)

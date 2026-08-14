@@ -46,6 +46,19 @@ class NewsService:
 
         return qs.order_by(ordering)
 
+    @classmethod
+    def get_public_news_detail(cls, news_id):
+        """Return a single published and verified news article, or None."""
+        return (
+            News.objects.filter(
+                id=news_id,
+                status=News.Status.PUBLISHED,
+                is_verified=True,
+            )
+            .select_related("category", "sport", "competition", "club")
+            .first()
+        )
+
     @staticmethod
     def record_view(news_id: str, user=None, request=None) -> None:
         """Record a news view audit log."""

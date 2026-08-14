@@ -16,7 +16,7 @@ from markets.models import (
     Market,
     MarketResultDisputeDecision,
 )
-from markets.permissions import HasApproveMarketPermission
+from markets.permissions import HasResultVerificationPermission
 from markets.result_dispute_decision_serializers import (
     MarketResultDisputeDecisionAdminSerializer,
     MarketResultDisputeDecisionCreateSerializer,
@@ -49,7 +49,7 @@ class AdminMarketResultDisputeDecisionCreateView(
 ):
     permission_classes = [
         IsAuthenticated,
-        HasApproveMarketPermission,
+        HasResultVerificationPermission,
     ]
     serializer_class = MarketResultDisputeDecisionCreateSerializer
 
@@ -127,7 +127,7 @@ class MarketResultDisputeDecisionListView(ListAPIView):
 class AdminMarketResultDisputeDecisionDetailView(RetrieveAPIView):
     permission_classes = [
         IsAuthenticated,
-        HasApproveMarketPermission,
+        HasResultVerificationPermission,
     ]
     serializer_class = MarketResultDisputeDecisionAdminSerializer
     lookup_field = "id"
