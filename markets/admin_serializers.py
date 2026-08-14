@@ -3,6 +3,7 @@ from django.core.exceptions import (
     ValidationError as DjangoValidationError,
 )
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from markets.models import (
@@ -195,6 +196,10 @@ class MarketAdminWriteSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
+    settles_by = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+    )
     is_featured = serializers.BooleanField(
         required=False,
         default=False,
@@ -226,6 +231,43 @@ class MarketAdminWriteSerializer(serializers.Serializer):
                     for field_name in sorted(unknown_fields)
                 }
             )
+
+        instance = self.instance
+        scope_type = attrs.get("scope_type", getattr(instance, "scope_type", None))
+        sporting_event = attrs.get("sporting_event", getattr(instance, "sporting_event", None))
+
+        if scope_type == MarketScope.EVENT:
+            if sporting_event is None:
+                raise serializers.ValidationError(
+                    {"sporting_event_id": "An event-scoped market requires a sporting event."}
+                )
+
+            event_is_new = instance is None or (
+                "sporting_event" in attrs
+                and sporting_event.pk != getattr(instance, "sporting_event_id", None)
+            )
+            if event_is_new:
+                event_error = None
+                if not sporting_event.is_verified:
+                    event_error = "Only verified sporting events may be used."
+                elif sporting_event.status != SportingEvent.Status.SCHEDULED:
+                    event_error = "Only scheduled sporting events may be used."
+                elif sporting_event.starts_at <= timezone.now():
+                    event_error = "The sporting event must start in the future."
+
+                if event_error:
+                    raise serializers.ValidationError({"sporting_event_id": event_error})
+
+                closes_at = attrs.get("closes_at", getattr(instance, "closes_at", None))
+                if closes_at is not None and closes_at > sporting_event.starts_at:
+                    raise serializers.ValidationError(
+                        {
+                            "closes_at": (
+                                "An event-scoped market cannot close after "
+                                "the sporting event starts."
+                            )
+                        }
+                    )
 
         return attrs
 

@@ -249,3 +249,64 @@ class PublicSportsCatalogueAPITests(APITestCase):
             1,
         )
         self.assertIsNone(response.data["results"][0]["competition"])
+
+    def test_event_list_starts_after_excludes_older_events(self):
+        response = self.client.get(
+            reverse("sports:event-list"),
+            {"starts_after": (self.now + timedelta(days=2, hours=12)).isoformat()},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(
+            [item["id"] for item in response.data["results"]],
+            [str(self.external_event.id)],
+        )
+
+    def test_event_list_starts_before_filters_later_events(self):
+        response = self.client.get(
+            reverse("sports:event-list"),
+            {"starts_before": (self.now + timedelta(days=2, hours=12)).isoformat()},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(
+            [item["id"] for item in response.data["results"]],
+            [str(self.event.id)],
+        )
+
+    def test_event_list_scheduled_and_starts_after_filters_together(self):
+        self.external_event.status = SportingEvent.Status.LIVE
+        self.external_event.save(update_fields=["status", "updated_at"])
+
+        response = self.client.get(
+            reverse("sports:event-list"),
+            {
+                "status": SportingEvent.Status.SCHEDULED,
+                "starts_after": (self.now + timedelta(days=1)).isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(
+            [item["id"] for item in response.data["results"]],
+            [str(self.event.id)],
+        )
+
+    def test_event_list_ordering_remains_starts_at_then_name(self):
+        same_time_event = SportingEvent.objects.create(
+            sport=self.football,
+            event_type=SportingEvent.EventType.MATCH,
+            name="A first alphabetically",
+            starts_at=self.event.starts_at,
+            status=SportingEvent.Status.SCHEDULED,
+            is_verified=True,
+            verified_at=self.now,
+        )
+
+        response = self.client.get(reverse("sports:event-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(
+            [item["id"] for item in response.data["results"]],
+            [str(same_time_event.id), str(self.event.id), str(self.external_event.id)],
+        )

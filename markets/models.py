@@ -813,6 +813,11 @@ class Market(TimeStampedUUIDModel):
         blank=True,
         db_index=True,
     )
+    settles_by = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     approved_at = models.DateTimeField(
         null=True,
         blank=True,
@@ -989,6 +994,13 @@ class Market(TimeStampedUUIDModel):
             and self.closes_at <= self.opens_at
         ):
             errors["closes_at"] = "Market close time must be after " "its opening time."
+
+        if (
+            self.closes_at is not None
+            and self.settles_by is not None
+            and self.settles_by < self.closes_at
+        ):
+            errors["settles_by"] = "Settlement target must be at or after the market close time."
 
         if self.scope_type == MarketScope.CUSTOM and not self.custom_subject.strip():
             errors["custom_subject"] = "A custom market requires a subject."

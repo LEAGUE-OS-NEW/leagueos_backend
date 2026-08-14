@@ -148,6 +148,7 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "status",
             "opens_at",
             "closes_at",
+            "settles_by",
             "is_featured",
             "sport",
             "category",
