@@ -14,8 +14,14 @@ from authentication.tests.factories import (
     UserFactory,
     UserRoleFactory,
 )
-from markets.models import MarketComplianceReview, MarketParticipantCompliance
+from markets.models import (
+    KYCVerificationEvent,
+    KYCVerificationSession,
+    MarketComplianceReview,
+    MarketParticipantCompliance,
+)
 from markets.services.compliance_service import MarketComplianceService
+from markets.services.kyc_service import KYCService
 from markets.tests.eligibility_test_support import make_market_eligible
 from wallets.models import Wallet
 
@@ -90,6 +96,84 @@ class MarketComplianceAPITests(APITestCase):
                 "jurisdiction_override_reason",
                 "internal_review_notes",
             },
+        )
+
+    def test_approve_via_patch_transitions_the_linked_kyc_session(self):
+        session, _ = KYCService.start(
+            participant=self.participant, idempotency_key="session-verify"
+        )
+        url = reverse(
+            "markets:admin-participant-compliance-detail", kwargs={"user_id": self.participant.id}
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.patch(url, {"kyc_status": "VERIFIED"}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+
+        session.refresh_from_db()
+        self.assertEqual(session.status, "VERIFIED")
+        self.assertIsNotNone(session.completed_at)
+        event = KYCVerificationEvent.objects.get(session=session, event_type="ADMIN_VERIFIED")
+        self.assertEqual(event.source, KYCVerificationEvent.Source.ADMIN)
+        self.assertEqual(event.actor, self.admin)
+        self.assertEqual(event.previous_status, "PENDING")
+        self.assertEqual(event.new_status, "VERIFIED")
+
+    def test_reject_via_patch_transitions_the_linked_kyc_session(self):
+        session, _ = KYCService.start(
+            participant=self.participant, idempotency_key="session-reject"
+        )
+        url = reverse(
+            "markets:admin-participant-compliance-detail", kwargs={"user_id": self.participant.id}
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.patch(url, {"kyc_status": "REJECTED"}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+
+        session.refresh_from_db()
+        self.assertEqual(session.status, "REJECTED")
+        self.assertTrue(
+            KYCVerificationEvent.objects.filter(
+                session=session, event_type="ADMIN_REJECTED"
+            ).exists()
+        )
+
+    def test_approve_with_no_kyc_session_is_a_graceful_noop(self):
+        self.assertFalse(
+            KYCVerificationSession.objects.filter(participant=self.participant).exists()
+        )
+        url = reverse(
+            "markets:admin-participant-compliance-detail", kwargs={"user_id": self.participant.id}
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.patch(url, {"kyc_status": "VERIFIED"}, format="json")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        compliance = MarketParticipantCompliance.objects.get(participant=self.participant)
+        self.assertEqual(compliance.kyc_status, "VERIFIED")
+        self.assertFalse(
+            KYCVerificationSession.objects.filter(participant=self.participant).exists()
+        )
+
+    def test_approve_does_not_touch_an_already_terminal_session(self):
+        session, _ = KYCService.start(
+            participant=self.participant, idempotency_key="session-terminal"
+        )
+        KYCService.admin_decide(participant=self.participant, decision="REJECTED", actor=self.admin)
+        session.refresh_from_db()
+        self.assertEqual(session.status, "REJECTED")
+        event_count_before = KYCVerificationEvent.objects.filter(session=session).count()
+
+        url = reverse(
+            "markets:admin-participant-compliance-detail", kwargs={"user_id": self.participant.id}
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.patch(url, {"kyc_status": "VERIFIED"}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+
+        session.refresh_from_db()
+        self.assertEqual(session.status, "REJECTED")
+        self.assertEqual(
+            KYCVerificationEvent.objects.filter(session=session).count(), event_count_before
         )
 
     def test_review_list_is_admin_only_and_paginated(self):
