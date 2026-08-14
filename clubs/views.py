@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
-
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import status
-from drf_spectacular.utils import extend_schema
-from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from clubs.models import (
@@ -110,8 +104,6 @@ class ClubProfileVersionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        from django.utils import timezone
-
         try:
             scheduled_dt = timezone.datetime.fromisoformat(scheduled_at)
             if scheduled_dt <= timezone.now():
@@ -164,8 +156,6 @@ class ClubMediaViewSet(viewsets.ModelViewSet):
                 {"scheduled_at": "This field is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        from django.utils import timezone
 
         try:
             scheduled_dt = timezone.datetime.fromisoformat(scheduled_at)
@@ -223,8 +213,6 @@ class ClubNewsViewSet(viewsets.ModelViewSet):
                 {"scheduled_at": "This field is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        from django.utils import timezone
 
         try:
             scheduled_dt = timezone.datetime.fromisoformat(scheduled_at)
