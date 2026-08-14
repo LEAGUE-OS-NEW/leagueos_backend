@@ -134,3 +134,105 @@ def test_ocr_service_stores_extracted_date_of_birth_as_date():
 
     verification.refresh_from_db()
     assert verification.extracted_date_of_birth == date(1990, 1, 1)
+
+
+@pytest.mark.django_db
+def test_auto_verify_high_risk_passing_checks():
+    user = User.objects.create_user(
+        username="highrisk_user", email="highrisk@example.com", password="Pass123!Password"
+    )
+    verification = KYCVerification.objects.create(
+        user=user, risk_level=KYCVerification.RiskLevel.HIGH, risk_score=0.55
+    )
+    img_bytes = create_test_image_bytes()
+    attempt = KYCVerificationAttempt.objects.create(
+        kyc_verification=verification,
+        attempt_number=1,
+        document_type=KYCVerification.DocumentType.PASSPORT,
+        document_image=SimpleUploadedFile("doc.jpg", img_bytes),
+        selfie_image=SimpleUploadedFile("selfie.jpg", img_bytes),
+    )
+
+    KYCCheckResult.objects.create(
+        kyc_verification=verification,
+        kyc_attempt=attempt,
+        check_type=KYCCheckResult.CheckType.IMAGE_QUALITY,
+        status=KYCCheckResult.Status.PASSED,
+    )
+    KYCCheckResult.objects.create(
+        kyc_verification=verification,
+        kyc_attempt=attempt,
+        check_type=KYCCheckResult.CheckType.FACE_DETECTION,
+        status=KYCCheckResult.Status.PASSED,
+    )
+    KYCCheckResult.objects.create(
+        kyc_verification=verification,
+        kyc_attempt=attempt,
+        check_type=KYCCheckResult.CheckType.FACE_MATCH,
+        status=KYCCheckResult.Status.PASSED,
+        score=0.88,
+    )
+
+    decision = KYCDecisionService.run_decision_engine(attempt)
+    assert decision.status == KYCVerification.Status.VERIFIED
+    assert user.is_verified is True
+
+
+@pytest.mark.django_db
+def test_auto_verify_uncertain_face_match():
+    user = User.objects.create_user(
+        username="uncertain_user", email="uncertain@example.com", password="Pass123!Password"
+    )
+    verification = KYCVerification.objects.create(user=user)
+    img_bytes = create_test_image_bytes()
+    attempt = KYCVerificationAttempt.objects.create(
+        kyc_verification=verification,
+        attempt_number=1,
+        document_type=KYCVerification.DocumentType.PASSPORT,
+        document_image=SimpleUploadedFile("doc.jpg", img_bytes),
+        selfie_image=SimpleUploadedFile("selfie.jpg", img_bytes),
+    )
+
+    KYCCheckResult.objects.create(
+        kyc_verification=verification,
+        kyc_attempt=attempt,
+        check_type=KYCCheckResult.CheckType.IMAGE_QUALITY,
+        status=KYCCheckResult.Status.PASSED,
+    )
+    KYCCheckResult.objects.create(
+        kyc_verification=verification,
+        kyc_attempt=attempt,
+        check_type=KYCCheckResult.CheckType.FACE_DETECTION,
+        status=KYCCheckResult.Status.PASSED,
+    )
+    KYCCheckResult.objects.create(
+        kyc_verification=verification,
+        kyc_attempt=attempt,
+        check_type=KYCCheckResult.CheckType.FACE_MATCH,
+        status=KYCCheckResult.Status.UNCERTAIN,
+        score=0.60,
+    )
+
+    decision = KYCDecisionService.run_decision_engine(attempt)
+    assert decision.status == KYCVerification.Status.VERIFIED
+    assert user.is_verified is True
+
+
+@pytest.mark.django_db
+def test_auto_verify_fallback_no_review():
+    user = User.objects.create_user(
+        username="fallback_user", email="fallback@example.com", password="Pass123!Password"
+    )
+    verification = KYCVerification.objects.create(user=user)
+    img_bytes = create_test_image_bytes()
+    attempt = KYCVerificationAttempt.objects.create(
+        kyc_verification=verification,
+        attempt_number=1,
+        document_type=KYCVerification.DocumentType.PASSPORT,
+        document_image=SimpleUploadedFile("doc.jpg", img_bytes),
+        selfie_image=SimpleUploadedFile("selfie.jpg", img_bytes),
+    )
+
+    decision = KYCDecisionService.run_decision_engine(attempt)
+    assert decision.status == KYCVerification.Status.VERIFIED
+    assert user.is_verified is True
