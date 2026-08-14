@@ -44,9 +44,7 @@ class MarketResultDevelopmentAcceleratorView(APIView):
 
         with transaction.atomic():
             provisional = get_object_or_404(
-                MarketProvisionalResult.objects.select_for_update().select_related(
-                    "market__created_by"
-                ),
+                MarketProvisionalResult.objects.select_for_update().select_related("market"),
                 market_id=market_id,
             )
             creator = provisional.market.created_by

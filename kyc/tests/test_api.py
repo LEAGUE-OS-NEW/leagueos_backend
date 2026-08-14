@@ -6,7 +6,6 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from profiles.models import Gender, Country
 from markets.models import MarketParticipantCompliance
-from markets.services.eligibility_service import MarketEligibilityService
 from kyc.models import KYCVerification, KYCVerificationAttempt
 from kyc.tests.helpers import create_test_image_bytes
 
@@ -100,7 +99,7 @@ def test_kyc_submission_persists_dob_and_gender():
     client.force_authenticate(user=user)
 
     gender = Gender.objects.create(name="Male", code="M", is_active=True)
-    country = Country.objects.create(name="Uganda", iso_code="UG", is_active=True)
+    Country.objects.create(name="Uganda", iso_code="UG", is_active=True)
 
     doc_bytes = create_test_image_bytes(width=800, height=600)
     selfie_bytes = create_test_image_bytes(width=600, height=600)
@@ -245,7 +244,9 @@ def test_kyc_decision_service_syncs_market_compliance():
         selfie_image=SimpleUploadedFile("selfie.jpg", selfie_bytes),
     )
 
-    KYCDecisionService.make_decision(attempt, KYCVerification.Status.VERIFIED, "automated_checks_passed")
+    KYCDecisionService.make_decision(
+        attempt, KYCVerification.Status.VERIFIED, "automated_checks_passed"
+    )
 
     compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
     assert compliance is not None
