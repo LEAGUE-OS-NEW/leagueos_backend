@@ -193,12 +193,12 @@ class ProfileSerializer(serializers.ModelSerializer):
     def get_avatar_url(self, obj: Profile) -> str | None:
         return obj.get_avatar_url()
 
-    def get_favourite_sports(self, obj: Profile):
+    def get_favourite_sports(self, obj: Profile) -> list[dict[str, Any]]:
         from onboarding.services.preference_service import PreferenceService
 
         return PreferenceService.get_user_sports(obj.user)
 
-    def get_favourite_competitions(self, obj: Profile):
+    def get_favourite_competitions(self, obj: Profile) -> list[dict[str, Any]]:
         from onboarding.services.preference_service import PreferenceService
 
         return PreferenceService.get_user_competitions(obj.user)

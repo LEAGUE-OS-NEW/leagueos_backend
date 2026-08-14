@@ -17,6 +17,45 @@ Fan registration, email OTP verification, authentication, authorization, session
 - Role-based access control (RBAC)
 - Generic permission engine
 - OpenAPI schema with drf-spectacular
+- Swagger UI and ReDoc documentation
+- Postman collection for API testing
+
+## API Documentation
+
+Once the server is running, you can access:
+
+- **Swagger UI:** http://127.0.0.1:8000/api/v1/docs/
+- **ReDoc:** http://127.0.0.1:8000/api/v1/redoc/
+- **OpenAPI Schema:** http://127.0.0.1:8000/api/v1/schema/?format=json
+- **Health Check:** http://127.0.0.1:8000/api/v1/system/health/
+
+### Postman
+
+Import the Postman collection and environment:
+
+1. Open Postman.
+2. Import `docs/postman/LeagueOS.postman_collection.json`.
+3. Import `docs/postman/LeagueOS.postman_environment.json`.
+4. Select the **LeagueOS API Environment**.
+5. Set `base_url` to your backend URL (default `http://127.0.0.1:8000`).
+6. Use the **Login** request to obtain tokens. The collection will automatically
+   save `access_token` and `refresh_token` into the environment.
+7. Protected requests will automatically use `{{access_token}}`.
+
+### OpenAPI Specification
+
+The canonical OpenAPI specification is generated from the live Django URL
+configuration and stored at:
+
+```
+docs/openapi.yml
+```
+
+To regenerate it after endpoint changes:
+
+```bash
+python manage.py spectacular --file docs/openapi.yml --validate
+```
 
 ## Requirements
 
