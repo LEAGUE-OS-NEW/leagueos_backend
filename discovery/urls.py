@@ -6,6 +6,7 @@ from discovery.views import (
     ClubDetailView,
     ClubFollowView,
     ClubListView,
+    ClubMediaListView,
     CompetitionListView,
     FixtureDetailView,
     FixtureListView,
@@ -39,6 +40,11 @@ urlpatterns = [
     # Clubs
     path("clubs/", ClubListView.as_view(), name="club-list"),
     path("clubs/<uuid:club_id>/", ClubDetailView.as_view(), name="club-detail"),
+    path(
+        "clubs/<uuid:club_id>/media/",
+        ClubMediaListView.as_view(),
+        name="club-media-list",
+    ),
     path(
         "clubs/<uuid:club_id>/follow/",
         ClubFollowView.as_view(),

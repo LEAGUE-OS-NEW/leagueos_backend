@@ -13,6 +13,7 @@ from clubs.views import (
     ClubWorkspaceViewSet,
     MembershipPlanViewSet,
     MerchandiseProductViewSet,
+    ProductCategoryViewSet,
     StaffInvitationAcceptView,
     StaffInvitationViewSet,
     StoreOrderViewSet,
@@ -27,6 +28,7 @@ router.register(r"news", ClubNewsViewSet, basename="club-news")
 router.register(r"membership-plans", MembershipPlanViewSet, basename="membership-plan")
 router.register(r"ticket-products", TicketProductViewSet, basename="ticket-product")
 router.register(r"merchandise", MerchandiseProductViewSet, basename="merchandise-product")
+router.register(r"categories", ProductCategoryViewSet, basename="product-category")
 router.register(r"orders", StoreOrderViewSet, basename="store-order")
 router.register(r"audit-logs", ClubAuditLogViewSet, basename="club-audit-log")
 router.register(r"staff-invitations", StaffInvitationViewSet, basename="staff-invitation")
@@ -64,6 +66,16 @@ urlpatterns = [
         name="club-profile-detail",
     ),
     path(
+        "<uuid:club_pk>/profiles/<uuid:pk>/publish/",
+        ClubProfileVersionViewSet.as_view({"post": "publish"}),
+        name="club-profile-publish",
+    ),
+    path(
+        "<uuid:club_pk>/profiles/<uuid:pk>/schedule/",
+        ClubProfileVersionViewSet.as_view({"post": "schedule"}),
+        name="club-profile-schedule",
+    ),
+    path(
         "<uuid:club_pk>/media/",
         ClubMediaViewSet.as_view({"get": "list", "post": "create"}),
         name="club-media-list",
@@ -74,6 +86,38 @@ urlpatterns = [
             {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
         ),
         name="club-media-detail",
+    ),
+    path(
+        "<uuid:club_pk>/media/<uuid:pk>/publish/",
+        ClubMediaViewSet.as_view({"post": "publish"}),
+        name="club-media-publish",
+    ),
+    path(
+        "<uuid:club_pk>/media/<uuid:pk>/schedule/",
+        ClubMediaViewSet.as_view({"post": "schedule"}),
+        name="club-media-schedule",
+    ),
+    path(
+        "<uuid:club_pk>/news/",
+        ClubNewsViewSet.as_view({"get": "list", "post": "create"}),
+        name="club-news-list",
+    ),
+    path(
+        "<uuid:club_pk>/news/<uuid:pk>/",
+        ClubNewsViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
+        name="club-news-detail",
+    ),
+    path(
+        "<uuid:club_pk>/news/<uuid:pk>/publish/",
+        ClubNewsViewSet.as_view({"post": "publish"}),
+        name="club-news-publish",
+    ),
+    path(
+        "<uuid:club_pk>/news/<uuid:pk>/schedule/",
+        ClubNewsViewSet.as_view({"post": "schedule"}),
+        name="club-news-schedule",
     ),
     path(
         "<uuid:club_pk>/membership-plans/",
@@ -110,6 +154,18 @@ urlpatterns = [
             {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
         ),
         name="merchandise-detail",
+    ),
+    path(
+        "<uuid:club_pk>/categories/",
+        ProductCategoryViewSet.as_view({"get": "list", "post": "create"}),
+        name="product-category-list",
+    ),
+    path(
+        "<uuid:club_pk>/categories/<uuid:pk>/",
+        ProductCategoryViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
+        name="product-category-detail",
     ),
     path(
         "<uuid:club_pk>/orders/",

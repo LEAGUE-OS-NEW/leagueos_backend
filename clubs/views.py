@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from drf_spectacular.utils import extend_schema
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status, viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from clubs.models import (
@@ -16,6 +18,7 @@ from clubs.models import (
     ClubWorkspace,
     MembershipPlan,
     MerchandiseProduct,
+    ProductCategory,
     StaffInvitation,
     StoreOrder,
     TicketProduct,
@@ -30,6 +33,7 @@ from clubs.serializers.club_serializers import (
     ClubWorkspaceSerializer,
     MembershipPlanSerializer,
     MerchandiseProductSerializer,
+    ProductCategorySerializer,
     StaffInvitationAcceptSerializer,
     StaffInvitationSerializer,
     StoreOrderSerializer,
@@ -81,6 +85,44 @@ class ClubProfileVersionViewSet(viewsets.ModelViewSet):
         ) + 1
         serializer.save(club=club, version=next_version, created_by=self.request.user)
 
+    @action(detail=True, methods=["post"], permission_classes=[IsClubStaff])
+    def publish(self, request, club_pk=None, pk=None):
+        profile = self.get_object()
+        from clubs.services.club_profile_service import ClubProfileService
+
+        published = ClubProfileService.publish_profile(profile, request.user)
+        serializer = self.get_serializer(published)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsClubStaff])
+    def schedule(self, request, club_pk=None, pk=None):
+        profile = self.get_object()
+        scheduled_at = request.data.get("scheduled_at")
+        if not scheduled_at:
+            return Response(
+                {"scheduled_at": "This field is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            scheduled_dt = timezone.datetime.fromisoformat(scheduled_at)
+            if scheduled_dt <= timezone.now():
+                return Response(
+                    {"scheduled_at": "Scheduled time must be in the future."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except (ValueError, TypeError):
+            return Response(
+                {"scheduled_at": "Invalid datetime format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from clubs.services.club_profile_service import ClubProfileService
+
+        scheduled = ClubProfileService.schedule_profile(profile, scheduled_dt, request.user)
+        serializer = self.get_serializer(scheduled)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class ClubMediaViewSet(viewsets.ModelViewSet):
     serializer_class = ClubMediaSerializer
@@ -96,7 +138,49 @@ class ClubMediaViewSet(viewsets.ModelViewSet):
         club = Club.objects.get(id=club_id)
         serializer.save(club=club, uploaded_by=self.request.user)
 
+    @action(detail=True, methods=["post"], permission_classes=[IsClubStaff])
+    def publish(self, request, club_pk=None, pk=None):
+        media = self.get_object()
+        from clubs.services.media_service import MediaService
 
+        published = MediaService.publish_media(media, request.user)
+        serializer = self.get_serializer(published)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsClubStaff])
+    def schedule(self, request, club_pk=None, pk=None):
+        media = self.get_object()
+        scheduled_at = request.data.get("scheduled_at")
+        if not scheduled_at:
+            return Response(
+                {"scheduled_at": "This field is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            scheduled_dt = timezone.datetime.fromisoformat(scheduled_at)
+            if scheduled_dt <= timezone.now():
+                return Response(
+                    {"scheduled_at": "Scheduled time must be in the future."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except (ValueError, TypeError):
+            return Response(
+                {"scheduled_at": "Invalid datetime format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from clubs.services.media_service import MediaService
+
+        scheduled = MediaService.schedule_media(media, scheduled_dt, request.user)
+        serializer = self.get_serializer(scheduled)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    list=extend_schema(operation_id="api_v1_club_news_list"),
+    retrieve=extend_schema(operation_id="api_v1_club_news_retrieve"),
+)
 class ClubNewsViewSet(viewsets.ModelViewSet):
     serializer_class = ClubNewsSerializer
     permission_classes = [IsClubStaff]
@@ -110,6 +194,44 @@ class ClubNewsViewSet(viewsets.ModelViewSet):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
         serializer.save(club=club, created_by=self.request.user)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsClubStaff])
+    def publish(self, request, club_pk=None, pk=None):
+        news = self.get_object()
+        from clubs.services.news_service import NewsService
+
+        published = NewsService.publish_news(news, request.user)
+        serializer = self.get_serializer(published)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsClubStaff])
+    def schedule(self, request, club_pk=None, pk=None):
+        news = self.get_object()
+        scheduled_at = request.data.get("scheduled_at")
+        if not scheduled_at:
+            return Response(
+                {"scheduled_at": "This field is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            scheduled_dt = timezone.datetime.fromisoformat(scheduled_at)
+            if scheduled_dt <= timezone.now():
+                return Response(
+                    {"scheduled_at": "Scheduled time must be in the future."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except (ValueError, TypeError):
+            return Response(
+                {"scheduled_at": "Invalid datetime format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from clubs.services.news_service import NewsService
+
+        scheduled = NewsService.schedule_news(news, scheduled_dt, request.user)
+        serializer = self.get_serializer(scheduled)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class MembershipPlanViewSet(viewsets.ModelViewSet):
@@ -155,6 +277,21 @@ class MerchandiseProductViewSet(viewsets.ModelViewSet):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
         serializer.save(club=club, created_by=self.request.user)
+
+
+class ProductCategoryViewSet(viewsets.ModelViewSet):
+    serializer_class = ProductCategorySerializer
+    permission_classes = [IsClubStaff]
+
+    def get_queryset(self):
+        return ProductCategory.objects.filter(club_id=self.kwargs.get("club_pk")).order_by(
+            "display_order", "name"
+        )
+
+    def perform_create(self, serializer):
+        club_id = self.kwargs.get("club_pk")
+        club = Club.objects.get(id=club_id)
+        serializer.save(club=club)
 
 
 class StoreOrderViewSet(viewsets.ReadOnlyModelViewSet):

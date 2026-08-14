@@ -83,6 +83,7 @@ class ClubProfileVersionSerializer(serializers.ModelSerializer):
             "social_links",
             "published_at",
             "published_by",
+            "scheduled_at",
             "created_by",
         ]
         read_only_fields = ["id", "club", "version", "published_at", "published_by", "created_by"]
@@ -108,6 +109,7 @@ class ClubMediaSerializer(serializers.ModelSerializer):
             "uploaded_by",
             "published_at",
             "published_by",
+            "scheduled_at",
         ]
         read_only_fields = [
             "id",
@@ -137,6 +139,7 @@ class ClubNewsSerializer(serializers.ModelSerializer):
             "is_verified",
             "published_at",
             "published_by",
+            "scheduled_at",
             "created_by",
             "source_name",
             "source_reference",

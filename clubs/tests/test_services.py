@@ -10,6 +10,7 @@ from accounts.models import User
 from clubs.models import (
     ClubAnalytics,
     ClubAuditLog,
+    ClubNews,
     ClubProfileVersion,
     ClubWorkspace,
     InventoryAdjustment,
@@ -27,6 +28,7 @@ from clubs.services.membership_service import MembershipService
 from clubs.services.staff_service import StaffService
 from clubs.services.store_service import StoreService
 from clubs.services.ticket_service import TicketService
+from django.utils import timezone
 from profiles.models import Club
 
 
@@ -238,3 +240,127 @@ class TestClubAuditService:
         )
         logs = ClubAuditService.get_club_audit_logs(club)
         assert logs.count() == 1
+
+
+class TestClubProfileServiceScheduling:
+    def test_schedule_profile(self, user, club, admin_workspace):
+        profile = ClubProfileService.create_profile(club, user)
+        scheduled_at = timezone.now() + timezone.timedelta(days=1)
+        scheduled = ClubProfileService.schedule_profile(profile, scheduled_at, user)
+        assert scheduled.scheduled_at == scheduled_at
+        assert scheduled.status == ClubProfileVersion.ProfileStatus.PENDING_APPROVAL
+
+    def test_get_scheduled_profiles(self, user, club, admin_workspace):
+        profile = ClubProfileService.create_profile(club, user)
+        scheduled_at = timezone.now() - timezone.timedelta(hours=1)
+        ClubProfileService.schedule_profile(profile, scheduled_at, user)
+        scheduled = ClubProfileService.get_scheduled_profiles()
+        assert scheduled.count() == 1
+
+
+class TestMediaServiceSanitisation:
+    def test_strip_exif_from_image(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image as PILImage
+        import io
+
+        img = PILImage.new("RGB", (100, 100), color="red")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG")
+        buf.seek(0)
+        file_obj = SimpleUploadedFile("test.jpg", buf.read(), content_type="image/jpeg")
+
+        result = MediaService._strip_exif(file_obj)
+        assert result is not None
+        assert result.read() != b""
+
+
+class TestNewsService:
+    def test_create_news(self, user, club, admin_workspace):
+        from clubs.services.news_service import NewsService
+        from discovery.models import NewsCategory
+        from sports.models import Sport
+
+        category = NewsCategory.objects.create(code="test", name="Test")
+        sport = Sport.objects.create(name="Football", slug="football")
+
+        news = NewsService.create_news(
+            club,
+            user,
+            title="Test News",
+            body="<script>alert('xss')</script><p>Safe content</p>",
+            category=category,
+            sport=sport,
+        )
+        assert news.title == "Test News"
+        assert "<script>" not in news.body
+
+    def test_publish_news(self, user, club, admin_workspace):
+        from clubs.services.news_service import NewsService
+        from discovery.models import NewsCategory
+        from sports.models import Sport
+
+        category = NewsCategory.objects.create(code="test2", name="Test 2")
+        sport = Sport.objects.create(name="Rugby", slug="rugby")
+
+        news = NewsService.create_news(
+            club,
+            user,
+            title="Publish Test",
+            body="Content to publish",
+            category=category,
+            sport=sport,
+        )
+        published = NewsService.publish_news(news, user)
+        assert published.status == ClubNews.Status.PUBLISHED
+        assert published.published_by == user
+
+    def test_schedule_news(self, user, club, admin_workspace):
+        from clubs.services.news_service import NewsService
+        from discovery.models import NewsCategory
+        from sports.models import Sport
+
+        category = NewsCategory.objects.create(code="test3", name="Test 3")
+        sport = Sport.objects.create(name="Tennis", slug="tennis")
+
+        news = NewsService.create_news(
+            club,
+            user,
+            title="Schedule Test",
+            body="Content to schedule",
+            category=category,
+            sport=sport,
+        )
+        scheduled_at = timezone.now() + timezone.timedelta(days=1)
+        scheduled = NewsService.schedule_news(news, scheduled_at, user)
+        assert scheduled.scheduled_at == scheduled_at
+        assert scheduled.status == ClubNews.Status.PENDING_APPROVAL
+
+
+class TestSanitisationUtility:
+    def test_sanitise_html_removes_script_tags(self):
+        from clubs.services.sanitisation import sanitise_html
+
+        result = sanitise_html("<script>alert('xss')</script><p>Safe</p>")
+        assert "<script>" not in result
+        assert "Safe" in result
+
+    def test_sanitise_html_removes_javascript_protocol(self):
+        from clubs.services.sanitisation import sanitise_html
+
+        result = sanitise_html('<a href="javascript:alert(1)">click</a>')
+        assert "javascript:" not in result
+
+    def test_sanitise_html_allows_safe_tags(self):
+        from clubs.services.sanitisation import sanitise_html
+
+        result = sanitise_html("<p><strong>Bold</strong> text</p>")
+        assert "<p>" in result
+        assert "<strong>" in result
+
+    def test_sanitise_text_escapes_html(self):
+        from clubs.services.sanitisation import sanitise_text
+
+        result = sanitise_text("<script>alert('xss')</script>")
+        assert "&lt;script&gt;" in result
+        assert "<script>" not in result

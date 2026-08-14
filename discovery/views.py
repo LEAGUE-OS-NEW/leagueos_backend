@@ -193,6 +193,47 @@ class ClubDetailView(RetrieveAPIView):
         return Response(serializer.data)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        responses=DiscoveryClubSerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class ClubMediaListView(ListAPIView):
+    """Public club media list (published only)."""
+
+    permission_classes = [AllowAny]
+    pagination_class = SystemPagination
+
+    def get_queryset(self):
+        from clubs.models import ClubMedia
+        from profiles.models import Club
+
+        club_id = self.kwargs.get("club_id")
+        Club.objects.filter(id=club_id, is_active=True).first()
+        return ClubMedia.objects.filter(
+            club_id=club_id,
+            status=ClubMedia.Status.PUBLISHED,
+        ).order_by("display_order", "-created_at")
+
+    def list(self, request, *args, **kwargs):
+        media = self.get_queryset()
+        results = [
+            {
+                "id": str(m.id),
+                "media_type": m.media_type,
+                "title": m.title,
+                "description": m.description,
+                "url": m.file.url if m.file else m.url,
+                "thumbnail": m.thumbnail.url if m.thumbnail else None,
+                "is_featured": m.is_featured,
+            }
+            for m in media
+        ]
+
+        return Response({"results": results, "count": len(results)})
+
+
 # =============================================================================
 # Players
 # =============================================================================

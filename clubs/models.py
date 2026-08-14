@@ -247,6 +247,7 @@ class ClubProfileVersion(TimeStampedUUIDModel):
         blank=True,
         related_name="published_club_profiles",
     )
+    scheduled_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -327,6 +328,7 @@ class ClubMedia(TimeStampedUUIDModel):
         blank=True,
         related_name="published_club_media",
     )
+    scheduled_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         ordering = ["display_order", "-created_at"]
@@ -393,6 +395,7 @@ class ClubNews(TimeStampedUUIDModel):
         blank=True,
         related_name="published_club_news",
     )
+    scheduled_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
