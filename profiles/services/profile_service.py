@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from accounts.models import AuditLog
 from onboarding.services.preference_service import PreferenceService
-from profiles.models import Club, Profile
+from profiles.models import Profile
 from sports.models import Competition, Sport
 
 logger = logging.getLogger(__name__)
@@ -165,9 +165,7 @@ class ProfileService:
                     if favourite_competitions
                     else []
                 )
-                club_objs = (
-                    [favourite_club] if favourite_club is not None else []
-                )
+                club_objs = [favourite_club] if favourite_club is not None else []
 
                 PreferenceService.update_preferences_from_profile(
                     user=user,

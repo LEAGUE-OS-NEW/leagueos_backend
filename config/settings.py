@@ -500,6 +500,7 @@ MEDIA_URL = env("MEDIA_URL", default="/media/")
 # Automated KYC & Identity Verification Settings
 # =============================================================================
 KYC_ENABLED = env.bool("KYC_ENABLED", default=True)
+REVIEW_WORKFLOW_TOOLS_ENABLED = env.bool("REVIEW_WORKFLOW_TOOLS_ENABLED", default=False)
 DEV_KYC_BYPASS_ENABLED = env.bool("DEV_KYC_BYPASS_ENABLED", default=False)
 DEV_RESULT_ACCELERATOR_ENABLED = env.bool("DEV_RESULT_ACCELERATOR_ENABLED", default=False)
 KYC_MAX_ATTEMPTS = env.int("KYC_MAX_ATTEMPTS", default=3)

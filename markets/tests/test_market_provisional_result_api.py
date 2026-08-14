@@ -228,6 +228,24 @@ class MarketProvisionalResultAPITests(APITestCase):
         self.client.force_authenticate(self.participant_user)
         self.assertEqual(self.client.post(self.accelerator_url(market)).status_code, 403)
 
+    @override_settings(DEBUG=False, REVIEW_WORKFLOW_TOOLS_ENABLED=True)
+    def test_review_accelerator_rejects_ordinary_actor_even_with_permission(self):
+        self.operations_user.email = "creator@leagueos.test"
+        self.operations_user.save(update_fields=["email"])
+        market = self.close_market(self.create_market())
+        self.publish_directly(market)
+        self.client.force_authenticate(self.approver_user)
+        self.assertEqual(self.client.post(self.accelerator_url(market)).status_code, 404)
+
+    @override_settings(DEBUG=False, REVIEW_WORKFLOW_TOOLS_ENABLED=True)
+    def test_review_accelerator_rejects_ordinary_market_creator(self):
+        self.approver_user.email = "reviewer@leagueos.test"
+        self.approver_user.save(update_fields=["email"])
+        market = self.close_market(self.create_market())
+        self.publish_directly(market)
+        self.client.force_authenticate(self.approver_user)
+        self.assertEqual(self.client.post(self.accelerator_url(market)).status_code, 404)
+
     @override_settings(DEBUG=True, DEV_RESULT_ACCELERATOR_ENABLED=True)
     def test_development_accelerator_only_marks_synthetic_window_closed(self):
         self.operations_user.email = "market.ops.local@leagueos.test"

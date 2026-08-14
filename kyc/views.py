@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 signer = TimestampSigner()
 
 
+class KYCEmptyRequestSerializer(serializers.Serializer):
+    pass
+
+
 def get_client_ip(request):
     x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded:
@@ -195,14 +199,13 @@ class FanKYCDevelopmentBypassView(APIView):
     """Verify only the authenticated synthetic fan in an enabled local build."""
 
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = serializers.Serializer
+    serializer_class = KYCEmptyRequestSerializer
 
     def post(self, request):
-        if not (
-            settings.DEBUG
-            and getattr(settings, "DEV_KYC_BYPASS_ENABLED", False)
-            and request.user.email.lower().endswith("@leagueos.test")
-        ):
+        local_enabled = settings.DEBUG and getattr(settings, "DEV_KYC_BYPASS_ENABLED", False)
+        review_enabled = getattr(settings, "REVIEW_WORKFLOW_TOOLS_ENABLED", False)
+        synthetic_actor = request.user.email.lower().endswith("@leagueos.test")
+        if not ((local_enabled or review_enabled) and synthetic_actor):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         now = timezone.now()
@@ -221,7 +224,7 @@ class FanKYCDevelopmentBypassView(APIView):
             KYCMarketComplianceSyncService.sync(
                 verification=verification,
                 actor=request.user,
-                reason="DEVELOPMENT BYPASS: synthetic local fan verification.",
+                reason="REVIEW TOOL DEVELOPMENT BYPASS: synthetic fan verification.",
             )
             log_kyc_audit(
                 user=request.user,
@@ -230,6 +233,7 @@ class FanKYCDevelopmentBypassView(APIView):
                 metadata={
                     "verification_source": "DEVELOPMENT_BYPASS",
                     "development_only": True,
+                    "review_workflow_tool": True,
                 },
                 request=request,
             )
@@ -237,7 +241,7 @@ class FanKYCDevelopmentBypassView(APIView):
         return Response(
             build_response(
                 True,
-                "Verified for local development testing.",
+                "Verified for synthetic workflow review.",
                 data=KYCStatusResponseSerializer(verification).data,
             )
         )
@@ -276,7 +280,7 @@ class FanKYCRetryView(APIView):
     received RETRY_REQUIRED."""
 
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = serializers.Serializer
+    serializer_class = KYCEmptyRequestSerializer
 
     @extend_schema(
         request=None,
@@ -397,7 +401,7 @@ class AdminKYCDocumentUrlView(APIView):
     """Generates a temporary signed access URL for viewing private document or selfie images."""
 
     permission_classes = [HasManageCompliancePermission]
-    serializer_class = serializers.Serializer
+    serializer_class = KYCEmptyRequestSerializer
 
     @extend_schema(
         parameters=[

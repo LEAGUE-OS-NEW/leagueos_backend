@@ -76,9 +76,11 @@ class MarketOutcomePublicSerializer(serializers.ModelSerializer):
             "opening_price_ugx",
         ]
 
+    @extend_schema_field(serializers.DecimalField(max_digits=8, decimal_places=5, allow_null=True))
     def get_opening_probability_pct(self, obj):
         return None if obj.opening_price is None else obj.opening_price * Decimal("100")
 
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_opening_price_ugx(self, obj):
         if obj.opening_price is None:
             return None

@@ -629,6 +629,31 @@ class MarketSettlementServiceTests(SettlementFixtureMixin, TestCase):
         entry = settlement.position_settlements.get().wallet_ledger_entry
         self.assertEqual(entry.idempotency_reference, expected)
 
+    def test_settlement_before_settles_by_is_blocked(self):
+        market = self.resolve_market()
+        market.settles_by = timezone.now() + timedelta(hours=1)
+        market.save(update_fields=["settles_by", "updated_at"])
+        with self.assertRaises(ValidationError) as context:
+            MarketSettlementService.settle_market(market_id=market.id, actor=self.actor)
+        self.assertIn("settles_by", context.exception.message_dict)
+
+    def test_settlement_at_settles_by_is_allowed(self):
+        market = self.resolve_market()
+        target = timezone.now() + timedelta(hours=1)
+        market.settles_by = target
+        market.save(update_fields=["settles_by", "updated_at"])
+        with patch("markets.services.settlement_service.timezone.now", return_value=target):
+            settlement = MarketSettlementService.settle_market(
+                market_id=market.id, actor=self.actor
+            )
+        self.assertEqual(settlement.market_id, market.id)
+
+    def test_null_settles_by_preserves_historical_behavior(self):
+        market = self.resolve_market()
+        self.assertIsNone(market.settles_by)
+        settlement = MarketSettlementService.settle_market(market_id=market.id, actor=self.actor)
+        self.assertEqual(settlement.market_id, market.id)
+
 
 class MarketSettlementAPITests(SettlementFixtureMixin, APITestCase):
     def url(self, market_id):

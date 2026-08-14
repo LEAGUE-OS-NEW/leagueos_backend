@@ -40,6 +40,17 @@ class KYCDevelopmentBypassTests(APITestCase):
         self.authenticate(user)
         self.assertEqual(self.client.post(self.url).status_code, 404)
 
+    @override_settings(DEBUG=False, REVIEW_WORKFLOW_TOOLS_ENABLED=True)
+    def test_review_flag_still_rejects_non_synthetic_email(self):
+        user = User.objects.create_user(username="ordinary-fan", email="fan@example.com")
+        self.authenticate(user)
+        self.assertEqual(self.client.post(self.url).status_code, 404)
+
+    @override_settings(DEBUG=False, REVIEW_WORKFLOW_TOOLS_ENABLED=True)
+    def test_review_flag_allows_only_authenticated_synthetic_fan(self):
+        self.authenticate()
+        self.assertEqual(self.client.post(self.url).status_code, 200)
+
     @override_settings(DEBUG=True, DEV_KYC_BYPASS_ENABLED=True)
     def test_synthetic_fan_is_audited_and_canonically_synchronized(self):
         other = User.objects.create_user(username="other", email="other@leagueos.test")

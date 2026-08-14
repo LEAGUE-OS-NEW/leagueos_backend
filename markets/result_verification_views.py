@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -10,7 +11,11 @@ from rest_framework.views import APIView
 from markets.admin_views import MarketAdminQuerysetMixin
 from markets.models import Market, MarketProvisionalResult, MarketResultDevelopmentAcceleration
 from markets.permissions import HasResultVerificationPermission
-from markets.result_verification_serializers import MarketResultVerificationSerializer
+from markets.result_verification_serializers import (
+    MarketResultAccelerationRequestSerializer,
+    MarketResultAccelerationResponseSerializer,
+    MarketResultVerificationSerializer,
+)
 
 
 class MarketResultVerificationQueueView(MarketAdminQuerysetMixin, ListAPIView):
@@ -35,9 +40,18 @@ class MarketResultVerificationQueueView(MarketAdminQuerysetMixin, ListAPIView):
 
 class MarketResultDevelopmentAcceleratorView(APIView):
     permission_classes = [IsAuthenticated, HasResultVerificationPermission]
+    serializer_class = MarketResultAccelerationRequestSerializer
 
+    @extend_schema(
+        request=MarketResultAccelerationRequestSerializer,
+        responses={200: MarketResultAccelerationResponseSerializer},
+    )
     def post(self, request, market_id):
-        if not (settings.DEBUG and getattr(settings, "DEV_RESULT_ACCELERATOR_ENABLED", False)):
+        local_enabled = settings.DEBUG and getattr(
+            settings, "DEV_RESULT_ACCELERATOR_ENABLED", False
+        )
+        review_enabled = getattr(settings, "REVIEW_WORKFLOW_TOOLS_ENABLED", False)
+        if not (local_enabled or review_enabled):
             return Response(status=status.HTTP_404_NOT_FOUND)
         if not request.user.email.lower().endswith("@leagueos.test"):
             return Response(status=status.HTTP_404_NOT_FOUND)
