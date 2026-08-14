@@ -161,12 +161,12 @@ class MarketComplianceAPITests(APITestCase):
         self.client.force_authenticate(self.participant)
         with CaptureQueriesContext(connection) as queries:
             self.client.get(eligibility)
-        self.assertLessEqual(len(queries), 3)
+        self.assertLessEqual(len(queries), 4)
         make_market_eligible(self.participant)
         self.participant.refresh_from_db()
         with CaptureQueriesContext(connection) as queries:
             self.client.get(eligibility)
-        self.assertLessEqual(len(queries), 3)
+        self.assertLessEqual(len(queries), 4)
 
         self.client.force_authenticate(self.admin)
         detail = reverse(

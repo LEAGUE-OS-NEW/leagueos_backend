@@ -62,6 +62,25 @@ class KYCDecisionService:
 
         verification.save()
 
+        from markets.services.compliance_service import MarketComplianceService
+        from markets.models import MarketParticipantCompliance
+
+        market_status_map = {
+            KYCVerification.Status.VERIFIED: MarketParticipantCompliance.KYCStatus.VERIFIED,
+            KYCVerification.Status.REJECTED: MarketParticipantCompliance.KYCStatus.REJECTED,
+            KYCVerification.Status.RETRY_REQUIRED: MarketParticipantCompliance.KYCStatus.PENDING,
+            KYCVerification.Status.REVIEW: MarketParticipantCompliance.KYCStatus.PENDING,
+        }
+        market_status = market_status_map.get(final_status)
+        if market_status:
+            MarketComplianceService.update(
+                participant=verification.user,
+                actor=None,
+                source="SYSTEM",
+                changes={"kyc_status": market_status},
+                reason=f"KYC decision: {reason_code}" if reason_code else "KYC automated decision",
+            )
+
         logger.info(
             "KYC verification %s for user %s transition to %s (reason: %s).",
             verification.id,
