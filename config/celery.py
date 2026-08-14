@@ -22,8 +22,36 @@ def discover_kyc_tasks():
     def setup_periodic_tasks(sender, **kwargs):
         sender.add_periodic_task(86400, retention_cleanup_task.s(), name="kyc-retention-cleanup")
 
-    @app.task
-    def retention_cleanup_task():
-        from kyc.services.retention_service import KYCRetentionService
 
-        return KYCRetentionService.cleanup_expired_files()
+def discover_club_tasks():
+    if app is None:
+        return
+    app.autodiscover_tasks(["clubs"])
+
+    @app.on_after_configure.connect
+    def setup_club_periodic_tasks(sender, **kwargs):
+        sender.add_periodic_task(
+            300,
+            publish_scheduled_club_content_task.s(),
+            name="club-publish-scheduled-content",
+        )
+
+
+def _retention_cleanup_task():
+    from kyc.services.retention_service import KYCRetentionService
+
+    return KYCRetentionService.cleanup_expired_files()
+
+
+def _publish_scheduled_club_content_task():
+    from clubs.tasks import publish_scheduled_content
+
+    return publish_scheduled_content()
+
+
+if app is not None:
+    retention_cleanup_task = app.task(_retention_cleanup_task)
+    publish_scheduled_club_content_task = app.task(_publish_scheduled_club_content_task)
+else:
+    retention_cleanup_task = None
+    publish_scheduled_club_content_task = None

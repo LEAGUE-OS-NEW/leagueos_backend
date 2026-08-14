@@ -391,6 +391,20 @@ SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"].update(
             ("PROVIDER_PAYABLE", "Provider Payable"),
             ("REVENUE", "Revenue"),
         ],
+        "ClubContentStatusEnum": [
+            ("DRAFT", "Draft"),
+            ("PENDING_APPROVAL", "Pending approval"),
+            ("APPROVED", "Approved"),
+            ("PUBLISHED", "Published"),
+            ("REJECTED", "Rejected"),
+            ("ARCHIVED", "Archived"),
+        ],
+        "Status7b4Enum": [
+            ("DRAFT", "Draft"),
+            ("PENDING_APPROVAL", "Pending approval"),
+            ("PUBLISHED", "Published"),
+            ("ARCHIVED", "Archived"),
+        ],
     }
 )
 
