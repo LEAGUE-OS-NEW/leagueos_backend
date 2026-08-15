@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
     ValidationError as DjangoValidationError,
@@ -5,6 +7,7 @@ from django.core.exceptions import (
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 
 from markets.models import (
     Market,
@@ -61,6 +64,7 @@ class MarketStatusTransitionSerializer(serializers.ModelSerializer):
 
 
 class MarketAdminReadSerializer(MarketPublicSerializer):
+    liquidity = serializers.SerializerMethodField()
     created_by = MarketAdminUserSerializer(
         read_only=True,
     )
@@ -88,7 +92,36 @@ class MarketAdminReadSerializer(MarketPublicSerializer):
             "resolution_notes",
             "resolution_evidence",
             "status_transitions",
+            "liquidity",
         ]
+
+    @extend_schema_field(serializers.DictField())
+    def get_liquidity(self, obj):
+        config = getattr(obj, "liquidity_configuration", None)
+        pool = getattr(obj, "collateral_pool", None)
+        outcomes = {o.side: o for o in obj.outcomes.all()}
+        half = Decimal(config.opening_spread_bps) / Decimal("20000") if config else Decimal("0")
+        return {
+            "liquidity_source": getattr(config, "source", None),
+            "initial_liquidity_ugx": getattr(config, "initial_liquidity_ugx", Decimal("0")),
+            "opening_spread_bps": getattr(config, "opening_spread_bps", 0),
+            "activation_status": getattr(config, "status", "UNCONFIGURED"),
+            "locked_collateral": getattr(pool, "locked_collateral", Decimal("0")),
+            "issued_complete_sets": sum(
+                (x.quantity for x in obj.complete_set_issuances.all()), Decimal("0")
+            ),
+            "opening_yes_ask": (
+                outcomes.get("YES").opening_price + half
+                if outcomes.get("YES") and outcomes.get("YES").opening_price is not None
+                else None
+            ),
+            "opening_no_ask": (
+                outcomes.get("NO").opening_price + half
+                if outcomes.get("NO") and outcomes.get("NO").opening_price is not None
+                else None
+            ),
+            "provider": getattr(getattr(config, "provider", None), "display_name", None),
+        }
 
 
 class MarketAdminListQuerySerializer(serializers.Serializer):
@@ -218,6 +251,17 @@ class MarketAdminWriteSerializer(serializers.Serializer):
     yes_probability = serializers.DecimalField(
         required=False, max_digits=7, decimal_places=5, min_value=0, max_value=100, default="50"
     )
+    initial_liquidity_ugx = serializers.DecimalField(
+        required=False, max_digits=20, decimal_places=4, min_value=0, default=0
+    )
+    liquidity_source = serializers.ChoiceField(
+        required=False,
+        choices=["PLATFORM_TREASURY", "EXTERNAL_MARKET_MAKER"],
+        default="PLATFORM_TREASURY",
+    )
+    opening_spread_bps = serializers.IntegerField(
+        required=False, min_value=0, max_value=5000, default=0
+    )
 
     def validate(self, attrs):
         unknown_fields = set(self.initial_data) - set(self.fields)
@@ -272,6 +316,9 @@ class MarketAdminWriteSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data):
+        initial_liquidity = validated_data.pop("initial_liquidity_ugx", 0)
+        liquidity_source = validated_data.pop("liquidity_source", "PLATFORM_TREASURY")
+        opening_spread = validated_data.pop("opening_spread_bps", 0)
         face_value_ugx = validated_data.pop("face_value_ugx", 10000)
         yes_probability = validated_data.pop("yes_probability", 50)
         yes_label = validated_data.pop(
@@ -297,12 +344,22 @@ class MarketAdminWriteSerializer(serializers.Serializer):
                     no_label=no_label,
                     **validated_data,
                 )
-                return MarketOpeningPricingService.configure(
+                market = MarketOpeningPricingService.configure(
                     market=market,
                     actor=self.context["request"].user,
                     face_value_ugx=face_value_ugx,
                     yes_probability=yes_probability,
                 )
+                from markets.services.liquidity_service import MarketLiquidityService
+
+                MarketLiquidityService.configure(
+                    market=market,
+                    actor=self.context["request"].user,
+                    initial_liquidity_ugx=initial_liquidity,
+                    source=liquidity_source,
+                    opening_spread_bps=opening_spread,
+                )
+                return market
         except DjangoValidationError as error:
             self._raise_serializer_validation_error(error)
 
@@ -319,6 +376,11 @@ class MarketAdminWriteSerializer(serializers.Serializer):
                 {"status": ("Only draft or rejected " "markets can be edited.")}
             )
 
+        liquidity_values = {
+            key: validated_data.pop(key)
+            for key in ("initial_liquidity_ugx", "liquidity_source", "opening_spread_bps")
+            if key in validated_data
+        }
         face_value_ugx = validated_data.pop("face_value_ugx", None)
         yes_probability = validated_data.pop("yes_probability", None)
         yes_label = validated_data.pop(
@@ -363,6 +425,24 @@ class MarketAdminWriteSerializer(serializers.Serializer):
                             if yes_probability is not None
                             else yes_outcome.opening_price * 100
                         ),
+                    )
+                if liquidity_values:
+                    from markets.services.liquidity_service import MarketLiquidityService
+
+                    current = getattr(instance, "liquidity_configuration", None)
+                    MarketLiquidityService.configure(
+                        market=instance,
+                        actor=self.context["request"].user,
+                        initial_liquidity_ugx=liquidity_values.get(
+                            "initial_liquidity_ugx", getattr(current, "initial_liquidity_ugx", 0)
+                        ),
+                        source=liquidity_values.get(
+                            "liquidity_source", getattr(current, "source", "PLATFORM_TREASURY")
+                        ),
+                        opening_spread_bps=liquidity_values.get(
+                            "opening_spread_bps", getattr(current, "opening_spread_bps", 0)
+                        ),
+                        provider=getattr(current, "provider", None),
                     )
         except DjangoValidationError as error:
             self._raise_serializer_validation_error(error)

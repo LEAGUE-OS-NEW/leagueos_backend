@@ -6,6 +6,16 @@ from wallets.models import PaymentProvider
 
 PAYMENT_PROVIDERS = [
     {
+        "code": "PESAPAL_SANDBOX",
+        "name": "Pesapal Sandbox",
+        "provider_type": "GENERIC",
+        "config": {
+            "supports_deposit": True,
+            "supports_withdrawal": False,
+            "environment": "SANDBOX",
+        },
+    },
+    {
         "code": "MOCK",
         "name": "Mock Payment Provider",
         "provider_type": "MOCK",

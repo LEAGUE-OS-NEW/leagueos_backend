@@ -2450,6 +2450,237 @@ class MarketPosition(TimeStampedUUIDModel):
             raise ValidationError(errors)
 
 
+class MarketLiquidityProvider(TimeStampedUUIDModel):
+    class ProviderType(models.TextChoices):
+        PLATFORM_TREASURY = "PLATFORM_TREASURY", "Platform treasury"
+        EXTERNAL_MARKET_MAKER = "EXTERNAL_MARKET_MAKER", "External market maker"
+
+    code = models.CharField(max_length=80, unique=True)
+    provider_type = models.CharField(max_length=40, choices=ProviderType.choices)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="liquidity_provider"
+    )
+    is_active = models.BooleanField(default=True)
+    display_name = models.CharField(max_length=160)
+
+    def __str__(self):
+        return f"{self.code}: {self.display_name}"
+
+
+class MarketLiquidityConfiguration(TimeStampedUUIDModel):  # noqa: DJ012
+    class Source(models.TextChoices):
+        PLATFORM_TREASURY = "PLATFORM_TREASURY", "Platform treasury"
+        EXTERNAL_MARKET_MAKER = "EXTERNAL_MARKET_MAKER", "External market maker"
+
+    class Status(models.TextChoices):
+        UNCONFIGURED = "UNCONFIGURED", "Unconfigured"
+        CONFIGURED = "CONFIGURED", "Configured"
+        ACTIVE = "ACTIVE", "Active"
+        EXHAUSTED = "EXHAUSTED", "Exhausted"
+        CLOSED = "CLOSED", "Closed"
+
+    market = models.OneToOneField(
+        Market, on_delete=models.PROTECT, related_name="liquidity_configuration"
+    )
+    source = models.CharField(
+        max_length=40, choices=Source.choices, default=Source.PLATFORM_TREASURY
+    )
+    initial_liquidity_ugx = models.DecimalField(max_digits=20, decimal_places=4, default=0)
+    opening_spread_bps = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UNCONFIGURED)
+    configured_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="configured_market_liquidity",
+    )
+    configured_at = models.DateTimeField(null=True, blank=True)
+    activated_at = models.DateTimeField(null=True, blank=True)
+    provider = models.ForeignKey(
+        MarketLiquidityProvider,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="market_configurations",
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(initial_liquidity_ugx__gte=0), name="market_liquidity_non_negative"
+            ),
+            models.CheckConstraint(
+                condition=Q(opening_spread_bps__lte=5000), name="market_liquidity_spread_bounded"
+            ),
+        ]
+
+    def clean(self):
+        if self.market_id and self.market.status not in {
+            Market.Status.DRAFT,
+            Market.Status.REJECTED,
+        }:
+            previous = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+            mutable = ("source", "initial_liquidity_ugx", "opening_spread_bps", "provider_id")
+            if previous is None or any(getattr(previous, f) != getattr(self, f) for f in mutable):
+                raise ValidationError(
+                    {"market": "Opening liquidity is frozen after draft/rejected."}
+                )
+        if self.initial_liquidity_ugx < 0:
+            raise ValidationError({"initial_liquidity_ugx": "Liquidity cannot be negative."})
+        if self.opening_spread_bps > 5000:
+            raise ValidationError({"opening_spread_bps": "Spread cannot exceed 5000 bps."})
+
+    def __str__(self):  # noqa: DJ012
+        return f"{self.market_id}: {self.status}"
+
+
+class MarketCollateralPool(TimeStampedUUIDModel):
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE", "Active"
+        SETTLED = "SETTLED", "Settled"
+        RELEASED = "RELEASED", "Released"
+
+    market = models.OneToOneField(Market, on_delete=models.PROTECT, related_name="collateral_pool")
+    currency = models.CharField(max_length=3, default="UGX")
+    locked_collateral = models.DecimalField(max_digits=20, decimal_places=4, default=0)
+    settled_collateral = models.DecimalField(max_digits=20, decimal_places=4, default=0)
+    released_collateral = models.DecimalField(max_digits=20, decimal_places=4, default=0)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(locked_collateral__gte=0)
+                & Q(settled_collateral__gte=0)
+                & Q(released_collateral__gte=0),
+                name="market_collateral_balances_non_negative",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.market_id}: {self.locked_collateral} {self.currency} locked"
+
+
+class MarketCompleteSetIssuance(TimeStampedUUIDModel):  # noqa: DJ012
+    class IssuanceType(models.TextChoices):
+        PLATFORM_OPENING = "PLATFORM_OPENING", "Platform opening"
+        COMPLEMENTARY_BUYS = "COMPLEMENTARY_BUYS", "Complementary buys"
+
+    market = models.ForeignKey(
+        Market, on_delete=models.PROTECT, related_name="complete_set_issuances"
+    )
+    issuance_type = models.CharField(max_length=30, choices=IssuanceType.choices)
+    quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    collateral_amount = models.DecimalField(max_digits=20, decimal_places=4)
+    yes_execution_price = models.DecimalField(max_digits=6, decimal_places=5)
+    no_execution_price = models.DecimalField(max_digits=6, decimal_places=5)
+    yes_order = models.ForeignKey(
+        MarketOrder,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="yes_complete_set_issuances",
+    )
+    no_order = models.ForeignKey(
+        MarketOrder,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="no_complete_set_issuances",
+    )
+    provider = models.ForeignKey(
+        MarketLiquidityProvider,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="issuances",
+    )
+    idempotency_reference = models.UUIDField(unique=True)
+    issued_at = models.DateTimeField(default=timezone.now)
+
+    def clean(self):
+        if self.quantity <= 0 or self.collateral_amount != self.quantity:
+            raise ValidationError(
+                {"collateral_amount": "Collateral must exactly equal issuance quantity."}
+            )
+        if self.yes_execution_price + self.no_execution_price != Decimal("1.00000"):
+            raise ValidationError({"prices": "YES and NO prices must sum exactly to 1.00000."})
+
+    def save(self, *args, **kwargs):  # noqa: DJ012
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Complete-set issuances are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Complete-set issuances are immutable.")
+
+    def __str__(self):  # noqa: DJ012
+        return f"{self.market_id}: {self.issuance_type} {self.quantity}"
+
+
+class MarketCollateralEntry(TimeStampedUUIDModel):  # noqa: DJ012
+    class EntryType(models.TextChoices):
+        TREASURY_LOCK = "TREASURY_LOCK", "Treasury lock"
+        COMPLEMENTARY_BUY_LOCK = "COMPLEMENTARY_BUY_LOCK", "Complementary buy lock"
+        SETTLEMENT_PAYOUT = "SETTLEMENT_PAYOUT", "Settlement payout"
+        VOID_RELEASE = "VOID_RELEASE", "Void release"
+        TREASURY_RELEASE = "TREASURY_RELEASE", "Treasury release"
+
+    pool = models.ForeignKey(MarketCollateralPool, on_delete=models.PROTECT, related_name="entries")
+    market = models.ForeignKey(Market, on_delete=models.PROTECT, related_name="collateral_entries")
+    entry_type = models.CharField(max_length=40, choices=EntryType.choices)
+    amount = models.DecimalField(max_digits=20, decimal_places=4)
+    idempotency_reference = models.UUIDField(unique=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="market_collateral_entries",
+    )
+    provider = models.ForeignKey(
+        MarketLiquidityProvider,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="collateral_entries",
+    )
+    order = models.ForeignKey(
+        MarketOrder,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="collateral_entries",
+    )
+    issuance = models.ForeignKey(
+        MarketCompleteSetIssuance,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="collateral_entries",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(amount__gt=0), name="market_collateral_entry_amount_positive"
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Collateral entries are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Collateral entries are immutable.")
+
+    def __str__(self):  # noqa: DJ012
+        return f"{self.market_id}: {self.entry_type} {self.amount}"
+
+
 class MarketSettlement(TimeStampedUUIDModel):
     market = models.OneToOneField(
         Market,

@@ -140,7 +140,17 @@ class Command(BaseCommand):
                         column.name
                         for column in connection.introspection.get_table_description(cursor, table)
                     }
-                if actual not in (current_columns[table], repair_columns[table]):
+
+                allowed_column_sets = [
+                    current_columns[table],
+                ]
+
+                repair_column_set = repair_columns.get(table)
+
+                if repair_column_set is not None:
+                    allowed_column_sets.append(repair_column_set)
+
+                if actual not in allowed_column_sets:
                     existing_unknown.append(table)
         if existing_unknown:
             return "REFUSE - unknown schema", True

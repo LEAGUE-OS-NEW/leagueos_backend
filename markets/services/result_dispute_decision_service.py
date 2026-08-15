@@ -145,7 +145,6 @@ class MarketResultDisputeDecisionService:
                 actor=actor,
                 notes=clean_notes,
                 evidence=clean_evidence,
-                _trusted_dispute_decision=True,
             )
         else:
             MarketResolutionService.resolve(
@@ -154,6 +153,7 @@ class MarketResultDisputeDecisionService:
                 winning_outcome_id=winner.id,
                 notes=clean_notes,
                 evidence=clean_evidence,
+                _trusted_dispute_decision=True,
             )
 
         return cls._create_decision(
