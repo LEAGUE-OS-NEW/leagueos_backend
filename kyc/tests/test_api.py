@@ -5,7 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APIClient
 from profiles.models import Gender, Country
-from markets.models import MarketParticipantCompliance
+from markets.services.eligibility_service import MarketEligibilityService
 from kyc.models import KYCVerification, KYCVerificationAttempt
 from kyc.tests.helpers import create_test_image_bytes
 
@@ -93,18 +93,15 @@ def test_admin_kyc_list_permissions():
     assert res_ok.status_code == status.HTTP_200_OK
     assert "verifications" in res_ok.data["data"]
 
+
 # ---------------------------------------------------------------------------
 # KYC approval → market eligibility synchronisation tests
 # ---------------------------------------------------------------------------
-from markets.models import KYCVerificationSession, MarketParticipantCompliance
-from markets.services.eligibility_service import MarketEligibilityService
 
 
 def _make_fan(username, email):
     """Helper: create an ordinary (non-admin) user."""
-    return User.objects.create_user(
-        username=username, email=email, password="Pass123!Password"
-    )
+    return User.objects.create_user(username=username, email=email, password="Pass123!Password")
 
 
 def _make_admin(username, email):
@@ -150,12 +147,12 @@ def test_admin_approve_kyc_sets_canonical_verification_verified():
 
 
 # ---------------------------------------------------------------------------
-# 2. Admin approves → MarketParticipantCompliance.kyc_status becomes VERIFIED
+# 2. Admin approves → user.is_verified becomes True
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db(transaction=True)
-def test_admin_approve_kyc_updates_market_participant_compliance():
+def test_admin_approve_kyc_verifies_user():
     fan = _make_fan("fan_appr2", "fan_appr2@example.com")
     admin = _make_admin("adm_appr2", "adm_appr2@example.com")
     verification = _seed_pending_verification(fan)
@@ -165,8 +162,10 @@ def test_admin_approve_kyc_updates_market_participant_compliance():
     url = f"/api/v1/admin/kyc/verifications/{verification.id}/review/"
     client.post(url, {"decision": "VERIFIED"}, format="json")
 
-    compliance = MarketParticipantCompliance.objects.get(participant=fan)
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.VERIFIED
+    verification.refresh_from_db()
+    assert verification.status == KYCVerification.Status.VERIFIED
+    fan.refresh_from_db()
+    assert fan.is_verified is True
 
 
 # ---------------------------------------------------------------------------
@@ -194,36 +193,7 @@ def test_fan_kyc_status_reflects_verified_after_admin_approval():
 
     assert resp.status_code == status.HTTP_200_OK
     assert resp.data["data"]["status"] == KYCVerification.Status.VERIFIED
-
-
-# ---------------------------------------------------------------------------
-# 4. Admin approves → GET /api/v1/markets/kyc/summary/ shows kyc_eligible=True
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.django_db(transaction=True)
-def test_market_kyc_summary_reflects_verified_after_admin_approval():
-    fan = _make_fan("fan_appr4", "fan_appr4@example.com")
-    admin = _make_admin("adm_appr4", "adm_appr4@example.com")
-    verification = _seed_pending_verification(fan)
-
-    admin_client = APIClient()
-    admin_client.force_authenticate(user=admin)
-    admin_client.post(
-        f"/api/v1/admin/kyc/verifications/{verification.id}/review/",
-        {"decision": "VERIFIED"},
-        format="json",
-    )
-
-    fan_client = APIClient()
-    fan_client.force_authenticate(user=fan)
-    resp = fan_client.get("/api/v1/markets/kyc/summary/")
-
-    assert resp.status_code == status.HTTP_200_OK
-    # as_dict() nests eligibility details under "requirements"
-    requirements = resp.data.get("requirements", {})
-    assert requirements.get("kyc_status") == "VERIFIED"
-    assert requirements.get("kyc_eligible") is True
+    assert resp.data["data"]["is_verified"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -252,12 +222,12 @@ def test_market_eligibility_service_kyc_eligible_after_approval():
 
 
 # ---------------------------------------------------------------------------
-# 6. Admin rejects → compliance kyc_status becomes REJECTED, fan not eligible
+# 6. Admin rejects → KYCVerification becomes REJECTED, fan not eligible
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db(transaction=True)
-def test_admin_reject_kyc_updates_compliance_and_blocks_eligibility():
+def test_admin_reject_kyc_blocks_eligibility():
     fan = _make_fan("fan_rej1", "fan_rej1@example.com")
     admin = _make_admin("adm_rej1", "adm_rej1@example.com")
     verification = _seed_pending_verification(fan)
@@ -273,25 +243,23 @@ def test_admin_reject_kyc_updates_compliance_and_blocks_eligibility():
     verification.refresh_from_db()
     assert verification.status == KYCVerification.Status.REJECTED
     assert "Document expired" in verification.rejection_reason
-
-    compliance = MarketParticipantCompliance.objects.get(participant=fan)
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.REJECTED
+    fan.refresh_from_db()
+    assert fan.is_verified is False
 
     fan_client = APIClient()
     fan_client.force_authenticate(user=fan)
-    resp = fan_client.get("/api/v1/markets/kyc/summary/")
+    resp = fan_client.get("/api/v1/fans/kyc/status/")
     assert resp.status_code == status.HTTP_200_OK
-    requirements = resp.data.get("requirements", {})
-    assert requirements.get("kyc_eligible") is False
+    assert resp.data["data"]["status"] == KYCVerification.Status.REJECTED
 
 
 # ---------------------------------------------------------------------------
-# 7. Admin sets REVIEW → compliance stays PENDING, not yet eligible
+# 7. Admin sets REVIEW → KYCVerification stays REVIEW, not yet eligible
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db(transaction=True)
-def test_admin_review_decision_keeps_compliance_pending():
+def test_admin_review_decision_keeps_kyc_pending():
     fan = _make_fan("fan_rev1", "fan_rev1@example.com")
     admin = _make_admin("adm_rev1", "adm_rev1@example.com")
     verification = _seed_pending_verification(fan)
@@ -307,48 +275,13 @@ def test_admin_review_decision_keeps_compliance_pending():
     verification.refresh_from_db()
     assert verification.status == KYCVerification.Status.REVIEW
 
-    compliance = MarketParticipantCompliance.objects.get(participant=fan)
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.PENDING
-
     result = MarketEligibilityService.evaluate(participant=fan)
     assert result.kyc_eligible is False
 
 
 # ---------------------------------------------------------------------------
-# 8. KYCVerificationSession is also moved to the terminal state on VERIFIED
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.django_db(transaction=True)
-def test_admin_approve_kyc_closes_open_session():
-    from markets.services.kyc_service import KYCService as _KYCService
-
-    fan = _make_fan("fan_sess1", "fan_sess1@example.com")
-    admin = _make_admin("adm_sess1", "adm_sess1@example.com")
-    verification = _seed_pending_verification(fan)
-
-    # Start a markets-side KYC session so there is an open session to close.
-    session, _ = _KYCService.start(
-        participant=fan,
-        initiated_by=fan,
-        idempotency_key="test-open-session",
-    )
-    assert session.status not in _KYCService.TERMINAL
-
-    admin_client = APIClient()
-    admin_client.force_authenticate(user=admin)
-    admin_client.post(
-        f"/api/v1/admin/kyc/verifications/{verification.id}/review/",
-        {"decision": "VERIFIED"},
-        format="json",
-    )
-
-    session.refresh_from_db()
-    assert session.status == "VERIFIED"
-
-
-# ---------------------------------------------------------------------------
-# 9. Non-admin cannot call the review endpoint
+# 8. Non-admin cannot call the review endpoint
 # ---------------------------------------------------------------------------
 
 
@@ -370,9 +303,6 @@ def test_non_admin_cannot_review_kyc():
     verification.refresh_from_db()
     assert verification.status == KYCVerification.Status.PENDING
 
-    # compliance must not have been created/updated
-    assert not MarketParticipantCompliance.objects.filter(participant=fan).exists()
-
 
 # ---------------------------------------------------------------------------
 # 10. Approval is atomic — partial failure leaves both systems unchanged
@@ -383,6 +313,7 @@ def test_non_admin_cannot_review_kyc():
 @pytest.mark.django_db(transaction=True)
 def test_review_unknown_verification_id_returns_404():
     import uuid
+
     admin = _make_admin("adm_404", "adm_404@example.com")
     client = APIClient()
     client.force_authenticate(user=admin)
@@ -392,6 +323,7 @@ def test_review_unknown_verification_id_returns_404():
         format="json",
     )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
+
 
 @pytest.mark.django_db
 def test_kyc_submission_persists_dob_and_gender():
@@ -427,7 +359,7 @@ def test_kyc_submission_persists_dob_and_gender():
 
 
 @pytest.mark.django_db
-def test_kyc_submission_syncs_market_participant_compliance():
+def test_kyc_submission_creates_verification():
     user = User.objects.create_user(
         username="fan_market", email="fan_market@example.com", password="Pass123!Password"
     )
@@ -449,9 +381,8 @@ def test_kyc_submission_syncs_market_participant_compliance():
     response = client.post("/api/v1/fans/kyc/", payload, format="multipart")
     assert response.status_code == status.HTTP_202_ACCEPTED
 
-    compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
-    assert compliance is not None
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.PENDING
+    verification = KYCVerification.objects.get(user=user)
+    assert verification.status == KYCVerification.Status.PENDING
 
 
 @pytest.mark.django_db
@@ -488,13 +419,12 @@ def test_kyc_multistep_preserves_earlier_information():
     assert user.profile.date_of_birth == date(1992, 6, 15)
     assert user.profile.gender_id == gender.id
 
-    compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
-    assert compliance is not None
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.PENDING
+    verification.refresh_from_db()
+    assert verification.status == KYCVerification.Status.PENDING
 
 
 @pytest.mark.django_db
-def test_kyc_admin_review_syncs_market_compliance():
+def test_kyc_admin_review_verifies_user():
     user = User.objects.create_user(
         username="fan_admin", email="fan_admin@example.com", password="Pass123!Password"
     )
@@ -522,15 +452,12 @@ def test_kyc_admin_review_syncs_market_compliance():
     )
     assert response.status_code == status.HTTP_200_OK
 
-    compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
-    assert compliance is not None
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.VERIFIED
     user.refresh_from_db()
     assert user.is_verified is True
 
 
 @pytest.mark.django_db
-def test_kyc_decision_service_syncs_market_compliance():
+def test_kyc_decision_service_verifies_user():
     from kyc.services.decision_service import KYCDecisionService
 
     user = User.objects.create_user(
@@ -551,8 +478,5 @@ def test_kyc_decision_service_syncs_market_compliance():
         attempt, KYCVerification.Status.VERIFIED, "automated_checks_passed"
     )
 
-    compliance = MarketParticipantCompliance.objects.filter(participant=user).first()
-    assert compliance is not None
-    assert compliance.kyc_status == MarketParticipantCompliance.KYCStatus.VERIFIED
     user.refresh_from_db()
     assert user.is_verified is True

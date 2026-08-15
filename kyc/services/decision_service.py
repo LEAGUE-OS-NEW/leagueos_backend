@@ -4,7 +4,6 @@ from django.utils import timezone
 from typing import TYPE_CHECKING
 
 from kyc.models import KYCCheckResult, KYCConfiguration, KYCVerification
-from kyc.services.market_compliance_sync import KYCMarketComplianceSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -62,29 +61,6 @@ class KYCDecisionService:
             verification.rejection_reason = reason_code
 
         verification.save()
-        KYCMarketComplianceSyncService.sync(
-            verification=verification,
-            reason=f"Automated KYC decision: {final_status} ({reason_code or 'no reason code'}).",
-        )
-
-        from markets.services.compliance_service import MarketComplianceService
-        from markets.models import MarketParticipantCompliance
-
-        market_status_map = {
-            KYCVerification.Status.VERIFIED: MarketParticipantCompliance.KYCStatus.VERIFIED,
-            KYCVerification.Status.REJECTED: MarketParticipantCompliance.KYCStatus.REJECTED,
-            KYCVerification.Status.RETRY_REQUIRED: MarketParticipantCompliance.KYCStatus.PENDING,
-            KYCVerification.Status.REVIEW: MarketParticipantCompliance.KYCStatus.PENDING,
-        }
-        market_status = market_status_map.get(final_status)
-        if market_status:
-            MarketComplianceService.update(
-                participant=verification.user,
-                actor=None,
-                source="SYSTEM",
-                changes={"kyc_status": market_status},
-                reason=f"KYC decision: {reason_code}" if reason_code else "KYC automated decision",
-            )
 
         logger.info(
             "KYC verification %s for user %s transition to %s (reason: %s).",
@@ -132,6 +108,11 @@ class KYCDecisionService:
         if verification.risk_level == KYCVerification.RiskLevel.CRITICAL:
             return cls.make_decision(
                 attempt, KYCVerification.Status.REJECTED, "critical_risk_level"
+            )
+
+        if verification.risk_level == KYCVerification.RiskLevel.HIGH:
+            return cls.make_decision(
+                attempt, KYCVerification.Status.REVIEW, "high_risk_level_requires_review"
             )
 
         # 2. Temporary Retry Required (Image Quality / Face Detection / Unclear Capture)

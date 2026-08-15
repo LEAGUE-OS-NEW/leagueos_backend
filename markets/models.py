@@ -44,13 +44,6 @@ class MarketScope(models.TextChoices):
 
 
 class MarketParticipantCompliance(TimeStampedUUIDModel):
-    class KYCStatus(models.TextChoices):
-        NOT_STARTED = "NOT_STARTED", "Not started"
-        PENDING = "PENDING", "Pending"
-        VERIFIED = "VERIFIED", "Verified"
-        REJECTED = "REJECTED", "Rejected"
-        EXPIRED = "EXPIRED", "Expired"
-
     class RestrictionStatus(models.TextChoices):
         CLEAR = "CLEAR", "Clear"
         RESTRICTED = "RESTRICTED", "Restricted"
@@ -63,9 +56,6 @@ class MarketParticipantCompliance(TimeStampedUUIDModel):
 
     participant = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="market_compliance"
-    )
-    kyc_status = models.CharField(
-        max_length=20, choices=KYCStatus.choices, default=KYCStatus.NOT_STARTED, db_index=True
     )
     restriction_status = models.CharField(
         max_length=20,
@@ -108,8 +98,6 @@ class MarketComplianceReview(TimeStampedUUIDModel):
         related_name="market_compliance_audits",
     )
     source = models.CharField(max_length=16, choices=Source.choices, default=Source.ADMIN)
-    previous_kyc_status = models.CharField(max_length=20)
-    new_kyc_status = models.CharField(max_length=20)
     previous_restriction_status = models.CharField(max_length=20)
     new_restriction_status = models.CharField(max_length=20)
     previous_jurisdiction_override = models.CharField(max_length=10)
@@ -139,117 +127,6 @@ class ImmutableAuditQuerySet(models.QuerySet):
 
     def delete(self):
         raise ValidationError("Audit records are immutable.")
-
-
-class KYCVerificationSession(TimeStampedUUIDModel):
-    class Status(models.TextChoices):
-        CREATED = "CREATED", "Created"
-        PENDING = "PENDING", "Pending"
-        IN_REVIEW = "IN_REVIEW", "In review"
-        VERIFIED = "VERIFIED", "Verified"
-        REJECTED = "REJECTED", "Rejected"
-        EXPIRED = "EXPIRED", "Expired"
-        CANCELLED = "CANCELLED", "Cancelled"
-        ERROR = "ERROR", "Error"
-
-    participant = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="kyc_sessions"
-    )
-    provider_code = models.CharField(max_length=64, db_index=True)
-    external_reference = models.CharField(max_length=255, null=True, blank=True, unique=True)
-    client_idempotency_key = models.CharField(max_length=128)
-    status = models.CharField(
-        max_length=16, choices=Status.choices, default=Status.CREATED, db_index=True
-    )
-    provider_status = models.CharField(max_length=100, blank=True)
-    verification_level = models.CharField(max_length=50, default="STANDARD")
-    initiated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="initiated_kyc_sessions",
-    )
-    initiated_at = models.DateTimeField(default=timezone.now)
-    expires_at = models.DateTimeField()
-    completed_at = models.DateTimeField(null=True, blank=True)
-    last_event_at = models.DateTimeField(null=True, blank=True)
-    continuation_url = models.URLField(max_length=500, blank=True)
-    failure_code = models.CharField(max_length=100, blank=True)
-    status_message = models.CharField(max_length=500, blank=True)
-    internal_notes = models.TextField(blank=True)
-
-    class Meta:
-        ordering = ["-initiated_at", "-id"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["participant", "client_idempotency_key"],
-                name="kyc_participant_idempotency_uniq",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.provider_code} verification for {self.participant_id}"
-
-    @property
-    def is_terminal(self):
-        return self.status in {
-            self.Status.VERIFIED,
-            self.Status.REJECTED,
-            self.Status.EXPIRED,
-            self.Status.CANCELLED,
-            self.Status.ERROR,
-        }
-
-
-class KYCVerificationEvent(TimeStampedUUIDModel):
-    class Source(models.TextChoices):
-        PARTICIPANT = "PARTICIPANT", "Participant"
-        PROVIDER = "PROVIDER", "Provider"
-        ADMIN = "ADMIN", "Administrator"
-        SYSTEM = "SYSTEM", "System"
-
-    session = models.ForeignKey(
-        KYCVerificationSession, on_delete=models.PROTECT, related_name="events"
-    )
-    event_type = models.CharField(max_length=64)
-    previous_status = models.CharField(max_length=16, blank=True)
-    new_status = models.CharField(max_length=16)
-    provider_status = models.CharField(max_length=100, blank=True)
-    external_event_id = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
-    payload_digest = models.CharField(max_length=64, db_index=True)
-    metadata = models.JSONField(default=dict, blank=True)
-    source = models.CharField(max_length=16, choices=Source.choices)
-    actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="kyc_events",
-    )
-    occurred_at = models.DateTimeField(default=timezone.now)
-    objects = ImmutableAuditQuerySet.as_manager()
-
-    class Meta:
-        ordering = ["created_at", "id"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["session", "external_event_id"],
-                condition=Q(external_event_id__isnull=False),
-                name="kyc_session_external_event_uniq",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.event_type} for {self.session_id}"
-
-    def save(self, *args, **kwargs):
-        if self.pk and type(self).objects.filter(pk=self.pk).exists():
-            raise ValidationError("KYC events are immutable.")
-        return super().save(*args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        raise ValidationError("KYC events are immutable.")
 
 
 class MarketRiskProfile(TimeStampedUUIDModel):

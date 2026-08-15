@@ -695,10 +695,10 @@ class AdminDashboardSummaryView(APIView):
             )
 
         if PermissionService.has_permission(request.user, "manage_compliance"):
-            from markets.models import MarketParticipantCompliance
+            from kyc.models import KYCVerification
 
-            data["compliance_cases"] = MarketParticipantCompliance.objects.filter(
-                kyc_status="PENDING"
+            data["compliance_cases"] = KYCVerification.objects.filter(
+                status__in=[KYCVerification.Status.PENDING, KYCVerification.Status.REVIEW]
             ).count()
 
         if PermissionService.has_permission(request.user, "manage_support_cases"):

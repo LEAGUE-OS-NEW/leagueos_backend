@@ -7,7 +7,6 @@ from markets.models import MarketComplianceReview, MarketParticipantCompliance
 
 class MarketComplianceService:
     FIELDS = (
-        "kyc_status",
         "restriction_status",
         "jurisdiction_override",
         "jurisdiction_override_reason",
@@ -44,8 +43,6 @@ class MarketComplianceService:
             participant=participant,
             actor=actor,
             source=source,
-            previous_kyc_status=before["kyc_status"],
-            new_kyc_status=compliance.kyc_status,
             previous_restriction_status=before["restriction_status"],
             new_restriction_status=compliance.restriction_status,
             previous_jurisdiction_override=before["jurisdiction_override"],

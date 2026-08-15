@@ -172,8 +172,8 @@ def test_auto_verify_high_risk_passing_checks():
     )
 
     decision = KYCDecisionService.run_decision_engine(attempt)
-    assert decision.status == KYCVerification.Status.VERIFIED
-    assert user.is_verified is True
+    assert decision.status == KYCVerification.Status.REVIEW
+    assert user.is_verified is False
 
 
 @pytest.mark.django_db

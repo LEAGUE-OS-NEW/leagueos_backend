@@ -55,6 +55,7 @@ class KYCStatusResponseSerializer(serializers.ModelSerializer):
     max_attempts = serializers.SerializerMethodField()
     submitted_at = serializers.DateTimeField(source="created_at", read_only=True)
     completed_at = serializers.DateTimeField(source="verification_completed_at", read_only=True)
+    is_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = KYCVerification
@@ -72,6 +73,7 @@ class KYCStatusResponseSerializer(serializers.ModelSerializer):
             "submitted_at",
             "completed_at",
             "verified_at",
+            "is_verified",
         ]
 
     def get_max_attempts(self, obj) -> int:
@@ -88,6 +90,9 @@ class KYCStatusResponseSerializer(serializers.ModelSerializer):
             in [KYCVerification.Status.RETRY_REQUIRED, KYCVerification.Status.NOT_STARTED]
             and current_count < max_att
         )
+
+    def get_is_verified(self, obj) -> bool:
+        return obj.status == KYCVerification.Status.VERIFIED
 
 
 class KYCCheckResultSerializer(serializers.ModelSerializer):

@@ -20,8 +20,6 @@ from kyc.serializers import (
 )
 from kyc.tasks import process_kyc_attempt
 from markets.services.compliance_service import MarketComplianceService
-from markets.services.kyc_service import KYCService
-from kyc.services.market_compliance_sync import KYCMarketComplianceSyncService
 from markets.permissions import HasManageCompliancePermission
 
 logger = logging.getLogger(__name__)
@@ -133,9 +131,6 @@ class FanKYCSubmitView(APIView):
             verification.document_type = serializer.validated_data["document_type"]
             verification.document_country = serializer.validated_data["document_country"]
             verification.save()
-            KYCMarketComplianceSyncService.sync(
-                verification=verification, reason="Fan submitted canonical KYC files."
-            )
 
             profile, _ = Profile.objects.get_or_create(user=user)
             if "date_of_birth" in serializer.validated_data:
@@ -143,16 +138,6 @@ class FanKYCSubmitView(APIView):
             if "gender" in serializer.validated_data:
                 profile.gender = serializer.validated_data["gender"]
             profile.save(update_fields=["date_of_birth", "gender", "updated_at"])
-
-            from markets.services.compliance_service import MarketComplianceService
-            from markets.models import MarketParticipantCompliance
-
-            MarketComplianceService.update(
-                participant=user,
-                actor=None,
-                source="SYSTEM",
-                changes={"kyc_status": MarketParticipantCompliance.KYCStatus.PENDING},
-            )
 
         log_kyc_audit(
             user=user,
@@ -223,11 +208,9 @@ class FanKYCDevelopmentBypassView(APIView):
             verification.rejection_reason = ""
             verification.retry_reason = ""
             verification.save()
-            KYCMarketComplianceSyncService.sync(
-                verification=verification,
-                actor=request.user,
-                reason="REVIEW TOOL DEVELOPMENT BYPASS: synthetic fan verification.",
-            )
+            user = request.user
+            user.is_verified = True
+            user.save(update_fields=["is_verified", "updated_at"])
             log_kyc_audit(
                 user=request.user,
                 action="KYC_VERIFIED",
@@ -478,13 +461,6 @@ class AdminKYCReviewActionView(APIView):
         notes = serializer.validated_data.get("notes", "")
 
         with transaction.atomic():
-            # 1. Update the canonical KYC record (kyc app).
-            verification.status = decision
-            if decision == KYCVerification.Status.VERIFIED:
-                verification.verified_at = timezone.now()
-                user = verification.user
-                user.is_verified = True
-                user.save(update_fields=["is_verified", "updated_at"])
             verification = (
                 KYCVerification.objects.select_for_update()
                 .select_related("user")
@@ -496,6 +472,14 @@ class AdminKYCReviewActionView(APIView):
                     build_response(False, "KYC verification record not found."),
                     status=status.HTTP_404_NOT_FOUND,
                 )
+
+            # 1. Update the canonical KYC record (kyc app).
+            verification.status = decision
+            if decision == KYCVerification.Status.VERIFIED:
+                verification.verified_at = timezone.now()
+                user = verification.user
+                user.is_verified = True
+                user.save(update_fields=["is_verified", "updated_at"])
 
             verification.status = decision
             verification.verification_source = KYCVerification.VerificationSource.MANUAL
@@ -513,7 +497,7 @@ class AdminKYCReviewActionView(APIView):
                     f"Manual admin rejection: {notes}" if notes else "Manual admin rejection"
                 )
             verification.save()
- 
+
             # 2. Map the decision to the markets compliance kyc_status and
             #    persist it on MarketParticipantCompliance so that
             #    MarketEligibilityService.evaluate() sees the updated state.
@@ -537,50 +521,17 @@ class AdminKYCReviewActionView(APIView):
             # 3. Transition any open KYCVerificationSession (markets app) to
             #    the same terminal state so the admin queue and session list
             #    reflect the manual decision.
-            if decision in (
-                KYCVerification.Status.VERIFIED,
-                KYCVerification.Status.REJECTED,
-            ):
-                KYCService.admin_decide(
-                    participant=verification.user,
-                    decision=decision,
-                    actor=request.user,
-                    notes=notes,
-                )
-            KYCMarketComplianceSyncService.sync(
-                verification=verification,
-                actor=request.user,
-                reason=f"Manual KYC decision: {decision}. {notes}".strip(),
+            log_kyc_audit(
+                user=request.user,
+                action=(
+                    "KYC_REVIEW_REQUIRED"
+                    if decision == "REVIEW"
+                    else ("KYC_VERIFIED" if decision == "VERIFIED" else "KYC_REJECTED")
+                ),
+                resource_id=verification.id,
+                metadata={"admin_decision": decision, "notes": notes},
+                request=request,
             )
-
-        from markets.services.compliance_service import MarketComplianceService
-        from markets.models import MarketParticipantCompliance
-
-        market_status = {
-            KYCVerification.Status.VERIFIED: MarketParticipantCompliance.KYCStatus.VERIFIED,
-            KYCVerification.Status.REJECTED: MarketParticipantCompliance.KYCStatus.REJECTED,
-            KYCVerification.Status.REVIEW: MarketParticipantCompliance.KYCStatus.PENDING,
-        }.get(decision, MarketParticipantCompliance.KYCStatus.PENDING)
-
-        MarketComplianceService.update(
-            participant=verification.user,
-            actor=request.user,
-            source="ADMIN",
-            changes={"kyc_status": market_status},
-            reason=f"Admin review: {notes}" if notes else "Admin review",
-        )
-
-        log_kyc_audit(
-            user=request.user,
-            action=(
-                "KYC_REVIEW_REQUIRED"
-                if decision == "REVIEW"
-                else ("KYC_VERIFIED" if decision == "VERIFIED" else "KYC_REJECTED")
-            ),
-            resource_id=verification.id,
-            metadata={"admin_decision": decision, "notes": notes},
-            request=request,
-        )
 
         return Response(
             build_response(True, f"Verification marked as {decision}.", data={"status": decision}),

@@ -6,8 +6,6 @@ from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 
 from markets.compliance_admin_serializers import (
-    AdminKYCSessionDetailSerializer,
-    AdminKYCSessionSerializer,
     ComplianceDecisionSerializer,
     DecisionProposalRequestSerializer,
     DecisionRequestSerializer,
@@ -17,7 +15,6 @@ from markets.compliance_admin_serializers import (
 )
 from markets.models import (
     ComplianceDecisionProposal,
-    KYCVerificationSession,
     MarketRiskAssessment,
     MarketRiskProfile,
 )
@@ -33,38 +30,6 @@ class FilterValidationMixin:
         if value and value not in choices:
             raise serializers.ValidationError({name: "Invalid filter value."})
         return value
-
-
-class AdminKYCSessionListView(FilterValidationMixin, ListAPIView):
-    permission_classes = [HasManageCompliancePermission]
-    serializer_class = AdminKYCSessionSerializer
-    pagination_class = PublicCatalogPagination
-
-    def get_queryset(self):
-        q = KYCVerificationSession.objects.all().order_by("-initiated_at", "-id")
-        p = self.request.query_params
-        status = self.validate_choice("status", KYCVerificationSession.Status.values)
-        if status:
-            q = q.filter(status=status)
-        if p.get("provider"):
-            q = q.filter(provider_code=p["provider"])
-        if p.get("participant"):
-            participant = serializers.UUIDField().run_validation(p["participant"])
-            q = q.filter(participant_id=participant)
-        if p.get("from"):
-            from_date = serializers.DateField().run_validation(p["from"])
-            q = q.filter(initiated_at__date__gte=from_date)
-        if p.get("to"):
-            to_date = serializers.DateField().run_validation(p["to"])
-            q = q.filter(initiated_at__date__lte=to_date)
-        return q
-
-
-class AdminKYCSessionDetailView(RetrieveAPIView):
-    permission_classes = [HasManageCompliancePermission]
-    serializer_class = AdminKYCSessionDetailSerializer
-    queryset = KYCVerificationSession.objects.prefetch_related("events")
-    lookup_url_kwarg = "session_id"
 
 
 class AdminRiskProfileListView(FilterValidationMixin, ListAPIView):
