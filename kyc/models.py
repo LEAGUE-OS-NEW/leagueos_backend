@@ -1,6 +1,9 @@
 import uuid
+
 from django.conf import settings
 from django.db import models
+
+from config.storage_backends import get_private_storage
 
 
 def kyc_private_document_path(instance, filename):
@@ -192,8 +195,14 @@ class KYCVerificationAttempt(models.Model):
         choices=KYCVerification.DocumentType.choices,
     )
     document_country = models.CharField(max_length=3, default="UGA")
-    document_image = models.FileField(upload_to=kyc_private_document_path)
-    selfie_image = models.FileField(upload_to=kyc_private_selfie_path)
+    document_image = models.FileField(
+        upload_to=kyc_private_document_path,
+        storage=get_private_storage,
+    )
+    selfie_image = models.FileField(
+        upload_to=kyc_private_selfie_path,
+        storage=get_private_storage,
+    )
 
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
