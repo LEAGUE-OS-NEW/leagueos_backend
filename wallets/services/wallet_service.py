@@ -2,17 +2,21 @@
 
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
-from uuid import UUID
+from uuid import UUID, uuid4, uuid5
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from wallets.services.withdrawal_risk_service import WithdrawalRiskService
+
 from wallets.models import (
+    AuditLog,
     DepositIntent,
     LedgerEntry,
     PaymentProvider,
     Wallet,
+    WalletTransaction,
     WithdrawalRequest,
 )
 
@@ -45,6 +49,7 @@ class WalletService:
         order=None,
         fill=None,
         transaction=None,
+        counterparty_account=None,
     ) -> LedgerEntry:
         """Credit funds to available balance."""
         return cls._execute(
@@ -58,6 +63,7 @@ class WalletService:
             order=order,
             fill=fill,
             wallet_transaction=transaction,
+            counterparty_account=counterparty_account,
         )
 
     @classmethod
@@ -72,6 +78,7 @@ class WalletService:
         order=None,
         fill=None,
         transaction=None,
+        counterparty_account=None,
     ) -> LedgerEntry:
         """Move funds from available to reserved balance."""
         return cls._execute(
@@ -84,6 +91,7 @@ class WalletService:
             order=order,
             fill=fill,
             wallet_transaction=transaction,
+            counterparty_account=counterparty_account,
         )
 
     @classmethod
@@ -98,6 +106,7 @@ class WalletService:
         order=None,
         fill=None,
         transaction=None,
+        counterparty_account=None,
     ) -> LedgerEntry:
         """Move funds from reserved to available balance."""
         return cls._execute(
@@ -110,6 +119,7 @@ class WalletService:
             order=order,
             fill=fill,
             wallet_transaction=transaction,
+            counterparty_account=counterparty_account,
         )
 
     @classmethod
@@ -124,6 +134,7 @@ class WalletService:
         order=None,
         fill=None,
         transaction=None,
+        counterparty_account=None,
     ) -> LedgerEntry:
         """Debit funds from available balance."""
         return cls._execute(
@@ -136,6 +147,7 @@ class WalletService:
             order=order,
             fill=fill,
             wallet_transaction=transaction,
+            counterparty_account=counterparty_account,
         )
 
     @classmethod
@@ -150,6 +162,7 @@ class WalletService:
         order=None,
         fill=None,
         transaction=None,
+        counterparty_account=None,
     ) -> LedgerEntry:
         """Debit funds from reserved balance."""
         return cls._execute(
@@ -162,6 +175,7 @@ class WalletService:
             order=order,
             fill=fill,
             wallet_transaction=transaction,
+            counterparty_account=counterparty_account,
         )
 
     @classmethod
@@ -179,15 +193,21 @@ class WalletService:
         order=None,
         fill=None,
         wallet_transaction=None,
+        counterparty_account=None,
     ) -> LedgerEntry:
         currency = cls._normalize_currency(currency)
         amount = cls._normalize_amount(amount)
         reference = cls._normalize_reference(idempotency_reference)
-        context = {
+        ledger_context = {
             "market": market,
             "order": order,
             "fill": fill,
             "transaction": wallet_transaction,
+        }
+
+        replay_context = {
+            **ledger_context,
+            "counterparty_account": counterparty_account,
         }
 
         existing = cls._get_existing_entry(reference)
@@ -198,7 +218,7 @@ class WalletService:
                 currency=currency,
                 amount=amount,
                 operation=operation,
-                **context,
+                **replay_context,
             )
             return existing
 
@@ -211,7 +231,7 @@ class WalletService:
                 currency=currency,
                 amount=amount,
                 operation=operation,
-                **context,
+                **replay_context,
             )
             return existing
 
@@ -231,7 +251,7 @@ class WalletService:
                 currency=currency,
                 amount=amount,
                 operation=operation,
-                **context,
+                **replay_context,
             )
             return existing
 
@@ -248,20 +268,28 @@ class WalletService:
         wallet.full_clean()
         wallet.save(update_fields=["available_balance", "reserved_balance", "updated_at"])
 
-        internal = entry_type in (LedgerEntry.EntryType.RESERVE, LedgerEntry.EntryType.RELEASE)
+        internal = entry_type in (
+            LedgerEntry.EntryType.RESERVE,
+            LedgerEntry.EntryType.RELEASE,
+        )
+
+        if internal:
+            credit_account = LedgerEntry.AccountType.USER_WALLET
+        elif counterparty_account is not None:
+            valid_accounts = {choice for choice, _label in LedgerEntry.AccountType.choices}
+            if counterparty_account not in valid_accounts:
+                raise ValidationError({"counterparty_account": "Unsupported ledger account."})
+            credit_account = counterparty_account
+        elif operation == cls.OPERATION_CREDIT:
+            credit_account = LedgerEntry.AccountType.PROVIDER_PAYABLE
+        else:
+            credit_account = LedgerEntry.AccountType.REVENUE
+
         entry = LedgerEntry(
             wallet=wallet,
             entry_type=entry_type,
             debit_account=LedgerEntry.AccountType.USER_WALLET,
-            credit_account=(
-                LedgerEntry.AccountType.USER_WALLET
-                if internal
-                else (
-                    LedgerEntry.AccountType.PROVIDER_PAYABLE
-                    if operation == cls.OPERATION_CREDIT
-                    else LedgerEntry.AccountType.REVENUE
-                )
-            ),
+            credit_account=credit_account,
             amount=amount,
             currency=currency,
             available_balance_before=available_before,
@@ -269,7 +297,7 @@ class WalletService:
             reserved_balance_before=reserved_before,
             reserved_balance_after=reserved_after,
             idempotency_reference=reference,
-            **context,
+            **ledger_context,
         )
         entry.full_clean(validate_unique=False, validate_constraints=False)
         try:
@@ -370,7 +398,23 @@ class WalletService:
         order=None,
         fill=None,
         transaction=None,
+        counterparty_account=None,
     ) -> None:
+        if operation in (
+            cls.OPERATION_RESERVE,
+            cls.OPERATION_RELEASE,
+        ):
+            expected_credit_account = LedgerEntry.AccountType.USER_WALLET
+        elif counterparty_account is not None:
+            valid_accounts = {value for value, _label in LedgerEntry.AccountType.choices}
+            if counterparty_account not in valid_accounts:
+                raise ValidationError({"counterparty_account": "Unsupported ledger account."})
+            expected_credit_account = counterparty_account
+        elif operation == cls.OPERATION_CREDIT:
+            expected_credit_account = LedgerEntry.AccountType.PROVIDER_PAYABLE
+        else:
+            expected_credit_account = LedgerEntry.AccountType.REVENUE
+
         matches = all(
             (
                 entry.wallet.user_id == user.pk,
@@ -380,7 +424,13 @@ class WalletService:
                 entry.market_id == getattr(market, "pk", None),
                 entry.order_id == getattr(order, "pk", None),
                 entry.fill_id == getattr(fill, "pk", None),
-                entry.transaction_id == getattr(transaction, "pk", None),
+                entry.transaction_id
+                == getattr(
+                    transaction,
+                    "pk",
+                    None,
+                ),
+                entry.credit_account == expected_credit_account,
             )
         )
         if not matches:
@@ -466,34 +516,69 @@ class WalletService:
     @classmethod
     @transaction.atomic
     def create_deposit_intent(
-        cls, *, user, provider_code: str, amount, currency: str
+        cls,
+        *,
+        user,
+        provider_code: str,
+        amount,
+        currency: str,
+        idempotency_key=None,
     ) -> DepositIntent:
-        """Create a deposit intent for the given user and provider."""
+        """Create an idempotent deposit intent."""
+
+        provider_code = str(provider_code or "").strip().upper()
+
         try:
-            provider = PaymentProvider.objects.get(code=provider_code.upper(), is_active=True)
+            provider = PaymentProvider.objects.get(
+                code=provider_code,
+                is_active=True,
+            )
         except PaymentProvider.DoesNotExist:
             raise ValidationError(
                 {"provider_code": "Invalid or inactive payment provider."}
             ) from None
 
-        decimal_amount = Decimal(str(amount))
-        if decimal_amount <= 0:
-            raise ValidationError({"amount": "Amount must be positive."})
+        decimal_amount = cls._normalize_amount(amount)
+        currency = cls._normalize_currency(currency)
 
-        currency = currency.strip().upper()
-        if len(currency) != 3 or not currency.isalpha():
-            raise ValidationError(
-                {"currency": "Currency must be exactly three alphabetic characters."}
+        normalized_key = None
+
+        if idempotency_key is not None:
+            normalized_key = cls._normalize_reference(idempotency_key)
+
+            existing = (
+                DepositIntent.objects.select_related("provider")
+                .filter(idempotency_key=normalized_key)
+                .first()
             )
 
-        intent = DepositIntent.objects.create(
-            user=user,
-            provider=provider,
-            amount=decimal_amount,
-            currency=currency,
-            expires_at=timezone.now() + timedelta(hours=2),
-        )
-        return intent
+            if existing is not None:
+                matches = all(
+                    (
+                        existing.user_id == user.pk,
+                        existing.provider_id == provider.id,
+                        existing.amount == decimal_amount,
+                        existing.currency == currency,
+                    )
+                )
+
+                if not matches:
+                    raise ValidationError({"idempotency_key": IDEMPOTENCY_ERROR})
+
+                return existing
+
+        create_kwargs = {
+            "user": user,
+            "provider": provider,
+            "amount": decimal_amount,
+            "currency": currency,
+            "expires_at": timezone.now() + timedelta(hours=2),
+        }
+
+        if normalized_key is not None:
+            create_kwargs["idempotency_key"] = normalized_key
+
+        return DepositIntent.objects.create(**create_kwargs)
 
     @classmethod
     @transaction.atomic
@@ -518,29 +603,189 @@ class WalletService:
     @classmethod
     @transaction.atomic
     def create_withdrawal_request(
-        cls, *, user, amount, currency: str, destination: dict
+        cls,
+        *,
+        user,
+        amount,
+        currency: str,
+        destination: dict,
+        idempotency_key=None,
     ) -> WithdrawalRequest:
-        """Create a withdrawal request for the given user."""
-        currency = currency.strip().upper()
-        try:
-            wallet = Wallet.objects.get(user=user, currency=currency)
-        except Wallet.DoesNotExist:
-            raise ValidationError(
-                {"currency": "No wallet exists for the specified currency."}
-            ) from None
+        """Create a withdrawal and reserve its funds atomically."""
 
-        decimal_amount = Decimal(str(amount))
-        if decimal_amount <= 0:
-            raise ValidationError({"amount": "Amount must be positive."})
+        if not getattr(user, "is_active", False):
+            raise ValidationError(
+                {"user": "An active account is required " "to request a withdrawal."}
+            )
+
+        if not getattr(user, "is_verified", False):
+            raise ValidationError(
+                {"user": "Identity verification is required " "before withdrawing funds."}
+            )
+
+        currency = cls._normalize_currency(currency)
+        decimal_amount = cls._normalize_amount(amount)
+
+        if not isinstance(destination, dict) or not destination:
+            raise ValidationError({"destination": "A withdrawal destination " "is required."})
+
+        try:
+            request_key = UUID(str(idempotency_key)) if idempotency_key is not None else uuid4()
+        except (
+            TypeError,
+            ValueError,
+            AttributeError,
+        ) as error:
+            raise ValidationError({"idempotency_key": "A valid UUID is required."}) from error
+
+        transaction_reference = f"WDR-{request_key.hex}"
+
+        wallet = (
+            Wallet.objects.select_for_update()
+            .filter(
+                user=user,
+                currency=currency,
+            )
+            .first()
+        )
+
+        if wallet is None:
+            raise ValidationError({"currency": "No wallet exists for " "the specified currency."})
+
+        if wallet.status != Wallet.Status.ACTIVE:
+            raise ValidationError({"wallet": "This wallet is not active."})
+
+        existing_transaction = (
+            WalletTransaction.objects.select_related(
+                "wallet",
+                "withdrawal_request",
+            )
+            .filter(reference=transaction_reference)
+            .first()
+        )
+
+        if existing_transaction is not None:
+            try:
+                existing = existing_transaction.withdrawal_request
+            except WithdrawalRequest.DoesNotExist:
+                raise ValidationError(
+                    {
+                        "idempotency_key": "This reference belongs "
+                        "to an incomplete financial "
+                        "operation."
+                    }
+                ) from None
+
+            matches = all(
+                (
+                    existing.wallet.user_id == user.pk,
+                    existing.wallet.currency == currency,
+                    existing.amount == decimal_amount,
+                    existing.destination == destination,
+                    existing_transaction.transaction_type
+                    == WalletTransaction.TransactionType.WITHDRAWAL,
+                )
+            )
+
+            if not matches:
+                raise ValidationError({"idempotency_key": IDEMPOTENCY_ERROR})
+
+            return existing
 
         if wallet.available_balance < decimal_amount:
             raise ValidationError({"amount": "Insufficient available balance."})
+
+        wallet_transaction = WalletTransaction.objects.create(
+            wallet=wallet,
+            reference=transaction_reference,
+            transaction_type=WalletTransaction.TransactionType.WITHDRAWAL,
+            amount=decimal_amount,
+            currency=currency,
+            status=WalletTransaction.Status.PENDING,
+            description=("Wallet withdrawal request"),
+        )
 
         withdrawal = WithdrawalRequest.objects.create(
             wallet=wallet,
             amount=decimal_amount,
             destination=destination,
+            transaction=wallet_transaction,
+            status=WithdrawalRequest.Status.PENDING_APPROVAL,
         )
+
+        reserve_reference = uuid5(
+            request_key,
+            "withdrawal-reserve",
+        )
+
+        cls.reserve(
+            user=user,
+            currency=currency,
+            amount=decimal_amount,
+            idempotency_reference=reserve_reference,
+            transaction=wallet_transaction,
+        )
+
+        decision = WithdrawalRiskService.evaluate(withdrawal)
+
+        withdrawal.risk_status = decision.risk_status
+        withdrawal.risk_reasons = list(decision.reasons)
+        withdrawal.approval_policy_version = decision.policy_version
+
+        update_fields = [
+            "risk_status",
+            "risk_reasons",
+            "approval_policy_version",
+            "updated_at",
+        ]
+
+        if decision.auto_approve:
+            withdrawal.status = WithdrawalRequest.Status.APPROVED
+            withdrawal.approval_mode = WithdrawalRequest.ApprovalMode.AUTOMATIC
+            withdrawal.approved_at = timezone.now()
+
+            update_fields.extend(
+                [
+                    "status",
+                    "approval_mode",
+                    "approved_at",
+                ]
+            )
+
+        withdrawal.save(update_fields=update_fields)
+
+        AuditLog.objects.create(
+            user=user,
+            action="WITHDRAWAL_REQUESTED",
+            related_object_id=withdrawal.id,
+            metadata={
+                "amount": str(decimal_amount),
+                "currency": currency,
+                "status": withdrawal.status,
+                "transaction_id": str(wallet_transaction.id),
+                "risk_status": withdrawal.risk_status,
+                "risk_reasons": withdrawal.risk_reasons,
+                "approval_mode": withdrawal.approval_mode,
+                "approval_policy_version": withdrawal.approval_policy_version,
+            },
+        )
+
+        if decision.auto_approve:
+            AuditLog.objects.create(
+                user=None,
+                action="WITHDRAWAL_APPROVED",
+                related_object_id=withdrawal.id,
+                metadata={
+                    "approval_mode": WithdrawalRequest.ApprovalMode.AUTOMATIC,
+                    "policy_version": decision.policy_version,
+                    "risk_status": decision.risk_status,
+                    "risk_reasons": list(decision.reasons),
+                    "amount": str(decimal_amount),
+                    "currency": currency,
+                    "transaction_id": str(wallet_transaction.id),
+                },
+            )
+
         return withdrawal
 
     @classmethod
@@ -548,7 +793,14 @@ class WalletService:
     def get_withdrawal_request(cls, *, user, request_id) -> WithdrawalRequest:
         """Get a withdrawal request scoped to the user."""
         try:
-            return WithdrawalRequest.objects.get(id=request_id, wallet__user=user)
+            return WithdrawalRequest.objects.select_related(
+                "wallet",
+                "transaction",
+                "approved_by",
+            ).get(
+                id=request_id,
+                wallet__user=user,
+            )
         except WithdrawalRequest.DoesNotExist:
             from django.http import Http404
 

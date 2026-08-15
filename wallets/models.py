@@ -332,6 +332,77 @@ class DepositIntent(TimeStampedUUIDModel):
         return f"Deposit intent for {self.amount} {self.currency} by {self.user}"
 
 
+class PesapalDeposit(TimeStampedUUIDModel):
+    """Pesapal API 3.0 state associated with one wallet deposit intent."""
+
+    class Environment(models.TextChoices):
+        SANDBOX = "SANDBOX", _("Sandbox")
+        LIVE = "LIVE", _("Live")
+
+    intent = models.OneToOneField(
+        DepositIntent,
+        on_delete=models.PROTECT,
+        related_name="pesapal",
+    )
+    environment = models.CharField(
+        max_length=10,
+        choices=Environment.choices,
+        default=Environment.SANDBOX,
+        db_index=True,
+    )
+    merchant_reference = models.CharField(
+        max_length=50,
+        unique=True,
+        db_index=True,
+    )
+    order_tracking_id = models.CharField(
+        max_length=255,
+        blank=True,
+        db_index=True,
+    )
+    redirect_url = models.URLField(
+        max_length=2048,
+        blank=True,
+    )
+    provider_status = models.CharField(
+        max_length=30,
+        blank=True,
+        db_index=True,
+    )
+    confirmation_code = models.CharField(
+        max_length=255,
+        blank=True,
+    )
+    payment_method = models.CharField(
+        max_length=100,
+        blank=True,
+    )
+    payment_account = models.CharField(
+        max_length=255,
+        blank=True,
+    )
+    status_description = models.TextField(
+        blank=True,
+    )
+    last_checked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["order_tracking_id"],
+                condition=~models.Q(order_tracking_id=""),
+                name="unique_pesapal_order_tracking_id",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Pesapal {self.environment} " f"{self.merchant_reference}"
+
+
 class WithdrawalRequest(TimeStampedUUIDModel):
     """A user's request to withdraw funds."""
 
@@ -348,6 +419,11 @@ class WithdrawalRequest(TimeStampedUUIDModel):
         PASSED = "PASSED", _("Passed")
         FLAGGED = "FLAGGED", _("Flagged for Review")
         FAILED = "FAILED", _("Failed")
+
+    class ApprovalMode(models.TextChoices):
+        PENDING = "PENDING", _("Pending")
+        AUTOMATIC = "AUTOMATIC", _("Automatic")
+        MANUAL = "MANUAL", _("Manual")
 
     wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name="withdrawal_requests")
     amount = models.DecimalField(max_digits=16, decimal_places=4)
@@ -379,6 +455,20 @@ class WithdrawalRequest(TimeStampedUUIDModel):
     )
     approved_at = models.DateTimeField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True)
+    approval_mode = models.CharField(
+        max_length=20,
+        choices=ApprovalMode.choices,
+        default=ApprovalMode.PENDING,
+        db_index=True,
+    )
+    risk_reasons = models.JSONField(
+        default=list,
+        blank=True,
+    )
+    approval_policy_version = models.CharField(
+        max_length=50,
+        blank=True,
+    )
 
     class Meta:
         ordering = ["-created_at"]

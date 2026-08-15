@@ -542,3 +542,43 @@ except Exception:
             "LOCATION": "unique-snowflake",
         }
     }
+
+
+# Wallet withdrawal automatic-approval policy.
+#
+# These are configurable business/risk controls, not regulatory limits.
+WALLET_WITHDRAWAL_AUTO_APPROVAL_ENABLED = env.bool(
+    "WALLET_WITHDRAWAL_AUTO_APPROVAL_ENABLED",
+    default=True,
+)
+
+WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_SINGLE_UGX = Decimal(
+    env(
+        "WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_SINGLE_UGX",
+        default="250000",
+    )
+)
+
+WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_24H_UGX = Decimal(
+    env(
+        "WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_24H_UGX",
+        default="500000",
+    )
+)
+
+WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_24H_COUNT = env.int(
+    "WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_24H_COUNT",
+    default=3,
+)
+
+WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_7D_UGX = Decimal(
+    env(
+        "WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_7D_UGX",
+        default="1500000",
+    )
+)
+
+WALLET_WITHDRAWAL_AUTO_APPROVAL_REQUIRE_KNOWN_DESTINATION = env.bool(
+    "WALLET_WITHDRAWAL_AUTO_APPROVAL_REQUIRE_KNOWN_DESTINATION",
+    default=True,
+)
