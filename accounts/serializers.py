@@ -162,6 +162,32 @@ class VerifyOTPSerializer(serializers.Serializer):
     )
 
 
+class AccountSetupCompleteSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField(required=True, allow_blank=False)
+    last_name = serializers.CharField(required=True, allow_blank=False)
+
+    def validate(self, data):
+        if data["password"] != data["confirm_password"]:
+            raise serializers.ValidationError(
+                build_response(
+                    success=False,
+                    message="Invalid input",
+                    errors={"confirm_password": ["Passwords do not match."]},
+                )
+            )
+        return data
+
+    def validate_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+        return value
+
+
 class ResendOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
 

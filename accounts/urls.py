@@ -1,6 +1,7 @@
 from django.urls import path
 
 from accounts.views import (
+    AccountSetupCompleteView,
     RegisterView,
     RegistrationStatusView,
     ResendOTPView,
@@ -15,4 +16,5 @@ urlpatterns = [
     path("auth/resend-otp/", ResendOTPView.as_view(), name="resend-otp"),
     path("auth/resend-verification/", ResendOTPView.as_view(), name="resend-verification"),
     path("auth/registration-status/", RegistrationStatusView.as_view(), name="registration-status"),
+    path("auth/account-setup/", AccountSetupCompleteView.as_view(), name="account-setup"),
 ]

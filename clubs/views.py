@@ -24,8 +24,10 @@ from clubs.models import (
     TicketProduct,
 )
 from clubs.permissions import IsClubAdmin, IsClubStaff
+from clubs.services.club_admin_invitation_service import ClubAdminInvitationService
 from clubs.services.staff_service import StaffService
 from clubs.serializers.club_serializers import (
+    ClubAdminInviteSerializer,
     ClubAuditLogSerializer,
     ClubMediaSerializer,
     ClubNewsSerializer,
@@ -335,6 +337,37 @@ class StaffInvitationViewSet(viewsets.ModelViewSet):
             permissions=serializer.validated_data.get("permissions"),
         )
         serializer.instance = invitation
+
+
+class ClubAdminInviteView(APIView):
+    """Invites the first (or another) Club Admin for a club end to end —
+    creates the StaffInvitation and, for a brand-new email, also a pending
+    account + setup-link email (see ClubAdminInvitationService). Separate
+    from StaffInvitationViewSet.create, which only records a generic staff
+    invitation and assumes the invitee can already log in to accept it."""
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        request=ClubAdminInviteSerializer,
+        responses={201: StaffInvitationSerializer},
+        tags=["Clubs"],
+    )
+    def post(self, request, club_pk=None):
+        club = Club.objects.get(id=club_pk)
+        serializer = ClubAdminInviteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        invitation = ClubAdminInvitationService.invite(
+            club=club,
+            login_email=serializer.validated_data["login_email"],
+            notify_email=serializer.validated_data["notify_email"],
+            invited_by=request.user,
+        )
+        return Response(
+            StaffInvitationSerializer(invitation).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class StaffInvitationAcceptView(APIView):

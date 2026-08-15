@@ -18,8 +18,15 @@ class StaffService:
     """Service for staff management."""
 
     @staticmethod
-    def invite_staff(club, email, role, invited_by, permissions=None):
-        """Invite staff to club."""
+    def invite_staff(club, email, role, invited_by, permissions=None, send_email=True):
+        """Invite staff to club.
+
+        send_email=False lets a caller compose its own invitation email
+        (e.g. ClubAdminInvitationService, which bridges this with the
+        account-setup flow for brand-new invitees) instead of the
+        StaffInvitation accept-link email below, which assumes the invitee
+        already has an authenticated account.
+        """
         invitation = StaffInvitation.objects.create(
             club=club,
             email=email,
@@ -39,12 +46,13 @@ class StaffService:
             metadata={"email": email, "role": role},
         )
 
-        from accounts.services.email_service import EmailService
+        if send_email:
+            from accounts.services.email_service import EmailService
 
-        try:
-            EmailService.send_staff_invitation_email(invitation)
-        except Exception:
-            logger.exception("Failed to send staff invitation email to %s", email)
+            try:
+                EmailService.send_staff_invitation_email(invitation)
+            except Exception:
+                logger.exception("Failed to send staff invitation email to %s", email)
 
         return invitation
 

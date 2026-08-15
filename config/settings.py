@@ -417,6 +417,11 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@leagueos.com")
 
+# Frontend page that consumes an AccountSetupToken (?token=...) to let an
+# invited admin/club admin set their password. Referenced by
+# EmailService.send_account_setup_email / send_club_admin_setup_email.
+ACCOUNT_SETUP_URL = env("ACCOUNT_SETUP_URL", default="http://localhost:5173/accept-invite")
+
 
 # Registration and OTP Settings
 REGISTRATION_OTP_CHANNEL = env("REGISTRATION_OTP_CHANNEL", default="EMAIL").upper()
