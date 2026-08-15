@@ -119,9 +119,7 @@ def test_ocr_service_stores_extracted_date_of_birth_as_date():
 
     from unittest.mock import patch
 
-    with patch(
-        "kyc.services.ocr_service.get_document_validator"
-    ) as mock_validator:
+    with patch("kyc.services.ocr_service.get_document_validator") as mock_validator:
         validator_instance = mock_validator.return_value
         validator_instance.validate_structure.return_value = {}
         validator_instance.parse_fields.return_value = fake_extracted

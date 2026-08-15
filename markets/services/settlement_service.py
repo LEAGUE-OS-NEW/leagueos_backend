@@ -3,6 +3,7 @@ from uuid import UUID, uuid5
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from authentication.services.permission_service import PermissionService
@@ -208,6 +209,10 @@ class MarketSettlementService:
             errors["winning_outcome"] = "A confirmed winning outcome is required."
         elif market.winning_outcome.market_id != market.id:
             errors["winning_outcome"] = "The winning outcome must belong to the market."
+        if market.settles_by is not None and timezone.now() < market.settles_by:
+            errors["settles_by"] = (
+                "Settlement cannot execute before the configured settlement time."
+            )
         if errors:
             raise ValidationError(errors)
 

@@ -1,7 +1,8 @@
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.generics import (
+    GenericAPIView,
     ListCreateAPIView,
     RetrieveUpdateAPIView,
 )
@@ -14,10 +15,12 @@ from markets.admin_serializers import (
     MarketAdminListQuerySerializer,
     MarketAdminReadSerializer,
     MarketAdminWriteSerializer,
+    MarketOpeningPricingSerializer,
 )
-from markets.models import Market
+from markets.models import Market, MarketFill, MarketOrder
 from markets.permissions import (
     HasMarketAdminAccess,
+    HasManageMarketPermission,
 )
 from system.pagination import (
     PublicCatalogPagination,
@@ -45,6 +48,18 @@ class MarketAdminQuerysetMixin:
             "winning_outcome",
         ).prefetch_related(
             "outcomes",
+            Prefetch(
+                "orders",
+                queryset=MarketOrder.objects.select_related("outcome"),
+                to_attr="snapshot_orders",
+            ),
+            Prefetch(
+                "fills",
+                queryset=MarketFill.objects.select_related(
+                    "outcome", "buy_order", "sell_order"
+                ).order_by("-created_at", "-id"),
+                to_attr="snapshot_fills",
+            ),
             "status_transitions__actor",
             ("sporting_event__" "event_participants__" "participant"),
             ("sporting_event__" "event_participants__" "participant__sport"),
@@ -256,3 +271,26 @@ class MarketAdminDetailView(
         )
 
         return Response(response_serializer.data)
+
+
+class MarketOpeningPricingView(MarketAdminQuerysetMixin, GenericAPIView):
+    permission_classes = [IsAuthenticated, HasManageMarketPermission]
+    serializer_class = MarketOpeningPricingSerializer
+    lookup_url_kwarg = "market_id"
+
+    @extend_schema(
+        request=MarketOpeningPricingSerializer,
+        responses=MarketAdminReadSerializer,
+        tags=["Market Administration"],
+    )
+    def patch(self, request, market_id):
+        market = self.get_admin_queryset().get(pk=market_id)
+        serializer = self.get_serializer(
+            data=request.data, context={**self.get_serializer_context(), "market": market}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        refreshed = self.get_admin_queryset().get(pk=market_id)
+        return Response(
+            MarketAdminReadSerializer(refreshed, context=self.get_serializer_context()).data
+        )

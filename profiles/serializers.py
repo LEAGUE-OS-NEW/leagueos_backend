@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any
+from uuid import UUID
 
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from profiles.models import Club, Country, Gender, Language, Profile, Timezone
@@ -193,11 +195,13 @@ class ProfileSerializer(serializers.ModelSerializer):
     def get_avatar_url(self, obj: Profile) -> str | None:
         return obj.get_avatar_url()
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_favourite_sports(self, obj: Profile):
         from onboarding.services.preference_service import PreferenceService
 
         return PreferenceService.get_user_sports(obj.user)
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_favourite_competitions(self, obj: Profile):
         from onboarding.services.preference_service import PreferenceService
 
@@ -299,7 +303,9 @@ class ProfileUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Duplicate competition selections are not allowed.")
         competitions = Competition.objects.filter(pk__in=value, is_active=True)
         if competitions.count() != len(value):
-            raise serializers.ValidationError("One or more competitions do not exist or are inactive.")
+            raise serializers.ValidationError(
+                "One or more competitions do not exist or are inactive."
+            )
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:

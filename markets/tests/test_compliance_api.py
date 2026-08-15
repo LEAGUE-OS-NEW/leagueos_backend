@@ -14,7 +14,10 @@ from authentication.tests.factories import (
     UserFactory,
     UserRoleFactory,
 )
-from markets.models import MarketComplianceReview, MarketParticipantCompliance
+from markets.models import (
+    MarketComplianceReview,
+    MarketParticipantCompliance,
+)
 from markets.services.compliance_service import MarketComplianceService
 from markets.tests.eligibility_test_support import make_market_eligible
 from wallets.models import Wallet

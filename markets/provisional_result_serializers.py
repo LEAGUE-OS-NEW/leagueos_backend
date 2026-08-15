@@ -85,7 +85,7 @@ class MarketProvisionalResultReadSerializer(serializers.ModelSerializer):
         self,
         obj: MarketProvisionalResult,
     ) -> str:
-        if timezone.now() < obj.dispute_deadline:
+        if timezone.now() < obj.dispute_deadline and not hasattr(obj, "development_acceleration"):
             return "OPEN"
 
         return "CLOSED"
@@ -94,4 +94,6 @@ class MarketProvisionalResultReadSerializer(serializers.ModelSerializer):
         self,
         obj: MarketProvisionalResult,
     ) -> bool:
-        return timezone.now() < obj.dispute_deadline
+        return timezone.now() < obj.dispute_deadline and not hasattr(
+            obj, "development_acceleration"
+        )

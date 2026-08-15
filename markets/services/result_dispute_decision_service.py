@@ -72,7 +72,9 @@ class MarketResultDisputeDecisionService:
 
         decided_at = timezone.now()
 
-        if decided_at < provisional_result.dispute_deadline:
+        if decided_at < provisional_result.dispute_deadline and not hasattr(
+            provisional_result, "development_acceleration"
+        ):
             raise ValidationError(
                 {
                     "dispute_window": (
@@ -143,6 +145,7 @@ class MarketResultDisputeDecisionService:
                 actor=actor,
                 notes=clean_notes,
                 evidence=clean_evidence,
+                _trusted_dispute_decision=True,
             )
         else:
             MarketResolutionService.resolve(

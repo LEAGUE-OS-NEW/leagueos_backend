@@ -29,7 +29,9 @@ class MarketRiskService:
             responsible = None
         score, reasons = 0, []
         kyc_verification = getattr(participant, "kyc_verification", None)
-        kyc_status = kyc_verification.status if kyc_verification else KYCVerification.Status.NOT_STARTED
+        kyc_status = (
+            kyc_verification.status if kyc_verification else KYCVerification.Status.NOT_STARTED
+        )
         if kyc_status == KYCVerification.Status.REJECTED:
             score += 35
             reasons.append("KYC_REJECTED")

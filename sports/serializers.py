@@ -148,6 +148,8 @@ class ParticipantListQuerySerializer(serializers.Serializer):
 
 
 class SportingEventListQuerySerializer(serializers.Serializer):
+    starts_after = serializers.DateTimeField(required=False)
+    starts_before = serializers.DateTimeField(required=False)
     sport = serializers.UUIDField(
         required=False,
     )

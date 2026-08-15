@@ -59,7 +59,9 @@ def _mark_kyc_failed(attempt_id_str: str) -> None:
     """Mark an attempt and its parent verification as FAILED after unrecoverable errors."""
     try:
         attempt_id = UUID(attempt_id_str) if isinstance(attempt_id_str, str) else attempt_id_str
-        attempt = KYCVerificationAttempt.objects.select_related("kyc_verification").get(id=attempt_id)
+        attempt = KYCVerificationAttempt.objects.select_related("kyc_verification").get(
+            id=attempt_id
+        )
         verification = attempt.kyc_verification
 
         now = timezone.now()
@@ -81,9 +83,20 @@ def _mark_kyc_failed(attempt_id_str: str) -> None:
             verification.status = KYCVerification.Status.REJECTED
             verification.rejection_reason = "Automated processing failed. Please contact support."
             verification.verification_completed_at = now
-            verification.save(update_fields=["status", "rejection_reason", "verification_completed_at", "updated_at"])
+            verification.save(
+                update_fields=[
+                    "status",
+                    "rejection_reason",
+                    "verification_completed_at",
+                    "updated_at",
+                ]
+            )
 
-        logger.error("Marked KYC attempt %s and verification %s as FAILED after unrecoverable error.", attempt_id, verification.id)
+        logger.error(
+            "Marked KYC attempt %s and verification %s as FAILED after unrecoverable error.",
+            attempt_id,
+            verification.id,
+        )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to mark KYC attempt %s as failed: %s", attempt_id_str, exc)
 

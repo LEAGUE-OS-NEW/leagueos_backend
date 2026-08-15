@@ -1,4 +1,4 @@
-from django.db.models import BooleanField, Exists, OuterRef, Q, Value
+from django.db.models import BooleanField, Exists, OuterRef, Prefetch, Q, Value
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import (
     ListAPIView,
@@ -9,6 +9,8 @@ from rest_framework.permissions import AllowAny
 from markets.models import (
     Market,
     MarketCategory,
+    MarketFill,
+    MarketOrder,
     MarketWatchlistEntry,
 )
 from markets.serializers import (
@@ -40,6 +42,18 @@ def public_market_queryset(user=None):
         )
         .prefetch_related(
             "outcomes",
+            Prefetch(
+                "orders",
+                queryset=MarketOrder.objects.select_related("outcome"),
+                to_attr="snapshot_orders",
+            ),
+            Prefetch(
+                "fills",
+                queryset=MarketFill.objects.select_related(
+                    "outcome", "buy_order", "sell_order"
+                ).order_by("-created_at", "-id"),
+                to_attr="snapshot_fills",
+            ),
             "sporting_event__event_participants__participant",
             "sporting_event__event_participants__participant__sport",
         )

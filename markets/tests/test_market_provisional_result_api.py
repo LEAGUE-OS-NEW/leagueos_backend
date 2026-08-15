@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -18,6 +19,7 @@ from markets.models import (
     MarketCategory,
     MarketOutcome,
     MarketProvisionalEvidence,
+    MarketResultDevelopmentAcceleration,
     MarketScope,
 )
 from markets.services.catalog_service import MarketCatalogService
@@ -192,6 +194,79 @@ class MarketProvisionalResultAPITests(APITestCase):
         values.update(overrides)
 
         return MarketProvisionalResultService.publish(**values)
+
+    def accelerator_url(self, market):
+        return reverse(
+            "markets:admin-result-verification-dev-end-window",
+            kwargs={"market_id": market.id},
+        )
+
+    @override_settings(DEBUG=False, DEV_RESULT_ACCELERATOR_ENABLED=True)
+    def test_development_accelerator_is_unavailable_outside_debug(self):
+        market = self.close_market(self.create_market())
+        self.publish_directly(market)
+        self.approver_user.email = "results.local@leagueos.test"
+        self.approver_user.save(update_fields=["email"])
+        self.client.force_authenticate(self.approver_user)
+        self.assertEqual(self.client.post(self.accelerator_url(market)).status_code, 404)
+
+    @override_settings(DEBUG=True, DEV_RESULT_ACCELERATOR_ENABLED=False)
+    def test_development_accelerator_is_unavailable_when_disabled(self):
+        market = self.close_market(self.create_market())
+        self.publish_directly(market)
+        self.approver_user.email = "results.local@leagueos.test"
+        self.approver_user.save(update_fields=["email"])
+        self.client.force_authenticate(self.approver_user)
+        self.assertEqual(self.client.post(self.accelerator_url(market)).status_code, 404)
+
+    @override_settings(DEBUG=True, DEV_RESULT_ACCELERATOR_ENABLED=True)
+    def test_development_accelerator_requires_permission(self):
+        market = self.close_market(self.create_market())
+        self.publish_directly(market)
+        self.participant_user.email = "fan.local@leagueos.test"
+        self.participant_user.save(update_fields=["email"])
+        self.client.force_authenticate(self.participant_user)
+        self.assertEqual(self.client.post(self.accelerator_url(market)).status_code, 403)
+
+    @override_settings(DEBUG=False, REVIEW_WORKFLOW_TOOLS_ENABLED=True)
+    def test_review_accelerator_rejects_ordinary_actor_even_with_permission(self):
+        self.operations_user.email = "creator@leagueos.test"
+        self.operations_user.save(update_fields=["email"])
+        market = self.close_market(self.create_market())
+        self.publish_directly(market)
+        self.client.force_authenticate(self.approver_user)
+        self.assertEqual(self.client.post(self.accelerator_url(market)).status_code, 404)
+
+    @override_settings(DEBUG=False, REVIEW_WORKFLOW_TOOLS_ENABLED=True)
+    def test_review_accelerator_rejects_ordinary_market_creator(self):
+        self.approver_user.email = "reviewer@leagueos.test"
+        self.approver_user.save(update_fields=["email"])
+        market = self.close_market(self.create_market())
+        self.publish_directly(market)
+        self.client.force_authenticate(self.approver_user)
+        self.assertEqual(self.client.post(self.accelerator_url(market)).status_code, 404)
+
+    @override_settings(DEBUG=True, DEV_RESULT_ACCELERATOR_ENABLED=True)
+    def test_development_accelerator_only_marks_synthetic_window_closed(self):
+        self.operations_user.email = "market.ops.local@leagueos.test"
+        self.operations_user.save(update_fields=["email"])
+        self.approver_user.email = "results.local@leagueos.test"
+        self.approver_user.save(update_fields=["email"])
+        market = self.close_market(self.create_market())
+        provisional = self.publish_directly(market)
+        original_deadline = provisional.dispute_deadline
+        self.client.force_authenticate(self.approver_user)
+
+        response = self.client.post(self.accelerator_url(market))
+
+        self.assertEqual(response.status_code, 200)
+        market.refresh_from_db()
+        provisional.refresh_from_db()
+        self.assertEqual(market.status, Market.Status.CLOSED)
+        self.assertFalse(hasattr(market, "settlement"))
+        self.assertEqual(provisional.dispute_deadline, original_deadline)
+        marker = MarketResultDevelopmentAcceleration.objects.get(provisional_result=provisional)
+        self.assertEqual(marker.accelerated_by, self.approver_user)
 
     def test_publish_requires_authentication_and_permission(self):
         market = self.close_market(self.create_market())
