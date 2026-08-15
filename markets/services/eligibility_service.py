@@ -97,7 +97,7 @@ class MarketEligibilityService:
             kyc_eligible = kyc == KYCVerification.Status.VERIFIED
         else:
             kyc = KYCVerification.Status.NOT_STARTED
-            kyc_eligible = getattr(participant, "is_verified", False)
+            kyc_eligible = False
         restriction = (
             compliance.restriction_status
             if compliance

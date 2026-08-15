@@ -208,6 +208,9 @@ class FanKYCDevelopmentBypassView(APIView):
             verification.rejection_reason = ""
             verification.retry_reason = ""
             verification.save()
+            user = request.user
+            user.is_verified = True
+            user.save(update_fields=["is_verified", "updated_at"])
             log_kyc_audit(
                 user=request.user,
                 action="KYC_VERIFIED",
