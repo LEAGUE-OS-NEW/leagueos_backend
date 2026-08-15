@@ -139,9 +139,6 @@ class MarketComplianceAPITests(APITestCase):
 
     def test_review_records_are_immutable_and_routes_are_read_only(self):
         make_market_eligible(self.participant)
-        detail = reverse(
-            "markets:admin-participant-compliance-detail", kwargs={"user_id": self.participant.id}
-        )
         reviews = reverse(
             "markets:admin-participant-compliance-reviews", kwargs={"user_id": self.participant.id}
         )
