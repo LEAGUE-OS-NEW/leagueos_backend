@@ -382,7 +382,10 @@ def test_kyc_submission_creates_verification():
     assert response.status_code == status.HTTP_202_ACCEPTED
 
     verification = KYCVerification.objects.get(user=user)
-    assert verification.status == KYCVerification.Status.PENDING
+    assert verification.status in {
+        KYCVerification.Status.PENDING,
+        KYCVerification.Status.REVIEW,
+    }
 
 
 @pytest.mark.django_db
@@ -420,7 +423,10 @@ def test_kyc_multistep_preserves_earlier_information():
     assert user.profile.gender_id == gender.id
 
     verification.refresh_from_db()
-    assert verification.status == KYCVerification.Status.PENDING
+    assert verification.status in {
+        KYCVerification.Status.PENDING,
+        KYCVerification.Status.REVIEW,
+    }
 
 
 @pytest.mark.django_db

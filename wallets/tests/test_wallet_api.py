@@ -73,7 +73,8 @@ class TestDepositAPI:
 
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["status"] == "PENDING"
-        assert "payment_url" in response.data  # Assuming mock provider returns this
+        assert response.data["provider_code"] == "MOCK"
+        assert "payment_url" not in response.data
 
     def test_create_deposit_intent_invalid_provider(self, auth_client):
         url = reverse("wallets:deposit-intent-create")

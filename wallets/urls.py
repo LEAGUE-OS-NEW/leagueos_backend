@@ -6,6 +6,8 @@ from wallets.views import (
     DepositCallbackView,
     DepositIntentDetailView,
     DepositIntentView,
+    PesapalCallbackView,
+    PesapalIpnView,
     ReceiptDownloadView,
     TransactionDetailView,
     TransactionListView,
@@ -22,6 +24,16 @@ urlpatterns = [
     path("", WalletListView.as_view(), name="wallet-list"),
     # Deposits
     path("deposits/", DepositIntentView.as_view(), name="deposit-intent-create"),
+    path(
+        "deposits/pesapal/callback/",
+        PesapalCallbackView.as_view(),
+        name="pesapal-callback",
+    ),
+    path(
+        "deposits/pesapal/ipn/",
+        PesapalIpnView.as_view(),
+        name="pesapal-ipn",
+    ),
     path(
         "deposits/callback/<str:provider_code>/",
         DepositCallbackView.as_view(),

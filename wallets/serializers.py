@@ -67,8 +67,13 @@ class LedgerEntryFilterSerializer(serializers.Serializer):
 
 class DepositIntentSerializer(serializers.Serializer):
     provider_code = serializers.CharField()
-    amount = serializers.DecimalField(max_digits=16, decimal_places=4, min_value=Decimal("0.01"))
+    amount = serializers.DecimalField(
+        max_digits=16,
+        decimal_places=4,
+        min_value=Decimal("0.01"),
+    )
     currency = serializers.CharField(max_length=3)
+    idempotency_key = serializers.UUIDField(required=False)
 
 
 class DepositIntentReadSerializer(serializers.Serializer):
@@ -79,13 +84,89 @@ class DepositIntentReadSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
     expires_at = serializers.DateTimeField()
     payment_url = serializers.CharField(required=False)
+    provider_code = serializers.CharField(required=False)
+    order_tracking_id = serializers.CharField(required=False)
+    provider_status = serializers.CharField(required=False)
 
 
 class WithdrawalRequestSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(max_digits=16, decimal_places=4, min_value=Decimal("0.01"))
+    amount = serializers.DecimalField(
+        max_digits=16,
+        decimal_places=4,
+        min_value=Decimal("0.01"),
+    )
     currency = serializers.CharField(max_length=3)
     destination = serializers.JSONField()
+    idempotency_key = serializers.UUIDField(required=False)
+
+
+class WithdrawalRequestReadSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    amount = serializers.DecimalField(
+        max_digits=16,
+        decimal_places=4,
+    )
+    currency = serializers.SerializerMethodField()
+    destination = serializers.JSONField()
+    status = serializers.CharField()
+    risk_status = serializers.CharField()
+    risk_reasons = serializers.JSONField()
+    approval_mode = serializers.CharField()
+    approval_policy_version = serializers.CharField()
+    approved_at = serializers.DateTimeField(allow_null=True)
+    rejection_reason = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+    transaction_id = serializers.UUIDField(allow_null=True)
+
+    @extend_schema_field(serializers.CharField())
+    def get_currency(self, withdrawal):
+        if isinstance(withdrawal, dict):
+            return withdrawal.get("currency")
+        return withdrawal.wallet.currency
+
+
+class WalletTransactionReadSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    reference = serializers.CharField()
+    transaction_type = serializers.CharField()
+    amount = serializers.DecimalField(
+        max_digits=16,
+        decimal_places=4,
+    )
+    currency = serializers.CharField()
+    status = serializers.CharField()
+    provider_code = serializers.SerializerMethodField()
+    provider_reference = serializers.CharField()
+    description = serializers.CharField()
+    completed_at = serializers.DateTimeField(allow_null=True)
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_provider_code(self, transaction):
+        if transaction.provider_id is None:
+            return None
+        return transaction.provider.code
 
 
 class DepositCallbackSerializer(serializers.Serializer):
     """Provider callback payload - intentionally permissive."""
+
+
+class PesapalNotificationSerializer(serializers.Serializer):
+    OrderTrackingId = serializers.CharField()
+    OrderMerchantReference = serializers.CharField()
+    OrderNotificationType = serializers.CharField(required=False)
+
+
+class PesapalIpnAcknowledgementSerializer(serializers.Serializer):
+    orderNotificationType = serializers.CharField()
+    orderTrackingId = serializers.CharField()
+    orderMerchantReference = serializers.CharField()
+    status = serializers.IntegerField()
+
+
+class PesapalCallbackResultSerializer(serializers.Serializer):
+    deposit = serializers.CharField(allow_blank=True)
+    status = serializers.CharField()

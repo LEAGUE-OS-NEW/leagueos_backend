@@ -49,7 +49,9 @@ class WalletReadService:
     @classmethod
     def list_transactions(cls, *, user, **filters):
         """List wallet transactions scoped to the user."""
-        queryset = WalletTransaction.objects.filter(wallet__user=user)
+        queryset = WalletTransaction.objects.filter(wallet__user=user).select_related(
+            "provider", "wallet"
+        )
         currency = filters.get("currency")
         if currency:
             normalized = cls.normalize_currency(currency)
@@ -60,7 +62,10 @@ class WalletReadService:
     def get_transaction(cls, *, user, transaction_id):
         """Get a transaction scoped to the user."""
         try:
-            return WalletTransaction.objects.get(id=transaction_id, wallet__user=user)
+            return WalletTransaction.objects.select_related("provider", "wallet").get(
+                id=transaction_id,
+                wallet__user=user,
+            )
         except WalletTransaction.DoesNotExist:
             from django.http import Http404
 

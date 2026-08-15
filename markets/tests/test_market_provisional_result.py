@@ -442,20 +442,16 @@ class MarketProvisionalResultTests(TestCase):
                 pk=evidence.pk,
             ).delete()
 
-    def test_open_dispute_window_blocks_normal_settlement_without_mutation(
+    def test_open_dispute_window_blocks_direct_resolution_without_mutation(
         self,
     ):
         market = self.close_market(self.create_market())
         self.publish(market)
-        self.resolve(market)
 
         before = self.financial_snapshot()
 
         with self.assertRaises(ValidationError) as error:
-            MarketSettlementService.settle_market(
-                market_id=market.id,
-                actor=self.approver_user,
-            )
+            self.resolve(market)
 
         self.assertIn(
             "dispute_window",

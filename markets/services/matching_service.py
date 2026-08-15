@@ -43,6 +43,23 @@ class MarketMatchingService:
                 ),
                 Decimal("0.0000"),
             )
+            if taker.side == MarketOrder.Side.BUY:
+                opposite = "NO" if taker.outcome.side == "YES" else "YES"
+                available += sum(
+                    MarketOrder.objects.filter(
+                        market=taker.market,
+                        outcome__side=opposite,
+                        side=MarketOrder.Side.BUY,
+                        status__in=cls.FILLABLE_STATUSES,
+                        limit_price__gte=Decimal("1.00000") - taker.limit_price,
+                        quantity__gt=F("filled_quantity"),
+                    )
+                    .exclude(user=taker.user)
+                    .exclude(pk=taker.pk)
+                    .annotate(remaining=F("quantity") - F("filled_quantity"))
+                    .values_list("remaining", flat=True),
+                    Decimal("0.0000"),
+                )
             if available < required:
                 return []
         fills = []
@@ -75,6 +92,13 @@ class MarketMatchingService:
             taker.refresh_from_db()
             maker.refresh_from_db()
 
+        taker.refresh_from_db()
+        if cls._is_fillable(taker) and taker.side == MarketOrder.Side.BUY:
+            from markets.services.complementary_matching_service import (
+                ComplementaryBuyMatchingService,
+            )
+
+            ComplementaryBuyMatchingService.match(taker.id)
         return fills
 
     @staticmethod

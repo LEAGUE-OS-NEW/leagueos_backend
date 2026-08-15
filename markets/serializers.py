@@ -104,6 +104,8 @@ class MarketEventSummarySerializer(serializers.ModelSerializer):
 
 
 class MarketPublicSerializer(serializers.ModelSerializer):
+    opening_liquidity_available = serializers.SerializerMethodField()
+    opening_reference = serializers.SerializerMethodField()
     is_watchlisted = serializers.BooleanField(read_only=True, default=False)
     event_group = MarketEventSummarySerializer(read_only=True)
     sport = SportPublicSerializer(
@@ -167,7 +169,35 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "updated_at",
             "is_watchlisted",
             "trading_snapshot",
+            "opening_liquidity_available",
+            "opening_reference",
         ]
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_opening_liquidity_available(self, obj):
+        config = getattr(obj, "liquidity_configuration", None)
+        if not config or config.status != "ACTIVE" or not config.provider_id:
+            return False
+        prefetched = getattr(obj, "snapshot_orders", None)
+        if prefetched is not None:
+            return any(
+                order.user_id == config.provider.user_id
+                and order.side == "SELL"
+                and order.status in {"OPEN", "PARTIALLY_FILLED"}
+                for order in prefetched
+            )
+        return obj.orders.filter(
+            user_id=config.provider.user_id,
+            side="SELL",
+            status__in=("OPEN", "PARTIALLY_FILLED"),
+        ).exists()
+
+    @extend_schema_field(serializers.DictField())
+    def get_opening_reference(self, obj):
+        return {
+            outcome.side: format_normalized_price(outcome.opening_price)
+            for outcome in obj.outcomes.all()
+        }
 
     def get_trading_snapshot(self, obj) -> dict:
         active_statuses = {"PENDING", "OPEN", "PARTIALLY_FILLED"}
