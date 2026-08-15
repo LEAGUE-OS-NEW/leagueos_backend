@@ -127,6 +127,7 @@ class MarketResolutionService:
         actor,
         notes: str,
         evidence: str,
+        _trusted_dispute_decision: bool = False,
     ) -> Market:
         cls._require_permission(actor)
 
