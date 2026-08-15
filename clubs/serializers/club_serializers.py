@@ -316,6 +316,15 @@ class StaffInvitationAcceptSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
+class ClubAdminInviteSerializer(serializers.Serializer):
+    """The LeagueOS login identity is distinct from where the invite is
+    actually delivered — a brand-new club admin has no working inbox at
+    their assigned login address yet."""
+
+    login_email = serializers.EmailField()
+    notify_email = serializers.EmailField()
+
+
 class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory

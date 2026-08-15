@@ -1,5 +1,7 @@
 from django.urls import path
 
+from profiles.views import ClubListView
+
 from platform_admin.views import (
     AdminAuditLogListView,
     AdminDashboardSummaryView,
@@ -48,4 +50,5 @@ urlpatterns = [
     ),
     path("audit/", AdminAuditLogListView.as_view(), name="audit-list"),
     path("dashboard/", AdminDashboardSummaryView.as_view(), name="dashboard-summary"),
+    path("clubs/", ClubListView.as_view(), name="club-list"),
 ]
