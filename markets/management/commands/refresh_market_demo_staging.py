@@ -10,7 +10,6 @@ from django.utils import timezone
 
 from authentication.models import Role, UserRole
 from kyc.models import KYCVerification
-from kyc.services.market_compliance_sync import KYCMarketComplianceSyncService
 from markets.models import (
     Market,
     MarketCompleteSetIssuance,
@@ -424,11 +423,6 @@ class Command(BaseCommand):
             if not user.is_verified:
                 user.is_verified = True
                 user.save(update_fields=["is_verified", "updated_at"])
-            KYCMarketComplianceSyncService.sync(
-                verification=verification,
-                actor=user,
-                reason="LEAGUE_OS_DEMO staging review development bypass.",
-            )
             role = Role.objects.filter(name="Verified Market User").first()
             if role:
                 UserRole.objects.update_or_create(
