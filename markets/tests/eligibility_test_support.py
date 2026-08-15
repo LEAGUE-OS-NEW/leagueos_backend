@@ -1,5 +1,6 @@
 from datetime import date
 
+from kyc.models import KYCVerification
 from markets.models import MarketParticipantCompliance
 from profiles.models import Country
 from profiles.services.profile_service import ProfileService
@@ -21,4 +22,10 @@ def make_market_eligible(user, *, date_of_birth=None, country_code="UG"):
             "jurisdiction_override": MarketParticipantCompliance.JurisdictionOverride.NONE,
         },
     )
+    KYCVerification.objects.update_or_create(
+        user=user,
+        defaults={"status": KYCVerification.Status.VERIFIED},
+    )
+    user.is_verified = True
+    user.save(update_fields=["is_verified", "updated_at"])
     return compliance

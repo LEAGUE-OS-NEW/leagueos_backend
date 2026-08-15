@@ -132,10 +132,13 @@ class MarketComplianceAPITests(APITestCase):
             result = MarketComplianceService.update(
                 participant=self.participant,
                 actor=self.admin,
-                changes={"restriction_status": "CLEAR"},
+                changes={"restriction_status": "RESTRICTED"},
             )
         self.assertEqual(result.pk, compliance.pk)
         self.assertEqual(MarketComplianceReview.objects.count(), 1)
+        self.assertEqual(
+            MarketComplianceReview.objects.first().new_restriction_status, "RESTRICTED"
+        )
 
     def test_review_records_are_immutable_and_routes_are_read_only(self):
         make_market_eligible(self.participant)
@@ -143,6 +146,28 @@ class MarketComplianceAPITests(APITestCase):
             "markets:admin-participant-compliance-reviews", kwargs={"user_id": self.participant.id}
         )
         self.client.force_authenticate(self.admin)
+        MarketComplianceReview.objects.create(
+            participant=self.participant,
+            actor=self.admin,
+            source=MarketComplianceReview.Source.ADMIN,
+            previous_restriction_status="CLEAR",
+            new_restriction_status="RESTRICTED",
+            previous_jurisdiction_override="NONE",
+            new_jurisdiction_override="NONE",
+            reason="First review",
+            notes_snapshot="",
+        )
+        MarketComplianceReview.objects.create(
+            participant=self.participant,
+            actor=self.admin,
+            source=MarketComplianceReview.Source.ADMIN,
+            previous_restriction_status="RESTRICTED",
+            new_restriction_status="CLEAR",
+            previous_jurisdiction_override="NONE",
+            new_jurisdiction_override="NONE",
+            reason="Second review",
+            notes_snapshot="",
+        )
         first, second = MarketComplianceReview.objects.all()
         self.assertGreaterEqual(first.created_at, second.created_at)
         first.reason = "changed"

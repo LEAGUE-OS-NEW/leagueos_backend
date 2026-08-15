@@ -4,7 +4,6 @@ from rest_framework.test import APITestCase
 
 from accounts.models import AuditLog
 from kyc.models import KYCCheckResult, KYCVerification
-from markets.models import MarketParticipantCompliance
 
 User = get_user_model()
 
@@ -66,10 +65,10 @@ class KYCDevelopmentBypassTests(APITestCase):
             KYCVerification.VerificationSource.DEVELOPMENT_BYPASS,
         )
         self.assertFalse(KYCVerification.objects.filter(user=other).exists())
-        self.assertEqual(
-            MarketParticipantCompliance.objects.get(participant=self.fan).kyc_status,
-            MarketParticipantCompliance.KYCStatus.VERIFIED,
-        )
+        verification.refresh_from_db()
+        self.assertEqual(verification.status, KYCVerification.Status.VERIFIED)
+        self.fan.refresh_from_db()
+        self.assertTrue(self.fan.is_verified)
         self.assertFalse(KYCCheckResult.objects.filter(kyc_verification=verification).exists())
         audit = AuditLog.objects.get(resource_id=verification.id, action="KYC_VERIFIED")
         self.assertEqual(audit.metadata["verification_source"], "DEVELOPMENT_BYPASS")

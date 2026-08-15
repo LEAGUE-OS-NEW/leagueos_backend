@@ -28,7 +28,7 @@ class MarketRiskService:
         except MarketResponsibleParticipation.DoesNotExist:
             responsible = None
         score, reasons = 0, []
-        kyc_verification = getattr(participant, "kyc_verification", None)
+        kyc_verification = KYCVerification.objects.filter(user=participant).first()
         kyc_status = (
             kyc_verification.status if kyc_verification else KYCVerification.Status.NOT_STARTED
         )

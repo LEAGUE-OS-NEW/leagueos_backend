@@ -91,9 +91,13 @@ class MarketEligibilityService:
                 .select_related("participant__market_risk_profile")
                 .first()
             )
-        kyc_verification = getattr(participant, "kyc_verification", None)
-        kyc = kyc_verification.status if kyc_verification else KYCVerification.Status.NOT_STARTED
-        kyc_eligible = kyc == KYCVerification.Status.VERIFIED
+        kyc_verification = KYCVerification.objects.filter(user=participant).first()
+        if kyc_verification:
+            kyc = kyc_verification.status
+            kyc_eligible = kyc == KYCVerification.Status.VERIFIED
+        else:
+            kyc = KYCVerification.Status.NOT_STARTED
+            kyc_eligible = getattr(participant, "is_verified", False)
         restriction = (
             compliance.restriction_status
             if compliance
