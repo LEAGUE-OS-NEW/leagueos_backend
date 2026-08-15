@@ -9,6 +9,8 @@ from rest_framework.exceptions import PermissionDenied
 from authentication.services.permission_service import PermissionService
 from markets.models import (
     Market,
+    MarketCollateralEntry,
+    MarketCollateralPool,
     MarketFeeLedgerEntry,
     MarketOrder,
     MarketPosition,
@@ -77,6 +79,11 @@ class MarketSettlementService:
             sum((position.quantity for position in winners), Decimal("0.0000"))
         )
         total_payout = cls._money(winning_quantity * cls.PAYOUT_PER_UNIT)
+        pool = MarketCollateralPool.objects.select_for_update().filter(market=market).first()
+        if pool is not None and pool.locked_collateral < total_payout:
+            raise ValidationError(
+                {"collateral": "Locked market collateral is insufficient for the winning payout."}
+            )
 
         settlement = MarketSettlement.objects.create(
             market=market,
@@ -96,6 +103,23 @@ class MarketSettlementService:
                 settlement=settlement,
                 market=market,
                 position=position,
+            )
+
+        if pool is not None and total_payout > 0:
+            pool.locked_collateral -= total_payout
+            pool.settled_collateral += total_payout
+            pool.status = MarketCollateralPool.Status.SETTLED
+            pool.save(
+                update_fields=["locked_collateral", "settled_collateral", "status", "updated_at"]
+            )
+            MarketCollateralEntry.objects.create(
+                pool=pool,
+                market=market,
+                entry_type=MarketCollateralEntry.EntryType.SETTLEMENT_PAYOUT,
+                amount=total_payout,
+                idempotency_reference=uuid5(settlement.id, "collateral-settlement"),
+                actor=actor,
+                metadata={"winning_outcome_id": str(market.winning_outcome_id)},
             )
 
         return settlement

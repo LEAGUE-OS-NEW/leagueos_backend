@@ -8,6 +8,8 @@ from rest_framework.exceptions import PermissionDenied
 from authentication.services.permission_service import PermissionService
 from markets.models import (
     Market,
+    MarketCollateralEntry,
+    MarketCollateralPool,
     MarketFeeLedgerEntry,
     MarketOrder,
     MarketPosition,
@@ -188,6 +190,24 @@ class MarketVoidRefundService:
         MarketVoidRefund.objects.filter(pk=refund.pk).update(**totals)
         for field, value in totals.items():
             setattr(refund, field, value)
+        pool = MarketCollateralPool.objects.select_for_update().filter(market=market).first()
+        if pool is not None and pool.locked_collateral > Decimal("0.0000"):
+            released = cls._money(pool.locked_collateral)
+            pool.locked_collateral = Decimal("0.0000")
+            pool.released_collateral += released
+            pool.status = MarketCollateralPool.Status.RELEASED
+            pool.save(
+                update_fields=["locked_collateral", "released_collateral", "status", "updated_at"]
+            )
+            MarketCollateralEntry.objects.create(
+                pool=pool,
+                market=market,
+                entry_type=MarketCollateralEntry.EntryType.VOID_RELEASE,
+                amount=released,
+                idempotency_reference=uuid5(refund.id, "collateral-void-release"),
+                actor=actor,
+                metadata={"position_refund_amount": str(totals["total_position_refund_amount"])},
+            )
         return refund
 
     @classmethod

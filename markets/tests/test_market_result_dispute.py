@@ -36,7 +36,6 @@ from markets.services.resolution_service import MarketResolutionService
 from markets.services.result_dispute_service import (
     MarketResultDisputeService,
 )
-from markets.services.settlement_service import MarketSettlementService
 from markets.services.void_refund_service import MarketVoidRefundService
 from sports.models import Competition, Sport, SportingEvent
 from wallets.models import LedgerEntry, Wallet
@@ -527,7 +526,7 @@ class MarketResultDisputeTests(TestCase):
                 pk=evidence.pk,
             ).delete()
 
-    def test_open_dispute_blocks_settlement_after_window_closes(self):
+    def test_open_dispute_blocks_direct_resolution_after_window_closes(self):
         market = self.close_market(self.create_market())
         self.create_position(market)
 
@@ -549,20 +548,15 @@ class MarketResultDisputeTests(TestCase):
         winner = market.outcomes.get(
             side=MarketOutcome.Side.YES,
         )
-        MarketResolutionService.resolve(
-            market_id=market.id,
-            actor=self.approver_user,
-            winning_outcome_id=winner.id,
-            notes="Final result confirmed.",
-            evidence="Approved provisional evidence.",
-        )
-
         financial_before = self.financial_snapshot()
 
         with self.assertRaises(ValidationError) as error:
-            MarketSettlementService.settle_market(
+            MarketResolutionService.resolve(
                 market_id=market.id,
                 actor=self.approver_user,
+                winning_outcome_id=winner.id,
+                notes="Final result confirmed.",
+                evidence="Approved provisional evidence.",
             )
 
         self.assertIn(

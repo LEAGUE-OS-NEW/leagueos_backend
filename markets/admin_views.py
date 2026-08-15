@@ -46,6 +46,8 @@ class MarketAdminQuerysetMixin:
             "approved_by",
             "resolved_by",
             "winning_outcome",
+            "liquidity_configuration__provider",
+            "collateral_pool",
         ).prefetch_related(
             "outcomes",
             Prefetch(
@@ -61,6 +63,7 @@ class MarketAdminQuerysetMixin:
                 to_attr="snapshot_fills",
             ),
             "status_transitions__actor",
+            "complete_set_issuances",
             ("sporting_event__" "event_participants__" "participant"),
             ("sporting_event__" "event_participants__" "participant__sport"),
         )

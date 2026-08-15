@@ -184,13 +184,17 @@ class MarketLifecycleService:
                 {"outcomes": ("The market requires one YES " "and one NO outcome.")}
             )
 
-        return cls._apply_transition(
+        opened = cls._apply_transition(
             market=market,
             actor=actor,
             action=MarketStatusTransition.Action.OPEN,
             to_status=Market.Status.OPEN,
             notes=clean_notes,
         )
+        from markets.services.liquidity_service import MarketLiquidityService
+
+        MarketLiquidityService.activate_opening_liquidity(market=opened, actor=actor)
+        return opened
 
     @classmethod
     @transaction.atomic
