@@ -7,6 +7,7 @@ from decimal import Decimal
 import pytest
 
 from accounts.models import User
+from authentication.models import AccountSetupToken
 from clubs.models import (
     ClubAnalytics,
     ClubAuditLog,
@@ -20,6 +21,7 @@ from clubs.models import (
 )
 from clubs.services.analytics_service import AnalyticsService
 from clubs.services.audit_service import ClubAuditService
+from clubs.services.club_admin_invitation_service import ClubAdminInvitationService
 from clubs.services.club_profile_service import ClubProfileService
 from clubs.services.club_workspace_service import ClubWorkspaceService
 from clubs.services.inventory_service import InventoryService
@@ -212,6 +214,70 @@ class TestStaffService:
         workspace = StaffService.accept_invitation(invitation.token, new_user)
         assert workspace.user == new_user
         assert workspace.role == ClubWorkspace.WorkspaceRole.STAFF
+
+
+class TestClubAdminInvitationService:
+    def test_invite_creates_pending_user_and_setup_token(self, user, club, admin_workspace):
+        invitation = ClubAdminInvitationService.invite(
+            club=club,
+            login_email="clubadmin@example.com",
+            notify_email="real.person@example.com",
+            invited_by=user,
+        )
+        assert invitation.status == StaffInvitation.Status.PENDING
+
+        invited_user = User.objects.get(email="clubadmin@example.com")
+        assert invited_user.account_status == User.AccountStatus.PENDING_INVITATION
+        live_tokens = AccountSetupToken.objects.filter(user=invited_user, used_at__isnull=True)
+        assert live_tokens.count() == 1
+
+    def test_resend_reuses_invitation_and_issues_a_fresh_token(self, user, club, admin_workspace):
+        first = ClubAdminInvitationService.invite(
+            club=club,
+            login_email="clubadmin@example.com",
+            notify_email="real.person@example.com",
+            invited_by=user,
+        )
+        invited_user = User.objects.get(email="clubadmin@example.com")
+        first_token = AccountSetupToken.objects.get(user=invited_user, used_at__isnull=True)
+
+        # Resending must not try to insert a second PENDING StaffInvitation
+        # for the same (club, email) — that used to raise an IntegrityError.
+        second = ClubAdminInvitationService.invite(
+            club=club,
+            login_email="clubadmin@example.com",
+            notify_email="real.person@example.com",
+            invited_by=user,
+        )
+
+        assert second.id == first.id
+        assert StaffInvitation.objects.filter(club=club, email="clubadmin@example.com").count() == 1
+
+        first_token.refresh_from_db()
+        assert first_token.used_at is not None, "the old token should be revoked on resend"
+
+        live_tokens = AccountSetupToken.objects.filter(user=invited_user, used_at__isnull=True)
+        assert live_tokens.count() == 1
+        assert live_tokens.first().id != first_token.id
+
+    def test_invite_for_already_active_user_sends_no_new_token(self, user, club, admin_workspace):
+        active_user = User.objects.create_user(
+            username="activeadmin",
+            email="active@example.com",
+            password="activepass123",
+            first_name="Active",
+            last_name="Admin",
+        )
+        assert active_user.account_status == User.AccountStatus.ACTIVE
+
+        ClubAdminInvitationService.invite(
+            club=club,
+            login_email="active@example.com",
+            notify_email="real.person@example.com",
+            invited_by=user,
+        )
+
+        assert not AccountSetupToken.objects.filter(user=active_user).exists()
 
 
 class TestAnalyticsService:

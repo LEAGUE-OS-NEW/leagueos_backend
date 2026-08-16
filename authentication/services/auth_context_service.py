@@ -38,6 +38,7 @@ class AuthContextService:
             "kyc_status": kyc_status,
             "roles": [role.name for role in roles],
             "permissions": permissions,
+            "club": AuthContextService._active_club(user),
             "dashboard_access": {
                 "entitlements": entitlements,
                 "default_entitlement": highest_role.name if highest_role else None,
@@ -48,6 +49,21 @@ class AuthContextService:
                 "current_step": onboarding.current_step if onboarding else None,
             },
         }
+
+    @staticmethod
+    def _active_club(user) -> dict | None:
+        """The frontend's legacy dashboard-access fallback (authStore.ts's
+        getLegacyClubId) already expects to read user.club.id — it just
+        never had a real value to read, and defaulted to a hardcoded demo
+        club instead. Populate it from the user's active ClubWorkspace."""
+        from clubs.models import ClubWorkspace
+
+        workspace = (
+            ClubWorkspace.objects.filter(user=user, is_active=True).select_related("club").first()
+        )
+        if not workspace:
+            return None
+        return {"id": str(workspace.club.id), "name": workspace.club.name}
 
     @classmethod
     def authenticated_data(cls, user, access=None, refresh=None) -> dict:
