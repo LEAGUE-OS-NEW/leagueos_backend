@@ -7,6 +7,7 @@ separate LIVE safety switch is explicitly enabled.
 
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 from urllib import error, parse, request
@@ -217,6 +218,16 @@ class PesapalClient:
                 path,
                 type(reason).__name__,
                 str(reason or "")[:300],
+            )
+
+            raise PesapalApiError("Could not reach Pesapal " f"during {path}.") from exc
+
+        except (OSError, http.client.HTTPException) as exc:
+            logger.error(
+                "Pesapal API low-level transport error " "method=%s path=%s error_type=%s",
+                method.upper(),
+                path,
+                type(exc).__name__,
             )
 
             raise PesapalApiError("Could not reach Pesapal " f"during {path}.") from exc
