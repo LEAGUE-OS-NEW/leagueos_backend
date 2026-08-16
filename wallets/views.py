@@ -23,10 +23,12 @@ from wallets.serializers import (
     LedgerEntryFilterSerializer,
     LedgerEntryReadSerializer,
     WalletReadSerializer,
+    WithdrawalRequestFilterSerializer,
     WithdrawalRequestReadSerializer,
     WithdrawalRequestSerializer,
     WalletTransactionReadSerializer,
 )
+from wallets.models import WithdrawalRequest
 from wallets.services.pesapal_client import PesapalApiError
 from wallets.services.pesapal_config import get_pesapal_config
 from wallets.services.pesapal_deposit_service import (
@@ -393,6 +395,71 @@ class WithdrawalRequestView(APIView):
     serializer_class = WithdrawalRequestSerializer
 
     @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "status",
+                str,
+                enum=[choice for choice, _label in WithdrawalRequest.Status.choices],
+            ),
+            OpenApiParameter(
+                "currency",
+                str,
+            ),
+            OpenApiParameter(
+                "created_from",
+                str,
+            ),
+            OpenApiParameter(
+                "created_to",
+                str,
+            ),
+        ],
+        responses={
+            200: WithdrawalRequestReadSerializer(
+                many=True,
+            ),
+            400: OpenApiResponse(
+                description="Invalid filter value.",
+            ),
+            401: OpenApiResponse(
+                description=("Authentication credentials " "are required."),
+            ),
+        },
+        tags=["Wallets"],
+    )
+    def get(self, request):
+        filter_serializer = WithdrawalRequestFilterSerializer(
+            data=request.query_params,
+        )
+        filter_serializer.is_valid(
+            raise_exception=True,
+        )
+
+        try:
+            queryset = WalletReadService.list_withdrawals(
+                user=request.user,
+                filters=(filter_serializer.validated_data),
+            )
+        except DjangoValidationError as error:
+            raise_currency_validation(error)
+
+        paginator = PublicCatalogPagination()
+        page = paginator.paginate_queryset(
+            queryset,
+            request,
+            view=self,
+        )
+
+        serializer = WithdrawalRequestReadSerializer(
+            page,
+            many=True,
+        )
+
+        return paginator.get_paginated_response(
+            serializer.data,
+        )
+
+    @extend_schema(
         request=WithdrawalRequestSerializer,
         responses={
             201: WithdrawalRequestReadSerializer,
@@ -430,6 +497,7 @@ class WithdrawalRequestView(APIView):
                     "approval_policy_version": withdrawal.approval_policy_version,
                     "approved_at": withdrawal.approved_at,
                     "rejection_reason": withdrawal.rejection_reason,
+                    "failure_reason": withdrawal.failure_reason,
                     "created_at": withdrawal.created_at,
                     "updated_at": withdrawal.updated_at,
                     "transaction_id": withdrawal.transaction_id,

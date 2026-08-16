@@ -788,6 +788,430 @@ class WalletService:
 
         return withdrawal
 
+    @staticmethod
+    def _require_withdrawal_actor(actor):
+        if actor is None or not getattr(
+            actor,
+            "is_active",
+            False,
+        ):
+            raise ValidationError(
+                {"actor": ("An active user is required " "for this withdrawal action.")}
+            )
+
+    @staticmethod
+    def _normalize_withdrawal_reason(
+        reason,
+        *,
+        field_name,
+    ) -> str:
+        normalized = str(reason or "").strip()
+
+        if not normalized:
+            raise ValidationError({field_name: ("A reason is required.")})
+
+        return normalized
+
+    @staticmethod
+    def _normalize_provider_reference(
+        provider_reference,
+    ) -> str:
+        normalized = str(provider_reference or "").strip()
+
+        if not normalized:
+            raise ValidationError(
+                {
+                    "provider_reference": (
+                        "A payout reference is " "required before completing " "a withdrawal."
+                    )
+                }
+            )
+
+        return normalized
+
+    @classmethod
+    def _get_locked_withdrawal(
+        cls,
+        *,
+        withdrawal_id,
+    ) -> WithdrawalRequest:
+        try:
+            withdrawal = (
+                WithdrawalRequest.objects.select_for_update(of=("self",))
+                .select_related(
+                    "wallet",
+                    "wallet__user",
+                    "transaction",
+                    "approved_by",
+                )
+                .get(
+                    id=withdrawal_id,
+                )
+            )
+        except WithdrawalRequest.DoesNotExist:
+            raise ValidationError({"withdrawal": ("Withdrawal request not found.")}) from None
+
+        if withdrawal.transaction_id is None:
+            raise ValidationError({"withdrawal": ("Withdrawal has no financial " "transaction.")})
+
+        if withdrawal.transaction.wallet_id != withdrawal.wallet_id:
+            raise ValidationError(
+                {"withdrawal": ("Withdrawal transaction does " "not match its wallet.")}
+            )
+
+        return withdrawal
+
+    @classmethod
+    @transaction.atomic
+    def approve_withdrawal(
+        cls,
+        *,
+        withdrawal_id,
+        actor,
+    ) -> WithdrawalRequest:
+        """Manually approve a pending withdrawal."""
+        cls._require_withdrawal_actor(
+            actor,
+        )
+
+        withdrawal = cls._get_locked_withdrawal(
+            withdrawal_id=withdrawal_id,
+        )
+
+        if withdrawal.status == WithdrawalRequest.Status.APPROVED:
+            return withdrawal
+
+        if withdrawal.status != WithdrawalRequest.Status.PENDING_APPROVAL:
+            raise ValidationError({"status": ("Only a pending withdrawal " "can be approved.")})
+
+        withdrawal.status = WithdrawalRequest.Status.APPROVED
+        withdrawal.approval_mode = WithdrawalRequest.ApprovalMode.MANUAL
+        withdrawal.approved_by = actor
+        withdrawal.approved_at = timezone.now()
+
+        withdrawal.save(
+            update_fields=[
+                "status",
+                "approval_mode",
+                "approved_by",
+                "approved_at",
+                "updated_at",
+            ]
+        )
+
+        AuditLog.objects.create(
+            user=actor,
+            action="WITHDRAWAL_APPROVED",
+            related_object_id=withdrawal.id,
+            metadata={
+                "approval_mode": (WithdrawalRequest.ApprovalMode.MANUAL),
+                "amount": str(withdrawal.amount),
+                "currency": (withdrawal.wallet.currency),
+                "transaction_id": str(withdrawal.transaction_id),
+            },
+        )
+
+        return withdrawal
+
+    @classmethod
+    @transaction.atomic
+    def reject_withdrawal(
+        cls,
+        *,
+        withdrawal_id,
+        actor,
+        reason,
+    ) -> WithdrawalRequest:
+        """Reject a pending withdrawal and release its funds."""
+        cls._require_withdrawal_actor(
+            actor,
+        )
+
+        normalized_reason = cls._normalize_withdrawal_reason(
+            reason,
+            field_name="reason",
+        )
+
+        withdrawal = cls._get_locked_withdrawal(
+            withdrawal_id=withdrawal_id,
+        )
+
+        if withdrawal.status == WithdrawalRequest.Status.REJECTED:
+            if withdrawal.rejection_reason != normalized_reason:
+                raise ValidationError(
+                    {
+                        "reason": (
+                            "This withdrawal was " "already rejected with a " "different reason."
+                        )
+                    }
+                )
+
+            return withdrawal
+
+        if withdrawal.status != WithdrawalRequest.Status.PENDING_APPROVAL:
+            raise ValidationError({"status": ("Only a pending withdrawal " "can be rejected.")})
+
+        cls.release(
+            user=withdrawal.wallet.user,
+            currency=withdrawal.wallet.currency,
+            amount=withdrawal.amount,
+            idempotency_reference=uuid5(
+                withdrawal.id,
+                "withdrawal-reject-release",
+            ),
+            transaction=withdrawal.transaction,
+        )
+
+        withdrawal.transaction.status = WalletTransaction.Status.CANCELLED
+        withdrawal.transaction.save(
+            update_fields=[
+                "status",
+                "updated_at",
+            ]
+        )
+
+        withdrawal.status = WithdrawalRequest.Status.REJECTED
+        withdrawal.rejection_reason = normalized_reason
+
+        withdrawal.save(
+            update_fields=[
+                "status",
+                "rejection_reason",
+                "updated_at",
+            ]
+        )
+
+        AuditLog.objects.create(
+            user=actor,
+            action="WITHDRAWAL_REJECTED",
+            related_object_id=withdrawal.id,
+            metadata={
+                "reason": normalized_reason,
+                "amount": str(withdrawal.amount),
+                "currency": (withdrawal.wallet.currency),
+                "transaction_id": str(withdrawal.transaction_id),
+            },
+        )
+
+        return withdrawal
+
+    @classmethod
+    @transaction.atomic
+    def mark_withdrawal_processing(
+        cls,
+        *,
+        withdrawal_id,
+        actor,
+    ) -> WithdrawalRequest:
+        """Move an approved withdrawal into payout processing."""
+        cls._require_withdrawal_actor(
+            actor,
+        )
+
+        withdrawal = cls._get_locked_withdrawal(
+            withdrawal_id=withdrawal_id,
+        )
+
+        if withdrawal.status == WithdrawalRequest.Status.PROCESSING:
+            return withdrawal
+
+        if withdrawal.status != WithdrawalRequest.Status.APPROVED:
+            raise ValidationError(
+                {"status": ("Only an approved withdrawal " "can enter processing.")}
+            )
+
+        withdrawal.status = WithdrawalRequest.Status.PROCESSING
+        withdrawal.save(
+            update_fields=[
+                "status",
+                "updated_at",
+            ]
+        )
+
+        AuditLog.objects.create(
+            user=actor,
+            action="WITHDRAWAL_PROCESSING",
+            related_object_id=withdrawal.id,
+            metadata={
+                "amount": str(withdrawal.amount),
+                "currency": (withdrawal.wallet.currency),
+                "transaction_id": str(withdrawal.transaction_id),
+            },
+        )
+
+        return withdrawal
+
+    @classmethod
+    @transaction.atomic
+    def complete_withdrawal(
+        cls,
+        *,
+        withdrawal_id,
+        actor,
+        provider_reference,
+    ) -> WithdrawalRequest:
+        """Complete a paid withdrawal and consume reserved funds."""
+        cls._require_withdrawal_actor(
+            actor,
+        )
+
+        normalized_reference = cls._normalize_provider_reference(provider_reference)
+
+        withdrawal = cls._get_locked_withdrawal(
+            withdrawal_id=withdrawal_id,
+        )
+
+        if withdrawal.status == WithdrawalRequest.Status.COMPLETED:
+            if withdrawal.transaction.provider_reference != normalized_reference:
+                raise ValidationError(
+                    {
+                        "provider_reference": (
+                            "This withdrawal was "
+                            "already completed with a "
+                            "different payout reference."
+                        )
+                    }
+                )
+
+            return withdrawal
+
+        if withdrawal.status != WithdrawalRequest.Status.PROCESSING:
+            raise ValidationError({"status": ("Only a processing withdrawal " "can be completed.")})
+
+        cls.consume_reserved(
+            user=withdrawal.wallet.user,
+            currency=withdrawal.wallet.currency,
+            amount=withdrawal.amount,
+            idempotency_reference=uuid5(
+                withdrawal.id,
+                "withdrawal-complete-debit",
+            ),
+            transaction=withdrawal.transaction,
+            counterparty_account=(LedgerEntry.AccountType.PROVIDER_PAYABLE),
+        )
+
+        completed_at = timezone.now()
+
+        withdrawal.transaction.status = WalletTransaction.Status.COMPLETED
+        withdrawal.transaction.provider_reference = normalized_reference
+        withdrawal.transaction.completed_at = completed_at
+        withdrawal.transaction.save(
+            update_fields=[
+                "status",
+                "provider_reference",
+                "completed_at",
+                "updated_at",
+            ]
+        )
+
+        withdrawal.status = WithdrawalRequest.Status.COMPLETED
+        withdrawal.save(
+            update_fields=[
+                "status",
+                "updated_at",
+            ]
+        )
+
+        AuditLog.objects.create(
+            user=actor,
+            action="WITHDRAWAL_COMPLETED",
+            related_object_id=withdrawal.id,
+            metadata={
+                "provider_reference": (normalized_reference),
+                "amount": str(withdrawal.amount),
+                "currency": (withdrawal.wallet.currency),
+                "transaction_id": str(withdrawal.transaction_id),
+            },
+        )
+
+        return withdrawal
+
+    @classmethod
+    @transaction.atomic
+    def fail_withdrawal(
+        cls,
+        *,
+        withdrawal_id,
+        actor,
+        reason,
+    ) -> WithdrawalRequest:
+        """Fail an uncompleted payout and return reserved funds."""
+        cls._require_withdrawal_actor(
+            actor,
+        )
+
+        normalized_reason = cls._normalize_withdrawal_reason(
+            reason,
+            field_name="reason",
+        )
+
+        withdrawal = cls._get_locked_withdrawal(
+            withdrawal_id=withdrawal_id,
+        )
+
+        if withdrawal.status == WithdrawalRequest.Status.FAILED:
+            if withdrawal.failure_reason != normalized_reason:
+                raise ValidationError(
+                    {"reason": ("This withdrawal already " "failed with a different " "reason.")}
+                )
+
+            return withdrawal
+
+        if withdrawal.status not in (
+            WithdrawalRequest.Status.APPROVED,
+            WithdrawalRequest.Status.PROCESSING,
+        ):
+            raise ValidationError(
+                {
+                    "status": (
+                        "Only an approved or " "processing withdrawal can " "be marked failed."
+                    )
+                }
+            )
+
+        cls.release(
+            user=withdrawal.wallet.user,
+            currency=withdrawal.wallet.currency,
+            amount=withdrawal.amount,
+            idempotency_reference=uuid5(
+                withdrawal.id,
+                "withdrawal-fail-release",
+            ),
+            transaction=withdrawal.transaction,
+        )
+
+        withdrawal.transaction.status = WalletTransaction.Status.FAILED
+        withdrawal.transaction.save(
+            update_fields=[
+                "status",
+                "updated_at",
+            ]
+        )
+
+        withdrawal.status = WithdrawalRequest.Status.FAILED
+        withdrawal.failure_reason = normalized_reason
+        withdrawal.save(
+            update_fields=[
+                "status",
+                "failure_reason",
+                "updated_at",
+            ]
+        )
+
+        AuditLog.objects.create(
+            user=actor,
+            action="WITHDRAWAL_FAILED",
+            related_object_id=withdrawal.id,
+            metadata={
+                "reason": normalized_reason,
+                "amount": str(withdrawal.amount),
+                "currency": (withdrawal.wallet.currency),
+                "transaction_id": str(withdrawal.transaction_id),
+            },
+        )
+
+        return withdrawal
+
     @classmethod
     @transaction.atomic
     def get_withdrawal_request(cls, *, user, request_id) -> WithdrawalRequest:

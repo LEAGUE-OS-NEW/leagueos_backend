@@ -19,7 +19,10 @@ WALLET_0002 = (
     "wallets",
     "0002_remove_ledgerentry_wallets_led_created_abc123_idx_and_more",
 )
-WALLET_LEAF = ("wallets", "0006_withdrawal_auto_approval_policy")
+WALLET_LEAF = (
+    "wallets",
+    "0008_withdrawal_failure_reason_and_processing_audit",
+)
 MARKETS_WITH_LEDGER_REFERENCES = (
     "markets",
     "0021_remove_marketfeeschedule_mkt_fee_scope_version_uniq_and_more",

@@ -1,5 +1,6 @@
 """Tests for the wallets API."""
 
+from decimal import Decimal
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from authentication.tests.factories import UserFactory
+from wallets.models import WithdrawalRequest
 from wallets.services.pesapal_client import PesapalApiError
 from wallets.services.pesapal_deposit_service import (
     PesapalDepositService,
@@ -128,6 +130,112 @@ class TestDepositAPI:
 
 
 class TestWithdrawalAPI:
+    def test_list_withdrawals_requires_authentication(
+        self,
+        client,
+    ):
+        url = reverse("wallets:withdrawal-request-create")
+
+        response = client.get(url)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_list_withdrawals_is_scoped_to_user(
+        self,
+        auth_client,
+    ):
+        own_wallet = WalletFactory(
+            user=auth_client.user,
+            currency="UGX",
+        )
+        other_wallet = WalletFactory(
+            user=UserFactory(),
+            currency="UGX",
+        )
+
+        first = WithdrawalRequest.objects.create(
+            wallet=own_wallet,
+            amount=Decimal("10000.0000"),
+            destination={"mobile_money_number": "0777000001"},
+            status=(WithdrawalRequest.Status.PENDING_APPROVAL),
+        )
+        second = WithdrawalRequest.objects.create(
+            wallet=own_wallet,
+            amount=Decimal("20000.0000"),
+            destination={"mobile_money_number": "0777000002"},
+            status=WithdrawalRequest.Status.COMPLETED,
+        )
+
+        WithdrawalRequest.objects.create(
+            wallet=other_wallet,
+            amount=Decimal("30000.0000"),
+            destination={"mobile_money_number": "0777000003"},
+            status=WithdrawalRequest.Status.COMPLETED,
+        )
+
+        url = reverse("wallets:withdrawal-request-create")
+
+        response = auth_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["count"] == 2
+
+        returned_ids = {item["id"] for item in response.data["results"]}
+
+        assert returned_ids == {
+            str(first.id),
+            str(second.id),
+        }
+
+    def test_list_withdrawals_filters_status_and_currency(
+        self,
+        auth_client,
+    ):
+        ugx_wallet = WalletFactory(
+            user=auth_client.user,
+            currency="UGX",
+        )
+        usd_wallet = WalletFactory(
+            user=auth_client.user,
+            currency="USD",
+        )
+
+        expected = WithdrawalRequest.objects.create(
+            wallet=ugx_wallet,
+            amount=Decimal("10000.0000"),
+            destination={"mobile_money_number": "0777000010"},
+            status=WithdrawalRequest.Status.COMPLETED,
+        )
+
+        WithdrawalRequest.objects.create(
+            wallet=ugx_wallet,
+            amount=Decimal("20000.0000"),
+            destination={"mobile_money_number": "0777000011"},
+            status=(WithdrawalRequest.Status.PENDING_APPROVAL),
+        )
+
+        WithdrawalRequest.objects.create(
+            wallet=usd_wallet,
+            amount=Decimal("30.0000"),
+            destination={"bank_account": "TEST-USD"},
+            status=WithdrawalRequest.Status.COMPLETED,
+        )
+
+        url = reverse("wallets:withdrawal-request-create")
+
+        response = auth_client.get(
+            url,
+            {
+                "status": "COMPLETED",
+                "currency": "UGX",
+            },
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["id"] == str(expected.id)
+        assert response.data["results"][0]["currency"] == "UGX"
+
     def test_create_withdrawal_request(self, auth_client):
         WalletFactory(user=auth_client.user, currency="UGX", available_balance=100000)
         url = reverse("wallets:withdrawal-request-create")
