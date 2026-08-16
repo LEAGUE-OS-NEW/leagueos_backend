@@ -65,6 +65,20 @@ class PesapalDiagnosticProbeSerializer(serializers.Serializer):
     tls = PesapalDiagnosticTlsSerializer()
 
 
+class PesapalDirectHttpAuthSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
+    elapsed_ms = serializers.FloatField(
+        allow_null=True,
+    )
+    http_status = serializers.IntegerField(
+        allow_null=True,
+    )
+    token_present = serializers.BooleanField()
+    error_type = serializers.CharField(
+        allow_blank=True,
+    )
+
+
 class PesapalDiagnosticTransportSerializer(serializers.Serializer):
     host = serializers.CharField()
     port = serializers.IntegerField()
@@ -82,6 +96,9 @@ class PesapalDiagnosticSerializer(serializers.Serializer):
     ipn_configured = serializers.BooleanField()
     callback_configured = serializers.BooleanField()
     transport = PesapalDiagnosticTransportSerializer(
+        required=False,
+    )
+    direct_http_auth = PesapalDirectHttpAuthSerializer(
         required=False,
     )
     authentication = PesapalDiagnosticAuthenticationSerializer()

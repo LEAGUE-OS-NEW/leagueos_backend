@@ -7,7 +7,10 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 from rest_framework.test import APIClient
 
-from system.views import _pesapal_transport_diagnostic
+from system.views import (
+    _pesapal_direct_http_auth_diagnostic,
+    _pesapal_transport_diagnostic,
+)
 
 User = get_user_model()
 
@@ -80,6 +83,26 @@ def successful_transport():
     }
 
 
+def successful_direct_http_auth():
+    return {
+        "ok": True,
+        "elapsed_ms": 650.0,
+        "http_status": 200,
+        "token_present": True,
+        "error_type": "",
+    }
+
+
+def timed_out_direct_http_auth():
+    return {
+        "ok": False,
+        "elapsed_ms": 6000.0,
+        "http_status": None,
+        "token_present": False,
+        "error_type": "TimeoutError",
+    }
+
+
 def unavailable_transport():
     return {
         "host": "cybqa.pesapal.com",
@@ -113,6 +136,84 @@ def unavailable_transport():
             }
         ],
     }
+
+
+def test_direct_http_auth_reports_success_without_exposing_token():
+    config = sandbox_config()
+
+    response = MagicMock()
+    response.status = 200
+    response.read.return_value = b'{"token":"provider-secret-token","status":"200"}'
+
+    connection = MagicMock()
+    connection.getresponse.return_value = response
+
+    with (
+        patch(
+            "system.views.http.client.HTTPSConnection",
+            return_value=connection,
+        ) as connection_class,
+        patch(
+            "system.views.ssl.create_default_context",
+            return_value=MagicMock(),
+        ),
+    ):
+        result = _pesapal_direct_http_auth_diagnostic(
+            config,
+        )
+
+    assert result["ok"] is True
+    assert result["http_status"] == 200
+    assert result["token_present"] is True
+    assert result["error_type"] == ""
+
+    assert "provider-secret-token" not in str(result)
+    assert "configured-key" not in str(result)
+    assert "configured-secret" not in str(result)
+
+    connection_class.assert_called_once()
+    connection.request.assert_called_once()
+
+    method, path = connection.request.call_args.args[:2]
+
+    assert method == "POST"
+    assert path == "/pesapalv3/api/Auth/RequestToken"
+
+    connection.close.assert_called_once()
+
+
+def test_direct_http_auth_reports_timeout_without_exception_details():
+    config = sandbox_config()
+
+    connection = MagicMock()
+    connection.request.side_effect = TimeoutError(
+        "private timeout details",
+    )
+
+    with (
+        patch(
+            "system.views.http.client.HTTPSConnection",
+            return_value=connection,
+        ),
+        patch(
+            "system.views.ssl.create_default_context",
+            return_value=MagicMock(),
+        ),
+    ):
+        result = _pesapal_direct_http_auth_diagnostic(
+            config,
+        )
+
+    assert result["ok"] is False
+    assert result["http_status"] is None
+    assert result["token_present"] is False
+    assert result["error_type"] == "TimeoutError"
+
+    assert "private timeout details" not in str(result)
+    assert "configured-key" not in str(result)
+    assert "configured-secret" not in str(result)
+
+    connection.close.assert_called_once()
 
 
 def test_transport_diagnostic_reports_dns_failure_without_exception_details():
@@ -295,20 +396,20 @@ def test_diagnostic_is_hidden_from_ordinary_accounts():
 @pytest.mark.django_db
 @override_settings(REVIEW_WORKFLOW_TOOLS_ENABLED=True)
 @patch(
-    "system.views._pesapal_transport_diagnostic",
-    return_value=successful_transport(),
+    "system.views._pesapal_direct_http_auth_diagnostic",
+    return_value=successful_direct_http_auth(),
 )
 @patch(
-    "system.views.PesapalClient.authenticate",
-    return_value="secret-token-that-must-not-be-returned",
+    "system.views._pesapal_transport_diagnostic",
+    return_value=successful_transport(),
 )
 @patch(
     "system.views.get_pesapal_config",
 )
 def test_synthetic_review_user_can_probe_pesapal_authentication(
     config_mock,
-    authenticate_mock,
     transport_mock,
+    direct_http_mock,
 ):
     config_mock.return_value = sandbox_config()
 
@@ -330,24 +431,28 @@ def test_synthetic_review_user_can_probe_pesapal_authentication(
         "ipn_configured": True,
         "callback_configured": True,
         "transport": successful_transport(),
+        "direct_http_auth": successful_direct_http_auth(),
         "authentication": {
             "ok": True,
             "error_type": "",
         },
     }
 
-    assert "secret-token-that-must-not-be-returned" not in response.content.decode()
+    assert "configured-key" not in response.content.decode()
+    assert "configured-secret" not in response.content.decode()
 
     transport_mock.assert_called_once_with(
         SANDBOX_URL,
     )
-    authenticate_mock.assert_called_once()
+    direct_http_mock.assert_called_once_with(
+        config_mock.return_value,
+    )
 
 
 @pytest.mark.django_db
 @override_settings(REVIEW_WORKFLOW_TOOLS_ENABLED=True)
 @patch(
-    "system.views.PesapalClient.authenticate",
+    "system.views._pesapal_direct_http_auth_diagnostic",
 )
 @patch(
     "system.views._pesapal_transport_diagnostic",
@@ -359,7 +464,7 @@ def test_synthetic_review_user_can_probe_pesapal_authentication(
 def test_authentication_is_skipped_when_transport_is_unavailable(
     config_mock,
     transport_mock,
-    authenticate_mock,
+    direct_http_mock,
 ):
     config_mock.return_value = sandbox_config()
 
@@ -382,28 +487,26 @@ def test_authentication_is_skipped_when_transport_is_unavailable(
     transport_mock.assert_called_once_with(
         SANDBOX_URL,
     )
-    authenticate_mock.assert_not_called()
+    direct_http_mock.assert_not_called()
 
 
 @pytest.mark.django_db
 @override_settings(REVIEW_WORKFLOW_TOOLS_ENABLED=True)
 @patch(
+    "system.views._pesapal_direct_http_auth_diagnostic",
+    return_value=timed_out_direct_http_auth(),
+)
+@patch(
     "system.views._pesapal_transport_diagnostic",
     return_value=successful_transport(),
 )
 @patch(
-    "system.views.PesapalClient.authenticate",
-    side_effect=TimeoutError(
-        "simulated transport timeout",
-    ),
-)
-@patch(
     "system.views.get_pesapal_config",
 )
-def test_authentication_timeout_after_tls_is_reported_safely(
+def test_direct_http_timeout_after_tls_is_reported_safely(
     config_mock,
-    authenticate_mock,
     transport_mock,
+    direct_http_mock,
 ):
     config_mock.return_value = sandbox_config()
 
@@ -418,15 +521,19 @@ def test_authentication_timeout_after_tls_is_reported_safely(
     body = response.json()
 
     assert body["transport"] == successful_transport()
+    assert body["direct_http_auth"] == timed_out_direct_http_auth()
 
     assert body["authentication"] == {
         "ok": False,
-        "error_type": "TimeoutError",
+        "error_type": "DirectHttpTimeoutError",
     }
 
-    assert "simulated transport timeout" not in response.content.decode()
+    assert "configured-key" not in response.content.decode()
+    assert "configured-secret" not in response.content.decode()
 
     transport_mock.assert_called_once_with(
         SANDBOX_URL,
     )
-    authenticate_mock.assert_called_once()
+    direct_http_mock.assert_called_once_with(
+        config_mock.return_value,
+    )
