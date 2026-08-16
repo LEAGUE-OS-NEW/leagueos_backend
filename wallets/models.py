@@ -455,6 +455,7 @@ class WithdrawalRequest(TimeStampedUUIDModel):
     )
     approved_at = models.DateTimeField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True)
+    failure_reason = models.TextField(blank=True)
     approval_mode = models.CharField(
         max_length=20,
         choices=ApprovalMode.choices,
@@ -506,6 +507,7 @@ class AuditLog(TimeStampedUUIDModel):
         ("WITHDRAWAL_REQUESTED", "Withdrawal requested"),
         ("WITHDRAWAL_APPROVED", "Withdrawal approved"),
         ("WITHDRAWAL_REJECTED", "Withdrawal rejected"),
+        ("WITHDRAWAL_PROCESSING", "Withdrawal processing"),
         ("WITHDRAWAL_COMPLETED", "Withdrawal completed"),
         ("WITHDRAWAL_FAILED", "Withdrawal failed"),
         # Ledger & Transactions
