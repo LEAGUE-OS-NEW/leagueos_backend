@@ -167,6 +167,72 @@ class EmailService:
         )
 
     @staticmethod
+    def send_club_admin_setup_email(
+        user,
+        setup_token: str,
+        club_name: str,
+        deliver_to: str,
+    ) -> None:
+        """Same link-building logic as send_account_setup_email, but names
+        the club/role and delivers to the invitee's personal address rather
+        than the LeagueOS login identity (which has no working inbox yet)."""
+        subject = f"You've been invited as Club Admin for {club_name}"
+
+        account_setup_url = getattr(
+            settings,
+            "ACCOUNT_SETUP_URL",
+            "",
+        ).strip()
+
+        setup_url = None
+
+        if account_setup_url:
+            separator = "&" if "?" in account_setup_url else "?"
+            setup_url = f"{account_setup_url}" f"{separator}" f"token={setup_token}"
+
+        first_name = user.first_name or "there"
+
+        if setup_url:
+            text_content = (
+                f"Hello {first_name},\n\n"
+                f"You've been invited to manage {club_name} on League OS "
+                f"as Club Admin, using the login {user.email}.\n\n"
+                "Complete your account setup using this link:\n"
+                f"{setup_url}\n\n"
+                "This invitation expires in 7 days.\n\n"
+                "If you were not expecting this invitation, "
+                "you can ignore this email.\n"
+            )
+        else:
+            text_content = (
+                f"Hello {first_name},\n\n"
+                f"You've been invited to manage {club_name} on League OS "
+                f"as Club Admin, using the login {user.email}.\n\n"
+                "Use the following account setup token:\n\n"
+                f"{setup_token}\n\n"
+                "This invitation expires in 7 days.\n\n"
+                "If you were not expecting this invitation, "
+                "you can ignore this email.\n"
+            )
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[deliver_to],
+        )
+
+        email.send(
+            fail_silently=False,
+        )
+
+        logger.info(
+            "Club admin setup email for %s sent to %s",
+            user.email,
+            deliver_to,
+        )
+
+    @staticmethod
     def send_staff_invitation_email(invitation) -> None:
         """Emails the invite link for a clubs.StaffInvitation."""
         subject = f"You've Been Invited to {invitation.club.name} on League OS"

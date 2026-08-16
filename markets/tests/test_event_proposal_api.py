@@ -327,6 +327,7 @@ class EventProposalAPITests(APITestCase):
         self.assertEqual(listing.status_code, 200, listing.data)
         item = listing.data["results"][0]
         public_statuses = {
+            Market.Status.APPROVED,
             Market.Status.OPEN,
             Market.Status.SUSPENDED,
             Market.Status.CLOSED,

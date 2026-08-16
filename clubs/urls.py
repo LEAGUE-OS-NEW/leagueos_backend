@@ -6,6 +6,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from clubs.views import (
+    ClubAdminInviteView,
     ClubAuditLogViewSet,
     ClubMediaViewSet,
     ClubNewsViewSet,
@@ -181,6 +182,11 @@ urlpatterns = [
         "<uuid:club_pk>/staff-invitations/",
         StaffInvitationViewSet.as_view({"get": "list", "post": "create"}),
         name="staff-invitation-list",
+    ),
+    path(
+        "<uuid:club_pk>/staff-invitations/invite-admin/",
+        ClubAdminInviteView.as_view(),
+        name="club-admin-invite",
     ),
     path(
         "<uuid:club_pk>/staff-invitations/<uuid:pk>/",

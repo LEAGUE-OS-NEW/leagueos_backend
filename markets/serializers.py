@@ -19,6 +19,7 @@ from sports.serializers import (
 )
 
 PUBLIC_MARKET_STATUSES = (
+    Market.Status.APPROVED,
     Market.Status.OPEN,
     Market.Status.SUSPENDED,
     Market.Status.CLOSED,

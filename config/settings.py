@@ -417,6 +417,11 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@leagueos.com")
 
+# Frontend page that consumes an AccountSetupToken (?token=...) to let an
+# invited admin/club admin set their password. Referenced by
+# EmailService.send_account_setup_email / send_club_admin_setup_email.
+ACCOUNT_SETUP_URL = env("ACCOUNT_SETUP_URL", default="http://localhost:5173/accept-invite")
+
 
 # Registration and OTP Settings
 REGISTRATION_OTP_CHANNEL = env("REGISTRATION_OTP_CHANNEL", default="EMAIL").upper()
@@ -469,27 +474,215 @@ AVATAR_ALLOWED_MIME_TYPES = [
 AVATAR_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
 
 # Storage backend selection (local, s3, minio, r2)
-STORAGE_BACKEND = env("STORAGE_BACKEND", default="local")
+STORAGE_BACKEND = (
+    env(
+        "STORAGE_BACKEND",
+        default="local",
+    )
+    .strip()
+    .lower()
+)
 
-# Default file storage backend
+SUPPORTED_STORAGE_BACKENDS = {
+    "local",
+    "s3",
+    "minio",
+    "r2",
+}
+
+if STORAGE_BACKEND not in SUPPORTED_STORAGE_BACKENDS:
+    raise ImproperlyConfigured(f"Unsupported STORAGE_BACKEND: {STORAGE_BACKEND}")
+
+S3_PRIVATE_URL_EXPIRY = env.int(
+    "S3_PRIVATE_URL_EXPIRY",
+    default=900,
+)
+
+if S3_PRIVATE_URL_EXPIRY <= 0:
+    raise ImproperlyConfigured("S3_PRIVATE_URL_EXPIRY must be greater than zero.")
+
 if STORAGE_BACKEND == "local":
-    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
-elif STORAGE_BACKEND in ("s3", "minio", "r2"):
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    PRIVATE_MEDIA_ROOT = BASE_DIR / "private_media"
+    PRIVATE_MEDIA_URL = "/private-media/"
 
-# S3 / MinIO / R2 connection settings
-AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
-AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
-AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
-AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="")
-AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default="")
-AWS_S3_SIGNATURE_VERSION = env("AWS_S3_SIGNATURE_VERSION", default="s3v4")
-AWS_S3_FILE_OVERWRITE = False
-AWS_QUERYSTRING_AUTH = False
-AWS_DEFAULT_ACL = "private"
-AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="")
-AWS_MEDIA_LOCATION = "media"
-MEDIA_URL = env("MEDIA_URL", default="/media/")
+    STORAGES = {
+        "default": {
+            "BACKEND": ("django.core.files.storage.FileSystemStorage"),
+            "OPTIONS": {
+                "location": MEDIA_ROOT,
+                "base_url": MEDIA_URL,
+            },
+        },
+        "private": {
+            "BACKEND": ("config.storage_backends." "LocalPrivateMediaStorage"),
+            "OPTIONS": {
+                "location": PRIVATE_MEDIA_ROOT,
+                "base_url": PRIVATE_MEDIA_URL,
+            },
+        },
+        "staticfiles": {
+            "BACKEND": ("django.contrib.staticfiles.storage." "StaticFilesStorage"),
+        },
+    }
+
+else:
+    S3_ACCESS_KEY_ID = env(
+        "S3_ACCESS_KEY_ID",
+        default=env(
+            "AWS_ACCESS_KEY_ID",
+            default="",
+        ),
+    ).strip()
+
+    S3_SECRET_ACCESS_KEY = env(
+        "S3_SECRET_ACCESS_KEY",
+        default=env(
+            "AWS_SECRET_ACCESS_KEY",
+            default="",
+        ),
+    ).strip()
+
+    S3_ENDPOINT_URL = (
+        env(
+            "S3_ENDPOINT_URL",
+            default=env(
+                "AWS_S3_ENDPOINT_URL",
+                default="",
+            ),
+        )
+        .strip()
+        .rstrip("/")
+    )
+
+    S3_REGION_NAME = env(
+        "S3_REGION_NAME",
+        default=env(
+            "AWS_S3_REGION_NAME",
+            default="us-east-1",
+        ),
+    ).strip()
+
+    S3_ADDRESSING_STYLE = env(
+        "S3_ADDRESSING_STYLE",
+        default="path",
+    ).strip()
+
+    S3_PUBLIC_BUCKET_NAME = env(
+        "S3_PUBLIC_BUCKET_NAME",
+        default=env(
+            "AWS_STORAGE_BUCKET_NAME",
+            default="",
+        ),
+    ).strip()
+
+    S3_PRIVATE_BUCKET_NAME = env(
+        "S3_PRIVATE_BUCKET_NAME",
+        default="",
+    ).strip()
+
+    S3_PUBLIC_CUSTOM_DOMAIN = env(
+        "S3_PUBLIC_CUSTOM_DOMAIN",
+        default=env(
+            "AWS_S3_CUSTOM_DOMAIN",
+            default="",
+        ),
+    ).strip()
+
+    S3_PUBLIC_URL_PROTOCOL = env(
+        "S3_PUBLIC_URL_PROTOCOL",
+        default="https:",
+    ).strip()
+
+    S3_PRIVATE_EXTERNAL_BASE_URL = (
+        env(
+            "S3_PRIVATE_EXTERNAL_BASE_URL",
+            default="",
+        )
+        .strip()
+        .rstrip("/")
+    )
+
+    S3_PUBLIC_CACHE_CONTROL = env(
+        "S3_PUBLIC_CACHE_CONTROL",
+        default="public, max-age=86400",
+    )
+
+    required_storage_values = {
+        "S3_ACCESS_KEY_ID": S3_ACCESS_KEY_ID,
+        "S3_SECRET_ACCESS_KEY": S3_SECRET_ACCESS_KEY,
+        "S3_ENDPOINT_URL": S3_ENDPOINT_URL,
+        "S3_PUBLIC_BUCKET_NAME": S3_PUBLIC_BUCKET_NAME,
+        "S3_PRIVATE_BUCKET_NAME": S3_PRIVATE_BUCKET_NAME,
+    }
+
+    missing_storage_values = [name for name, value in required_storage_values.items() if not value]
+
+    if missing_storage_values:
+        raise ImproperlyConfigured(
+            "S3 storage is enabled but required settings "
+            "are missing: " + ", ".join(missing_storage_values)
+        )
+
+    if not S3_PUBLIC_URL_PROTOCOL.endswith(":"):
+        S3_PUBLIC_URL_PROTOCOL = f"{S3_PUBLIC_URL_PROTOCOL}:"
+
+    common_s3_options = {
+        "access_key": S3_ACCESS_KEY_ID,
+        "secret_key": S3_SECRET_ACCESS_KEY,
+        "endpoint_url": S3_ENDPOINT_URL,
+        "region_name": S3_REGION_NAME,
+        "addressing_style": S3_ADDRESSING_STYLE,
+        "signature_version": "s3v4",
+        "file_overwrite": False,
+    }
+
+    public_s3_options = {
+        **common_s3_options,
+        "bucket_name": S3_PUBLIC_BUCKET_NAME,
+        "default_acl": None,
+        "querystring_auth": False,
+        "object_parameters": {
+            "CacheControl": S3_PUBLIC_CACHE_CONTROL,
+        },
+    }
+
+    if S3_PUBLIC_CUSTOM_DOMAIN:
+        public_s3_options.update(
+            {
+                "custom_domain": S3_PUBLIC_CUSTOM_DOMAIN,
+                "url_protocol": S3_PUBLIC_URL_PROTOCOL,
+            }
+        )
+
+    private_s3_options = {
+        **common_s3_options,
+        "bucket_name": S3_PRIVATE_BUCKET_NAME,
+        "default_acl": None,
+        "querystring_auth": True,
+        "querystring_expire": S3_PRIVATE_URL_EXPIRY,
+        "object_parameters": {
+            "CacheControl": "private, no-store",
+        },
+    }
+
+    STORAGES = {
+        "default": {
+            "BACKEND": ("config.storage_backends.PublicMediaStorage"),
+            "OPTIONS": public_s3_options,
+        },
+        "private": {
+            "BACKEND": ("config.storage_backends.PrivateMediaStorage"),
+            "OPTIONS": private_s3_options,
+        },
+        "staticfiles": {
+            "BACKEND": ("django.contrib.staticfiles.storage." "StaticFilesStorage"),
+        },
+    }
+
+    if S3_PUBLIC_CUSTOM_DOMAIN:
+        MEDIA_URL = f"{S3_PUBLIC_URL_PROTOCOL}//" f"{S3_PUBLIC_CUSTOM_DOMAIN.rstrip('/')}/"
+    else:
+        MEDIA_URL = f"{S3_ENDPOINT_URL}/" f"{S3_PUBLIC_BUCKET_NAME}/"
 
 # =============================================================================
 # Automated KYC & Identity Verification Settings
