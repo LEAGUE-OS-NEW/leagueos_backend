@@ -1,8 +1,10 @@
-from unittest.mock import Mock
+import json
+from unittest.mock import MagicMock, Mock, patch
 
 from django.test import SimpleTestCase
 
 from wallets.services.pesapal_client import (
+    PesapalApiError,
     PesapalClient,
 )
 from wallets.services.pesapal_config import (
@@ -119,6 +121,79 @@ class PesapalClientTests(SimpleTestCase):
                 "orderTrackingId": "tracking-123",
             },
         )
+
+    def test_null_error_object_is_not_provider_failure(self):
+        client = PesapalClient(sandbox_config())
+
+        response = MagicMock()
+        response.read.return_value = json.dumps(
+            {
+                "payment_method": "Visa",
+                "amount": 5000,
+                "payment_status_description": ("Completed"),
+                "status_code": 1,
+                "merchant_reference": ("LO-DEPOSIT-test"),
+                "currency": "UGX",
+                "error": {
+                    "error_type": None,
+                    "code": None,
+                    "message": None,
+                    "call_back_url": None,
+                },
+                "status": "200",
+            }
+        ).encode("utf-8")
+
+        response.__enter__.return_value = response
+
+        with patch(
+            "wallets.services." "pesapal_client.request.urlopen",
+            return_value=response,
+        ):
+            result = client._request_json(
+                "GET",
+                ("/api/Transactions/" "GetTransactionStatus"),
+                token="sandbox-token",
+                query={"orderTrackingId": ("tracking-123")},
+            )
+
+        self.assertEqual(
+            result["status_code"],
+            1,
+        )
+
+        self.assertEqual(
+            result["payment_status_description"],
+            "Completed",
+        )
+
+    def test_real_provider_error_still_raises(self):
+        client = PesapalClient(sandbox_config())
+
+        response = MagicMock()
+        response.read.return_value = json.dumps(
+            {
+                "error": {
+                    "error_type": ("validation_error"),
+                    "code": "400",
+                    "message": ("Invalid transaction."),
+                },
+                "status": "400",
+            }
+        ).encode("utf-8")
+
+        response.__enter__.return_value = response
+
+        with patch(
+            "wallets.services." "pesapal_client.request.urlopen",
+            return_value=response,
+        ):
+            with self.assertRaises(PesapalApiError):
+                client._request_json(
+                    "GET",
+                    ("/api/Transactions/" "GetTransactionStatus"),
+                    token="sandbox-token",
+                )
 
     def test_ipn_registration_defaults_to_post(self):
         client = PesapalClient(sandbox_config())
