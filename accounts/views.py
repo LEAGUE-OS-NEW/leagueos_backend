@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.models import AuditLog, OTPVerification, User, VerificationAttempt
 from accounts.serializers import (
+    AccountSetupCompleteSerializer,
     RegistrationStatusQuerySerializer,
     RegistrationStatusSerializer,
     ResendOTPSerializer,
@@ -22,10 +23,13 @@ from accounts.services.email_service import EmailService
 from accounts.services.otp_service import OTPService
 from authentication.models import Role
 from authentication.serializers import AuthTokenResponseSerializer
+from authentication.services.account_setup_service import AccountSetupService
 from authentication.services.auth_context_service import AuthContextService
 from authentication.services.role_service import RoleService
 from authentication.services.session_service import SessionService
 from authentication.services.token_service import TokenService
+from clubs.models import StaffInvitation
+from clubs.services.staff_service import StaffService
 from onboarding.services.onboarding_service import OnboardingService
 from profiles.models import Profile
 
@@ -288,4 +292,65 @@ class RegistrationStatusView(APIView):
                 "Registration status fetched.",
                 {"exists": True, **RegistrationStatusSerializer(user).data},
             )
+        )
+
+
+class AccountSetupCompleteView(APIView):
+    """Consumes an AccountSetupToken to set a password and activate the
+    account — the piece AccountSetupService always had but nothing called.
+
+    If a pending StaffInvitation exists for this email (the club-admin
+    invite path — see ClubAdminInvitationService), also accepts it in the
+    same request so the invitee lands with their ClubWorkspace + Club Admin
+    role already granted, instead of a second manual step.
+    """
+
+    serializer_class = AccountSetupCompleteSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user, error = AccountSetupService.complete_setup(
+            data["token"],
+            data["password"],
+            data["first_name"],
+            data["last_name"],
+        )
+        if not user:
+            return Response(
+                build_response(
+                    False,
+                    error or "Invalid or expired setup token.",
+                    errors={"token": [error or "Invalid or expired setup token."]},
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pending_invitation = (
+            StaffInvitation.objects.filter(
+                email__iexact=user.email,
+                status=StaffInvitation.Status.PENDING,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if pending_invitation:
+            StaffService.accept_invitation(token=pending_invitation.token, user=user)
+
+        ip_address = get_client_ip(request) or "127.0.0.1"
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+        access, refresh = TokenService.generate_tokens(user)
+        SessionService.create_session(user, refresh, ip_address, user_agent)
+        log_audit(user, "ACCOUNT_SETUP_COMPLETED", ip_address, user_agent)
+
+        return Response(
+            build_response(
+                True,
+                "Account set up successfully.",
+                AuthContextService.authenticated_data(user, access, refresh),
+            ),
+            status=status.HTTP_200_OK,
         )
