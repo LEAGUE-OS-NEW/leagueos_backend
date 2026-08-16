@@ -1,11 +1,18 @@
 """Tests for the wallets API."""
 
+from unittest.mock import Mock
+from uuid import uuid4
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from authentication.tests.factories import UserFactory
+from wallets.services.pesapal_client import PesapalApiError
+from wallets.services.pesapal_deposit_service import (
+    PesapalDepositService,
+)
 from wallets.tests.factories import PaymentProviderFactory, WalletFactory
 
 pytestmark = pytest.mark.django_db
@@ -81,6 +88,43 @@ class TestDepositAPI:
         data = {"amount": "50000", "currency": "UGX", "provider_code": "INVALID"}
         response = auth_client.post(url, data)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_pesapal_provider_error_returns_safe_502(
+        self,
+        auth_client,
+        monkeypatch,
+    ):
+        mocked_start = Mock(side_effect=PesapalApiError("Pesapal HTTP error 400."))
+
+        monkeypatch.setattr(
+            PesapalDepositService,
+            "start_deposit",
+            mocked_start,
+        )
+
+        url = reverse("wallets:deposit-intent-create")
+
+        response = auth_client.post(
+            url,
+            {
+                "amount": "50000",
+                "currency": "UGX",
+                "provider_code": ("PESAPAL_SANDBOX"),
+                "idempotency_key": str(uuid4()),
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+        assert response.data == {
+            "provider": [
+                "Pesapal Sandbox checkout "
+                "could not be confirmed. "
+                "Do not automatically retry "
+                "this request."
+            ]
+        }
 
 
 class TestWithdrawalAPI:
