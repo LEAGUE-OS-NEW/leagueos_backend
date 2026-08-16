@@ -1,6 +1,5 @@
 from django.db import migrations
 
-
 PROVIDER_CODE = "PESAPAL_SANDBOX"
 
 
@@ -14,11 +13,7 @@ def ensure_pesapal_sandbox_provider(apps, schema_editor):
         code=PROVIDER_CODE,
     ).first()
 
-    existing_config = (
-        dict(provider.config or {})
-        if provider is not None
-        else {}
-    )
+    existing_config = dict(provider.config or {}) if provider is not None else {}
 
     existing_config.update(
         {
@@ -40,7 +35,6 @@ def ensure_pesapal_sandbox_provider(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         (
             "wallets",
