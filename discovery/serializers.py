@@ -11,6 +11,7 @@ from discovery.models import (
     MatchTeamStatistic,
     MatchTimelineEvent,
     News,
+    NewsCategory,
 )
 from onboarding.models import UserClubPreference
 from profiles.models import Club
@@ -342,8 +343,119 @@ class NewsSerializer(serializers.ModelSerializer):
             "competition",
             "club",
             "is_featured",
+            "is_trending",
             "published_at",
         ]
+
+
+class NewsCategorySerializer(serializers.ModelSerializer):
+    """Public list of selectable news categories — used by the club
+    submission form and the admin Compose News form."""
+
+    class Meta:
+        model = NewsCategory
+        fields = ["id", "code", "name"]
+
+
+# =============================================================================
+# News moderation (club submission + platform admin review)
+# =============================================================================
+
+
+class NewsSubmissionSerializer(serializers.ModelSerializer):
+    """Club-side submission — creates a PENDING_APPROVAL article. `club` and
+    `status` are set server-side by the view, never taken from the client."""
+
+    class Meta:
+        model = News
+        fields = ["title", "summary", "body", "category", "sport", "competition"]
+
+
+class NewsComposeSerializer(serializers.ModelSerializer):
+    """Staff Compose News — create-and-publish directly, no club, no review."""
+
+    class Meta:
+        model = News
+        fields = ["title", "summary", "body", "category", "sport", "competition"]
+
+
+class NewsModerationSerializer(serializers.ModelSerializer):
+    """Full detail for the review queue, published list, and Edit Story —
+    exposes fields the public NewsSerializer intentionally omits."""
+
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = News
+        fields = [
+            "id",
+            "title",
+            "slug",
+            "summary",
+            "body",
+            "category",
+            "sport",
+            "competition",
+            "club",
+            "status",
+            "is_featured",
+            "is_trending",
+            "is_verified",
+            "rejection_reason",
+            "published_at",
+            "created_at",
+            "created_by",
+        ]
+        read_only_fields = [
+            "id",
+            "slug",
+            "club",
+            "status",
+            "is_featured",
+            "is_trending",
+            "is_verified",
+            "rejection_reason",
+            "published_at",
+            "created_at",
+            "created_by",
+        ]
+
+    def get_created_by(self, obj):
+        if not obj.created_by_id:
+            return None
+        return {
+            "id": obj.created_by_id,
+            "name": (
+                f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+                or obj.created_by.email
+            ),
+        }
+
+
+class NewsModerationUpdateSerializer(serializers.ModelSerializer):
+    """Edit Story — partial update of an article's content/classification."""
+
+    class Meta:
+        model = News
+        fields = ["title", "summary", "body", "category", "sport", "competition"]
+        extra_kwargs = {field: {"required": False} for field in fields}
+
+
+class NewsApproveSerializer(serializers.Serializer):
+    is_top_story = serializers.BooleanField(required=False, default=False)
+    is_trending = serializers.BooleanField(required=False, default=False)
+
+
+class NewsRejectSerializer(serializers.Serializer):
+    reason = serializers.CharField(allow_blank=False, max_length=2000)
+
+
+class NewsFeaturedSerializer(serializers.Serializer):
+    is_featured = serializers.BooleanField()
+
+
+class NewsTrendingSerializer(serializers.Serializer):
+    is_trending = serializers.BooleanField()
 
 
 # =============================================================================

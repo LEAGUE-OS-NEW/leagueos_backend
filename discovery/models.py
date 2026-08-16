@@ -326,6 +326,7 @@ class News(TimeStampedUUIDModel):
         db_index=True,
     )
     is_featured = models.BooleanField(default=False, db_index=True)
+    is_trending = models.BooleanField(default=False, db_index=True)
     is_verified = models.BooleanField(default=False, db_index=True)
     published_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
@@ -337,12 +338,14 @@ class News(TimeStampedUUIDModel):
     )
     source_name = models.CharField(max_length=120, blank=True)
     source_reference = models.CharField(max_length=255, blank=True)
+    rejection_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-published_at", "-created_at"]
         indexes = [
             models.Index(fields=["status", "is_verified", "published_at"]),
             models.Index(fields=["is_featured", "status", "published_at"]),
+            models.Index(fields=["is_trending", "status", "published_at"]),
             models.Index(fields=["category", "status", "published_at"]),
             models.Index(fields=["club", "status", "published_at"]),
             models.Index(fields=["competition", "status", "published_at"]),

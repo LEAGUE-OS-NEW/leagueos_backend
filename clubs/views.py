@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import status, viewsets
+from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from discovery.models import News
+from discovery.serializers import NewsModerationSerializer, NewsSubmissionSerializer
+from discovery.services.news_moderation_service import news_moderation_service
 from clubs.models import (
     ClubAuditLog,
     ClubMedia,
@@ -312,6 +315,51 @@ class ClubAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         return ClubAuditLog.objects.filter(club_id=self.kwargs.get("club_pk")).order_by(
             "-created_at"
         )
+
+
+class NewsSubmissionView(generics.ListCreateAPIView):
+    """Club-side submission into the real discovery.News moderation pipeline
+    (distinct from ClubNewsViewSet's orphaned ClubNews model above — this is
+    what Sports Data & Statistics Admin / Super Admin actually review)."""
+
+    permission_classes = [IsClubStaff]
+
+    def get_queryset(self):
+        return (
+            News.objects.filter(club_id=self.kwargs.get("club_pk"))
+            .select_related("category", "sport", "competition")
+            .order_by("-created_at")
+        )
+
+    def get_serializer_class(self):
+        return (
+            NewsModerationSerializer if self.request.method == "GET" else NewsSubmissionSerializer
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = NewsSubmissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        club = Club.objects.get(id=self.kwargs["club_pk"])
+        news = news_moderation_service.submit_for_review(
+            club=club,
+            created_by=request.user,
+            **serializer.validated_data,
+        )
+
+        from clubs.services.audit_service import club_audit_service
+
+        club_audit_service.record(
+            "NEWS_SUBMITTED",
+            club,
+            request.user,
+            entity_type="news",
+            entity_id=news.id,
+            request=request,
+            metadata={"title": news.title},
+        )
+
+        return Response(NewsModerationSerializer(news).data, status=status.HTTP_201_CREATED)
 
 
 class StaffInvitationViewSet(viewsets.ModelViewSet):

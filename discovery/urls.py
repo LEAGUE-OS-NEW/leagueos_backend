@@ -12,6 +12,7 @@ from discovery.views import (
     FixtureListView,
     FollowingListView,
     MatchCentreView,
+    NewsCategoryListView,
     NewsDetailView,
     NewsListView,
     PlayerDetailView,
@@ -74,6 +75,7 @@ urlpatterns = [
     # News
     path("news/", NewsListView.as_view(), name="news-list"),
     path("news/<uuid:news_id>/", NewsDetailView.as_view(), name="news-detail"),
+    path("news-categories/", NewsCategoryListView.as_view(), name="news-category-list"),
     # Match Centre
     path(
         "match-centre/<uuid:fixture_id>/",

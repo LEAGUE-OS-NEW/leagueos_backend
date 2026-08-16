@@ -14,6 +14,7 @@ from clubs.views import (
     ClubWorkspaceViewSet,
     MembershipPlanViewSet,
     MerchandiseProductViewSet,
+    NewsSubmissionView,
     ProductCategoryViewSet,
     StaffInvitationAcceptView,
     StaffInvitationViewSet,
@@ -119,6 +120,11 @@ urlpatterns = [
         "<uuid:club_pk>/news/<uuid:pk>/schedule/",
         ClubNewsViewSet.as_view({"post": "schedule"}),
         name="club-news-schedule",
+    ),
+    path(
+        "<uuid:club_pk>/news-submissions/",
+        NewsSubmissionView.as_view(),
+        name="club-news-submission-list",
     ),
     path(
         "<uuid:club_pk>/membership-plans/",
