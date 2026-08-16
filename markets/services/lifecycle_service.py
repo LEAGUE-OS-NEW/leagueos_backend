@@ -194,6 +194,18 @@ class MarketLifecycleService:
         from markets.services.liquidity_service import MarketLiquidityService
 
         MarketLiquidityService.activate_opening_liquidity(market=opened, actor=actor)
+
+        if (
+            opened.max_market_amount is not None
+            and opened.current_market_amount >= opened.max_market_amount
+        ):
+            from markets.services.close_cleanup_service import MarketCloseCleanupService
+
+            MarketCloseCleanupService.cleanup_locked_market(market=opened, actor=actor)
+            opened.status = Market.Status.CLOSED
+            opened.close_reason = Market.MarketCloseReason.MAXIMUM_AMOUNT_REACHED
+            opened.save(update_fields=["status", "close_reason", "updated_at"])
+
         return opened
 
     @classmethod

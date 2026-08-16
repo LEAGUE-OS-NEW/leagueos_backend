@@ -138,6 +138,20 @@ class MarketPublicSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     trading_snapshot = serializers.SerializerMethodField()
+    settlement_unit = serializers.IntegerField(read_only=True)
+    max_market_amount = serializers.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        read_only=True,
+    )
+    current_market_amount = serializers.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        read_only=True,
+    )
+    remaining_market_capacity = serializers.SerializerMethodField()
+    capacity_percentage = serializers.SerializerMethodField()
+    close_reason = serializers.CharField(read_only=True)
 
     class Meta:
         model = Market
@@ -149,6 +163,7 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "resolution_source",
             "resolution_criteria",
             "face_value_ugx",
+            "settlement_unit",
             "scope_type",
             "status",
             "opens_at",
@@ -172,6 +187,11 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "trading_snapshot",
             "opening_liquidity_available",
             "opening_reference",
+            "max_market_amount",
+            "current_market_amount",
+            "remaining_market_capacity",
+            "capacity_percentage",
+            "close_reason",
         ]
 
     @extend_schema_field(serializers.BooleanField())
@@ -248,6 +268,21 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "volume": sum((fill.quantity * fill.price for fill in fills), Decimal("0")),
             "trader_count": len(traders),
         }
+
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=4))
+    def get_remaining_market_capacity(self, obj):
+        if obj.max_market_amount is None:
+            return None
+        remaining = obj.max_market_amount - obj.current_market_amount
+        return remaining if remaining > 0 else Decimal("0.0000")
+
+    @extend_schema_field(serializers.DecimalField(max_digits=5, decimal_places=2))
+    def get_capacity_percentage(self, obj):
+        if obj.max_market_amount is None or obj.max_market_amount <= 0:
+            return None
+        return ((obj.current_market_amount / obj.max_market_amount) * Decimal("100")).quantize(
+            Decimal("0.01")
+        )
 
     @extend_schema_field(MarketSubjectSerializer)
     def get_subject(self, obj) -> dict:

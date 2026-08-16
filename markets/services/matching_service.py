@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid5
 
 from django.db import transaction
@@ -63,6 +63,7 @@ class MarketMatchingService:
             if available < required:
                 return []
         fills = []
+        spent_amount = Decimal("0.0000")
 
         for maker in makers:
             if not cls._is_fillable(taker):
@@ -75,6 +76,19 @@ class MarketMatchingService:
             quantity = min(taker_remaining, maker_remaining)
             if quantity <= Decimal("0.0000"):
                 continue
+
+            if (
+                taker.side == MarketOrder.Side.BUY
+                and taker.order_type == MarketOrder.OrderType.MARKET
+                and taker.amount is not None
+            ):
+                max_spend = taker.amount - spent_amount
+                max_quantity = (max_spend / maker.limit_price).quantize(
+                    Decimal("0.0001"), rounding=ROUND_HALF_UP
+                )
+                quantity = min(quantity, max_quantity)
+                if quantity <= Decimal("0.0000"):
+                    break
 
             fill = MarketFillService.execute_fill(
                 execution_reference=cls._execution_reference(
@@ -89,6 +103,10 @@ class MarketMatchingService:
                 price=maker.limit_price,
             )
             fills.append(fill)
+            if taker.side == MarketOrder.Side.BUY and taker.order_type == MarketOrder.OrderType.MARKET:
+                spent_amount += (quantity * maker.limit_price).quantize(
+                    Decimal("0.0001"), rounding=ROUND_HALF_UP
+                )
             taker.refresh_from_db()
             maker.refresh_from_db()
 
@@ -127,15 +145,25 @@ class MarketMatchingService:
         )
 
         if taker.side == MarketOrder.Side.BUY:
-            queryset = queryset.filter(
-                side=MarketOrder.Side.SELL,
-                limit_price__lte=taker.limit_price,
-            ).order_by("limit_price", "created_at", "id")
+            if taker.order_type == MarketOrder.OrderType.LIMIT:
+                queryset = queryset.filter(
+                    side=MarketOrder.Side.SELL,
+                    limit_price__lte=taker.limit_price,
+                ).order_by("limit_price", "created_at", "id")
+            else:
+                queryset = queryset.filter(
+                    side=MarketOrder.Side.SELL,
+                ).order_by("limit_price", "created_at", "id")
         else:
-            queryset = queryset.filter(
-                side=MarketOrder.Side.BUY,
-                limit_price__gte=taker.limit_price,
-            ).order_by("-limit_price", "created_at", "id")
+            if taker.order_type == MarketOrder.OrderType.LIMIT:
+                queryset = queryset.filter(
+                    side=MarketOrder.Side.BUY,
+                    limit_price__gte=taker.limit_price,
+                ).order_by("-limit_price", "created_at", "id")
+            else:
+                queryset = queryset.filter(
+                    side=MarketOrder.Side.BUY,
+                ).order_by("-limit_price", "created_at", "id")
 
         return list(queryset.values_list("id", flat=True))
 
@@ -192,8 +220,12 @@ class MarketMatchingService:
         if maker.user_id == taker.user_id or maker.side == taker.side:
             return False
         if taker.side == MarketOrder.Side.BUY:
-            return maker.limit_price <= taker.limit_price
-        return maker.limit_price >= taker.limit_price
+            if taker.order_type == MarketOrder.OrderType.LIMIT:
+                return maker.limit_price <= taker.limit_price
+            return True
+        if taker.order_type == MarketOrder.OrderType.LIMIT:
+            return maker.limit_price >= taker.limit_price
+        return True
 
     @staticmethod
     def _execution_reference(

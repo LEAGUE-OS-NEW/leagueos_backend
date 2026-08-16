@@ -1,5 +1,6 @@
 from decimal import (
     Decimal,
+    ROUND_HALF_UP,
 )
 from typing import TypedDict
 from uuid import uuid5
@@ -63,6 +64,8 @@ class MarketParticipationService:
         limit_price: Decimal,
         time_in_force: str = MarketOrder.TimeInForce.GTC,
         expires_at=None,
+        order_type: str = MarketOrder.OrderType.LIMIT,
+        amount: Decimal = None,
     ) -> MarketOrder:
         cls._require_permission(user)
         cls._require_verified_user(user)
@@ -93,6 +96,23 @@ class MarketParticipationService:
             market=market,
             outcome_id=outcome_id,
         )
+
+        if order_type == MarketOrder.OrderType.MARKET:
+            if side == MarketOrder.Side.BUY:
+                if amount is None:
+                    raise ValidationError({"amount": "BUY MARKET orders require an amount."})
+                best_ask = cls._best_ask(market=market, outcome=outcome)
+                reference_price = best_ask or outcome.opening_price or Decimal("0.50000")
+                quantity = (amount / reference_price).quantize(
+                    Decimal("0.0001"), rounding=ROUND_HALF_UP
+                )
+                limit_price = Decimal("0.99990")
+            else:
+                limit_price = Decimal("0.00001")
+        elif limit_price is None or quantity is None:
+            raise ValidationError(
+                {"limit_price": "LIMIT orders require limit_price and quantity."}
+            )
 
         responsible = MarketResponsibleParticipationService.evaluate_order(
             participant=user,
@@ -125,7 +145,9 @@ class MarketParticipationService:
             market=market,
             outcome=outcome,
             side=side,
+            order_type=order_type,
             quantity=quantity,
+            amount=amount if order_type == MarketOrder.OrderType.MARKET and side == MarketOrder.Side.BUY else None,
             limit_price=limit_price,
             filled_quantity=Decimal("0"),
             average_fill_price=None,
@@ -253,6 +275,21 @@ class MarketParticipationService:
             "released_position_quantity": released_position_quantity,
             "wallet_entry": wallet_entry,
         }
+
+    @staticmethod
+    def _best_ask(*, market: Market, outcome: MarketOutcome) -> Decimal | None:
+        ask = (
+            MarketOrder.objects.filter(
+                market=market,
+                outcome=outcome,
+                side=MarketOrder.Side.SELL,
+                status__in=MarketMatchingService.FILLABLE_STATUSES,
+            )
+            .order_by("limit_price", "created_at", "id")
+            .values_list("limit_price", flat=True)
+            .first()
+        )
+        return ask
 
     @classmethod
     def _calculate_buy_reservation(

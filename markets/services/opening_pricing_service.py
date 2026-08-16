@@ -49,7 +49,8 @@ class MarketOpeningPricingService:
             raise ValidationError({"outcomes": "A binary YES/NO outcome pair is required."})
 
         market.face_value_ugx = face_value
-        market.save(update_fields=["face_value_ugx", "updated_at"])
+        market.settlement_unit = face_value
+        market.save(update_fields=["face_value_ugx", "settlement_unit", "updated_at"])
         outcomes[MarketOutcome.Side.YES].opening_price = yes_price
         outcomes[MarketOutcome.Side.NO].opening_price = no_price
         MarketOutcome.objects.bulk_update(outcomes.values(), ["opening_price", "updated_at"])

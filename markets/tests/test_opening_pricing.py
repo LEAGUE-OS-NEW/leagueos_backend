@@ -50,7 +50,7 @@ class MarketOpeningPricingTests(TestCase):
             created_by=self.actor,
         )
 
-    def configure(self, probability=60, face_value=10000):
+    def configure(self, probability=60, face_value=5000):
         return MarketOpeningPricingService.configure(
             market=self.market,
             actor=self.actor,
@@ -59,7 +59,7 @@ class MarketOpeningPricingTests(TestCase):
         )
 
     def test_new_market_default_and_complementary_prices(self):
-        self.assertEqual(self.market.face_value_ugx, 10000)
+        self.assertEqual(self.market.face_value_ugx, 5000)
         self.configure()
         outcomes = {outcome.side: outcome for outcome in self.market.outcomes.all()}
         self.assertEqual(outcomes["YES"].opening_price, Decimal("0.60000"))
@@ -67,8 +67,8 @@ class MarketOpeningPricingTests(TestCase):
         self.assertEqual(sum(item.opening_price for item in outcomes.values()), Decimal("1.00000"))
         data = MarketPublicSerializer(Market.objects.get(pk=self.market.pk)).data
         by_side = {item["side"]: item for item in data["outcomes"]}
-        self.assertEqual(by_side["YES"]["opening_price_ugx"], 6000)
-        self.assertEqual(by_side["NO"]["opening_price_ugx"], 4000)
+        self.assertEqual(by_side["YES"]["opening_price_ugx"], 3000)
+        self.assertEqual(by_side["NO"]["opening_price_ugx"], 2000)
 
     def test_invalid_endpoints_are_rejected(self):
         for probability in (0, 100):
@@ -88,7 +88,7 @@ class MarketOpeningPricingTests(TestCase):
             MarketOpeningPricingService.configure(
                 market=self.market,
                 actor=self.outsider,
-                face_value_ugx=10000,
+                    face_value_ugx=5000,
                 yes_probability=50,
             )
 

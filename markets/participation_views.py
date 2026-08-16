@@ -85,10 +85,12 @@ class MarketOrderCreateView(APIView):
                 market_id=market_id,
                 outcome_id=(serializer.validated_data["outcome_id"]),
                 side=(serializer.validated_data["side"]),
-                quantity=(serializer.validated_data["quantity"]),
-                limit_price=(serializer.validated_data["limit_price"]),
+                quantity=(serializer.validated_data.get("quantity")),
+                limit_price=(serializer.validated_data.get("limit_price")),
                 time_in_force=serializer.validated_data["time_in_force"],
                 expires_at=serializer.validated_data.get("expires_at"),
+                order_type=serializer.validated_data.get("order_type", MarketOrder.OrderType.LIMIT),
+                amount=serializer.validated_data.get("amount"),
             )
         except MarketParticipationIneligible as error:
             AuditLog.objects.create(
