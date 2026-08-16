@@ -26,6 +26,7 @@ from markets.models import (
 )
 from markets.serializers import MarketPublicSerializer
 from markets.services.catalog_service import MarketCatalogService
+from markets.services.liquidity_service import MarketLiquidityService
 from markets.services.opening_pricing_service import MarketOpeningPricingService
 from sports.models import Sport
 from wallets.models import WalletTransaction
@@ -233,6 +234,43 @@ class MarketOpeningPricingTests(TestCase):
                 "configure_untraded_market_opening_pricing",
                 actor_email=self.actor.email,
             )
+
+    def test_public_serializer_exposes_safe_opening_liquidity_summary(self):
+        self.configure(
+            probability=50,
+            face_value=10000,
+        )
+
+        MarketLiquidityService.configure(
+            market=self.market,
+            actor=self.actor,
+            initial_liquidity_ugx=Decimal("500000.0000"),
+            opening_spread_bps=100,
+        )
+
+        data = MarketPublicSerializer(
+            Market.objects.get(
+                pk=self.market.pk,
+            )
+        ).data
+
+        self.assertEqual(
+            data["opening_liquidity"],
+            {
+                "initial_liquidity_ugx": "500000.0000",
+                "opening_spread_bps": 100,
+                "activation_status": "CONFIGURED",
+            },
+        )
+
+        self.assertNotIn(
+            "provider",
+            data["opening_liquidity"],
+        )
+        self.assertNotIn(
+            "locked_collateral",
+            data["opening_liquidity"],
+        )
 
     def test_snapshot_uses_reference_without_creating_trading_records(self):
         self.configure(60)
