@@ -17,6 +17,63 @@ class PesapalDiagnosticAuthenticationSerializer(serializers.Serializer):
     error_type = serializers.CharField(allow_blank=True)
 
 
+class PesapalDiagnosticAddressSerializer(serializers.Serializer):
+    family = serializers.CharField()
+    address = serializers.CharField()
+
+
+class PesapalDiagnosticDnsSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
+    elapsed_ms = serializers.FloatField(
+        allow_null=True,
+    )
+    addresses = PesapalDiagnosticAddressSerializer(
+        many=True,
+    )
+    error_type = serializers.CharField(
+        allow_blank=True,
+    )
+
+
+class PesapalDiagnosticTcpSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
+    elapsed_ms = serializers.FloatField(
+        allow_null=True,
+    )
+    error_type = serializers.CharField(
+        allow_blank=True,
+    )
+
+
+class PesapalDiagnosticTlsSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
+    elapsed_ms = serializers.FloatField(
+        allow_null=True,
+    )
+    protocol = serializers.CharField(
+        allow_blank=True,
+    )
+    error_type = serializers.CharField(
+        allow_blank=True,
+    )
+
+
+class PesapalDiagnosticProbeSerializer(serializers.Serializer):
+    family = serializers.CharField()
+    address = serializers.CharField()
+    tcp = PesapalDiagnosticTcpSerializer()
+    tls = PesapalDiagnosticTlsSerializer()
+
+
+class PesapalDiagnosticTransportSerializer(serializers.Serializer):
+    host = serializers.CharField()
+    port = serializers.IntegerField()
+    dns = PesapalDiagnosticDnsSerializer()
+    probes = PesapalDiagnosticProbeSerializer(
+        many=True,
+    )
+
+
 class PesapalDiagnosticSerializer(serializers.Serializer):
     environment = serializers.CharField()
     sandbox = serializers.BooleanField()
@@ -24,4 +81,7 @@ class PesapalDiagnosticSerializer(serializers.Serializer):
     credentials_present = serializers.BooleanField()
     ipn_configured = serializers.BooleanField()
     callback_configured = serializers.BooleanField()
+    transport = PesapalDiagnosticTransportSerializer(
+        required=False,
+    )
     authentication = PesapalDiagnosticAuthenticationSerializer()

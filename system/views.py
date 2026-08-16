@@ -1,3 +1,8 @@
+import socket
+import ssl
+import time
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connections
@@ -61,6 +66,212 @@ def health_check(request):
     )
 
 
+def _pesapal_transport_diagnostic(base_url: str) -> dict:
+    """
+    Safe staging diagnostic for the network layers below HTTPS.
+
+    No credentials, tokens, request bodies, or private application data
+    are returned.
+    """
+    parsed = urlparse(base_url)
+    host = parsed.hostname or ""
+    port = parsed.port or 443
+
+    result = {
+        "host": host,
+        "port": port,
+        "dns": {
+            "ok": False,
+            "elapsed_ms": None,
+            "addresses": [],
+            "error_type": "",
+        },
+        "probes": [],
+    }
+
+    started = time.monotonic()
+
+    try:
+        records = socket.getaddrinfo(
+            host,
+            port,
+            type=socket.SOCK_STREAM,
+        )
+    except Exception as exc:  # noqa: BLE001 - diagnostic reports type only
+        result["dns"] = {
+            "ok": False,
+            "elapsed_ms": round(
+                (time.monotonic() - started) * 1000,
+                1,
+            ),
+            "addresses": [],
+            "error_type": type(exc).__name__,
+        }
+        return result
+
+    addresses = []
+    seen = set()
+
+    for family, socktype, proto, _, sockaddr in records:
+        address = sockaddr[0]
+
+        key = (
+            family,
+            address,
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        family_name = (
+            "IPv6"
+            if family == socket.AF_INET6
+            else "IPv4" if family == socket.AF_INET else str(family)
+        )
+
+        addresses.append(
+            {
+                "family": family_name,
+                "address": address,
+                "_family": family,
+                "_socktype": socktype,
+                "_proto": proto,
+                "_sockaddr": sockaddr,
+            }
+        )
+
+    result["dns"] = {
+        "ok": bool(addresses),
+        "elapsed_ms": round(
+            (time.monotonic() - started) * 1000,
+            1,
+        ),
+        "addresses": [
+            {
+                "family": item["family"],
+                "address": item["address"],
+            }
+            for item in addresses
+        ],
+        "error_type": "",
+    }
+
+    # Probe at most one address per family so the staging diagnostic remains
+    # bounded even if the provider publishes a large DNS answer set.
+    selected = []
+    family_counts = {
+        "IPv4": 0,
+        "IPv6": 0,
+    }
+
+    for item in addresses:
+        family = item["family"]
+
+        if family not in family_counts:
+            continue
+
+        if family_counts[family] >= 1:
+            continue
+
+        family_counts[family] += 1
+        selected.append(item)
+
+    context = ssl.create_default_context()
+
+    for item in selected:
+        probe = {
+            "family": item["family"],
+            "address": item["address"],
+            "tcp": {
+                "ok": False,
+                "elapsed_ms": None,
+                "error_type": "",
+            },
+            "tls": {
+                "ok": False,
+                "elapsed_ms": None,
+                "protocol": "",
+                "error_type": "",
+            },
+        }
+
+        tcp_started = time.monotonic()
+        raw_socket = None
+
+        try:
+            raw_socket = socket.socket(
+                item["_family"],
+                item["_socktype"],
+                item["_proto"],
+            )
+            raw_socket.settimeout(3)
+            raw_socket.connect(
+                item["_sockaddr"],
+            )
+
+            probe["tcp"] = {
+                "ok": True,
+                "elapsed_ms": round(
+                    (time.monotonic() - tcp_started) * 1000,
+                    1,
+                ),
+                "error_type": "",
+            }
+        except Exception as exc:  # noqa: BLE001
+            probe["tcp"] = {
+                "ok": False,
+                "elapsed_ms": round(
+                    (time.monotonic() - tcp_started) * 1000,
+                    1,
+                ),
+                "error_type": type(exc).__name__,
+            }
+
+            if raw_socket is not None:
+                raw_socket.close()
+
+            result["probes"].append(probe)
+            continue
+
+        tls_started = time.monotonic()
+
+        try:
+            with context.wrap_socket(
+                raw_socket,
+                server_hostname=host,
+            ) as tls_socket:
+                probe["tls"] = {
+                    "ok": True,
+                    "elapsed_ms": round(
+                        (time.monotonic() - tls_started) * 1000,
+                        1,
+                    ),
+                    "protocol": tls_socket.version() or "",
+                    "error_type": "",
+                }
+        except Exception as exc:  # noqa: BLE001
+            probe["tls"] = {
+                "ok": False,
+                "elapsed_ms": round(
+                    (time.monotonic() - tls_started) * 1000,
+                    1,
+                ),
+                "protocol": "",
+                "error_type": type(exc).__name__,
+            }
+
+            try:
+                raw_socket.close()
+            except Exception:
+                pass
+
+        result["probes"].append(probe)
+
+    return result
+
+
 @extend_schema(
     request=None,
     responses={
@@ -120,6 +331,9 @@ def pesapal_diagnostic(request):
         "credentials_present": credentials_present,
         "ipn_configured": bool(config.ipn_id),
         "callback_configured": bool(config.callback_url),
+        "transport": _pesapal_transport_diagnostic(
+            config.base_url,
+        ),
         "authentication": {
             "ok": False,
             "error_type": "",
@@ -130,6 +344,20 @@ def pesapal_diagnostic(request):
         payload["authentication"] = {
             "ok": False,
             "error_type": "MissingCredentials",
+        }
+        return Response(
+            payload,
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    tls_available = any(
+        probe.get("tls", {}).get("ok") for probe in payload["transport"].get("probes", [])
+    )
+
+    if not tls_available:
+        payload["authentication"] = {
+            "ok": False,
+            "error_type": "TransportUnavailable",
         }
         return Response(
             payload,
