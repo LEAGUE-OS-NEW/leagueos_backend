@@ -195,6 +195,23 @@ class PesapalClientTests(SimpleTestCase):
                     token="sandbox-token",
                 )
 
+    def test_raw_timeout_is_normalized_to_pesapal_api_error(self):
+        client = PesapalClient(sandbox_config())
+
+        with patch(
+            "wallets.services.pesapal_client.request.urlopen",
+            side_effect=TimeoutError("simulated timeout"),
+        ):
+            with self.assertRaises(PesapalApiError):
+                client._request_json(
+                    "POST",
+                    "/api/Auth/RequestToken",
+                    payload={
+                        "consumer_key": "sandbox-key",
+                        "consumer_secret": "sandbox-secret",
+                    },
+                )
+
     def test_ipn_registration_defaults_to_post(self):
         client = PesapalClient(sandbox_config())
 
