@@ -247,9 +247,17 @@ class MarketAdminWriteSerializer(serializers.Serializer):
         default="No",
         max_length=120,
     )
-    face_value_ugx = serializers.IntegerField(required=False, min_value=1, default=10000)
+    face_value_ugx = serializers.IntegerField(required=False, min_value=1, default=5000)
+    settlement_unit = serializers.IntegerField(required=False, min_value=1, default=5000)
     yes_probability = serializers.DecimalField(
         required=False, max_digits=7, decimal_places=5, min_value=0, max_value=100, default="50"
+    )
+    max_market_amount = serializers.DecimalField(
+        required=False,
+        max_digits=20,
+        decimal_places=4,
+        min_value=0,
+        default=0,
     )
     initial_liquidity_ugx = serializers.DecimalField(
         required=False, max_digits=20, decimal_places=4, min_value=0, default=0
@@ -319,7 +327,9 @@ class MarketAdminWriteSerializer(serializers.Serializer):
         initial_liquidity = validated_data.pop("initial_liquidity_ugx", 0)
         liquidity_source = validated_data.pop("liquidity_source", "PLATFORM_TREASURY")
         opening_spread = validated_data.pop("opening_spread_bps", 0)
-        face_value_ugx = validated_data.pop("face_value_ugx", 10000)
+        face_value_ugx = validated_data.pop("face_value_ugx", 5000)
+        settlement_unit = validated_data.pop("settlement_unit", face_value_ugx)
+        max_market_amount = validated_data.pop("max_market_amount", None)
         yes_probability = validated_data.pop("yes_probability", 50)
         yes_label = validated_data.pop(
             "yes_label",
@@ -334,8 +344,11 @@ class MarketAdminWriteSerializer(serializers.Serializer):
             {
                 "status": Market.Status.DRAFT,
                 "created_by": (self.context["request"].user),
+                "settlement_unit": settlement_unit,
             }
         )
+        if max_market_amount:
+            validated_data["max_market_amount"] = max_market_amount
 
         try:
             with transaction.atomic():

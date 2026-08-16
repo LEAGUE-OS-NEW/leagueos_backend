@@ -12,6 +12,7 @@ from django.db import (
 )
 
 from markets.models import (
+    Market,
     MarketFeeLedgerEntry,
     MarketFill,
     MarketOrder,
@@ -69,6 +70,8 @@ class MarketFillService:
             sell_order_id=sell_order_id,
         )
 
+        market = Market.objects.select_for_update(of=("self",)).get(pk=buy_order.market_id)
+
         # A concurrent transaction may have
         # completed this execution while this
         # transaction waited for the order locks.
@@ -112,6 +115,9 @@ class MarketFillService:
             buy_order=buy_order,
             sell_order=sell_order,
         )
+
+        if market.status != Market.Status.OPEN:
+            raise ValidationError({"market": "This market is no longer open."})
 
         maker_order, taker_order = cls._resolve_order_roles(
             buy_order=buy_order,
@@ -200,6 +206,19 @@ class MarketFillService:
             raise ValidationError(
                 {"execution_reference": ("This execution reference " "has already been used.")}
             ) from error
+
+        if buy_order.side == MarketOrder.Side.BUY:
+            new_amount = market.current_market_amount + gross_notional
+            if market.max_market_amount is not None and new_amount >= market.max_market_amount:
+                market.current_market_amount = new_amount
+                market.close_reason = Market.MarketCloseReason.MAXIMUM_AMOUNT_REACHED
+                market.status = Market.Status.CLOSED
+                market.save(
+                    update_fields=["current_market_amount", "close_reason", "status", "updated_at"]
+                )
+            elif market.max_market_amount is not None:
+                market.current_market_amount = new_amount
+                market.save(update_fields=["current_market_amount", "updated_at"])
 
         cls._settle_buy_wallet(
             fill=fill,

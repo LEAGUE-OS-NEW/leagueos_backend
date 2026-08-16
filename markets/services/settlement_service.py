@@ -36,6 +36,10 @@ class MarketSettlementService:
     )
     MARKET_CURRENCY = "UGX"
     PAYOUT_PER_UNIT = Decimal("1.0000")
+    # Backend quantity is expressed in "share units".
+    # settlement_unit represents the UGX payout per full share;
+    # because the backend stores quantity in micro-share units where
+    # 1 backend unit = 1 UGX, PAYOUT_PER_UNIT remains 1.0000.
     QUANTITY_QUANTUM = Decimal("0.0001")
     MONEY_QUANTUM = Decimal("0.0001")
     PRICE_QUANTUM = Decimal("0.00000")

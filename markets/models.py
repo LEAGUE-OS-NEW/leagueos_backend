@@ -673,7 +673,39 @@ class Market(TimeStampedUUIDModel):
     resolution_criteria = models.TextField(
         blank=True,
     )
-    face_value_ugx = models.PositiveIntegerField(default=10000)
+    face_value_ugx = models.PositiveIntegerField(default=5000)
+    class MarketCloseReason(models.TextChoices):
+        MAXIMUM_AMOUNT_REACHED = "MAXIMUM_AMOUNT_REACHED", "Maximum amount reached"
+        SCHEDULED_CLOSE = "SCHEDULED_CLOSE", "Scheduled close"
+        ADMIN_CLOSED = "ADMIN_CLOSED", "Admin closed"
+
+    settlement_unit = models.PositiveIntegerField(
+        default=5000,
+        validators=[MinValueValidator(1)],
+        help_text="UGX payout per winning share unit.",
+    )
+    max_market_amount = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text="Maximum UGX trading volume for this market.",
+    )
+    current_market_amount = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        default=Decimal("0.0000"),
+        validators=[MinValueValidator(0)],
+        help_text="Current executed BUY volume counting toward market capacity.",
+    )
+    close_reason = models.CharField(
+        max_length=30,
+        choices=MarketCloseReason.choices,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     status = models.CharField(
         max_length=30,
         choices=Status.choices,
@@ -822,6 +854,13 @@ class Market(TimeStampedUUIDModel):
                     "is_featured",
                     "status",
                 ],
+            ),
+            models.Index(
+                fields=[
+                    "status",
+                    "current_market_amount",
+                ],
+                name="market_capacity_idx",
             ),
         ]
 
@@ -1975,6 +2014,10 @@ class MarketOrder(TimeStampedUUIDModel):
         IOC = "IOC", "Immediate or cancel"
         FOK = "FOK", "Fill or kill"
 
+    class OrderType(models.TextChoices):
+        MARKET = "MARKET", "Market"
+        LIMIT = "LIMIT", "Limit"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1996,6 +2039,12 @@ class MarketOrder(TimeStampedUUIDModel):
         default=Side.BUY,
         db_index=True,
     )
+    order_type = models.CharField(
+        max_length=10,
+        choices=OrderType.choices,
+        default=OrderType.LIMIT,
+        db_index=True,
+    )
     quantity = models.DecimalField(
         max_digits=18,
         decimal_places=4,
@@ -2003,6 +2052,14 @@ class MarketOrder(TimeStampedUUIDModel):
     limit_price = models.DecimalField(
         max_digits=6,
         decimal_places=5,
+    )
+    amount = models.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text="For MARKET BUY orders: UGX amount to spend.",
     )
     filled_quantity = models.DecimalField(
         max_digits=18,
@@ -2448,6 +2505,26 @@ class MarketPosition(TimeStampedUUIDModel):
 
         if errors:
             raise ValidationError(errors)
+
+    @property
+    def available_shares(self):
+        return (self.quantity - self.reserved_quantity).quantize(Decimal("0.0001"))
+
+    @property
+    def locked_shares(self):
+        return self.reserved_quantity
+
+    @property
+    def current_value(self):
+        if self.quantity <= 0:
+            return Decimal("0.0000")
+        return (self.quantity * self.average_entry_price).quantize(Decimal("0.0001"))
+
+    @property
+    def unrealized_profit(self):
+        if self.quantity <= 0:
+            return Decimal("0.0000")
+        return (self.current_value - self.total_cost).quantize(Decimal("0.0001"))
 
 
 class MarketLiquidityProvider(TimeStampedUUIDModel):
