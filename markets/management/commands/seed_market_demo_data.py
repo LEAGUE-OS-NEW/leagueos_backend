@@ -237,22 +237,6 @@ MARKETS = [
         "featured": True,
     },
     {
-        "event": "event:football:villa-express",
-        "category": "Event / Occurrence",
-        "question": ("Will both SC Villa and Express FC score?"),
-        "yes": "Both teams score",
-        "no": "At least one team does not score",
-        "featured": False,
-    },
-    {
-        "event": "event:football:bul-ura",
-        "category": "Handicap / Spread",
-        "question": ("Will BUL FC cover a -1 goal handicap against URA FC?"),
-        "yes": "BUL FC covers",
-        "no": "BUL FC does not cover",
-        "featured": False,
-    },
-    {
         "event": "event:rugby:kobs-heathens",
         "category": "Match Result",
         "question": ("Will KOBS Rugby Club beat Platinum Credit Heathens?"),
@@ -261,60 +245,12 @@ MARKETS = [
         "featured": True,
     },
     {
-        "event": "event:rugby:kobs-heathens",
-        "category": "Totals",
-        "question": ("Will KOBS vs Heathens have over 42.5 total points?"),
-        "yes": "Over 42.5",
-        "no": "42 points or fewer",
-        "featured": True,
-    },
-    {
-        "event": "event:rugby:pirates-buffaloes",
-        "category": "Correct Score / Margin",
-        "question": ("Will Black Pirates win by 1 to 7 points?"),
-        "yes": "Pirates by 1-7",
-        "no": "Any other result",
-        "featured": False,
-    },
-    {
-        "event": "event:rugby:rhinos-mongers",
-        "category": "Event / Occurrence",
-        "question": ("Will Rhinos vs Mongers include a yellow card?"),
-        "yes": "A yellow card is shown",
-        "no": "No yellow card",
-        "featured": False,
-    },
-    {
         "event": "event:basketball:oilers-blazers",
         "category": "Match Result",
         "question": ("Will City Oilers beat Namuwongo Blazers?"),
         "yes": "City Oilers win",
         "no": "Namuwongo Blazers win",
         "featured": True,
-    },
-    {
-        "event": "event:basketball:oilers-blazers",
-        "category": "Totals",
-        "question": ("Will City Oilers vs Blazers exceed 155.5 total points?"),
-        "yes": "Over 155.5",
-        "no": "155 points or fewer",
-        "featured": True,
-    },
-    {
-        "event": "event:basketball:ucu-kiu",
-        "category": "Handicap / Spread",
-        "question": ("Will UCU Canons cover a -4.5 point spread?"),
-        "yes": "UCU covers",
-        "no": "UCU does not cover",
-        "featured": False,
-    },
-    {
-        "event": "event:basketball:jaguars-rockets",
-        "category": "Event / Occurrence",
-        "question": ("Will JT Jaguars score 80 or more points?"),
-        "yes": "80+ points",
-        "no": "79 points or fewer",
-        "featured": False,
     },
 ]
 
@@ -429,14 +365,6 @@ class Command(BaseCommand):
         created_markets = self._seed_event_markets(
             creator=creator,
             events=events,
-            categories=categories,
-            templates=templates,
-        )
-
-        created_markets += self._seed_long_horizon_markets(
-            creator=creator,
-            competitions=competitions,
-            participants=participants,
             categories=categories,
             templates=templates,
         )
