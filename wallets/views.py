@@ -1,3 +1,5 @@
+import logging
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from urllib.parse import urlencode
 
@@ -33,6 +35,8 @@ from wallets.services.pesapal_deposit_service import (
 )
 from wallets.services.wallet_read_service import WalletReadService
 from wallets.services.wallet_service import WalletService
+
+logger = logging.getLogger(__name__)
 
 
 def raise_currency_validation(error):
@@ -133,6 +137,9 @@ class DepositIntentView(APIView):
             201: DepositIntentReadSerializer,
             400: OpenApiResponse(description="Invalid request data."),
             401: OpenApiResponse(description="Authentication credentials are required."),
+            502: OpenApiResponse(
+                description=("Pesapal Sandbox checkout " "could not be confirmed.")
+            ),
         },
         tags=["Wallets"],
     )
@@ -166,6 +173,25 @@ class DepositIntentView(APIView):
                 data = DepositIntentReadSerializer(intent).data
 
                 data["provider_code"] = intent.provider.code
+
+        except PesapalApiError:
+            logger.warning(
+                "Pesapal checkout start failed " "user_id=%s provider_code=%s",
+                request.user.pk,
+                provider_code,
+            )
+
+            return Response(
+                {
+                    "provider": [
+                        "Pesapal Sandbox checkout "
+                        "could not be confirmed. "
+                        "Do not automatically retry "
+                        "this request."
+                    ]
+                },
+                status=502,
+            )
 
         except DjangoValidationError as error:
             raise_currency_validation(error)
