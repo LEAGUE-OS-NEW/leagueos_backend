@@ -1,3 +1,5 @@
+import http.client
+import json
 import socket
 import ssl
 import time
@@ -20,7 +22,6 @@ from system.serializers import (
     HealthCheckSerializer,
     PesapalDiagnosticSerializer,
 )
-from wallets.services.pesapal_client import PesapalClient
 from wallets.services.pesapal_config import get_pesapal_config
 
 
@@ -64,6 +65,105 @@ def health_check(request):
         },
         status=status.HTTP_200_OK if healthy else status.HTTP_503_SERVICE_UNAVAILABLE,
     )
+
+
+def _pesapal_direct_http_auth_diagnostic(config) -> dict:
+    """
+    Probe Pesapal RequestToken using http.client directly.
+
+    This bypasses urllib handlers and proxy discovery.
+    Credentials and tokens are never returned.
+    """
+    parsed = urlparse(config.base_url)
+
+    host = parsed.hostname or ""
+    port = parsed.port or 443
+    path = parsed.path.rstrip("/") + "/api/Auth/RequestToken"
+
+    body = json.dumps(
+        {
+            "consumer_key": config.consumer_key,
+            "consumer_secret": config.consumer_secret,
+        }
+    ).encode("utf-8")
+
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Content-Length": str(len(body)),
+        "User-Agent": "LeagueOS-Pesapal/1.0",
+        "Connection": "close",
+    }
+
+    result = {
+        "ok": False,
+        "elapsed_ms": None,
+        "http_status": None,
+        "token_present": False,
+        "error_type": "",
+    }
+
+    started = time.monotonic()
+    connection = None
+
+    try:
+        connection = http.client.HTTPSConnection(
+            host,
+            port,
+            timeout=6,
+            context=ssl.create_default_context(),
+        )
+
+        connection.request(
+            "POST",
+            path,
+            body=body,
+            headers=headers,
+        )
+
+        response = connection.getresponse()
+        raw = response.read()
+
+        result["elapsed_ms"] = round(
+            (time.monotonic() - started) * 1000,
+            1,
+        )
+        result["http_status"] = response.status
+
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ):
+            payload = {}
+
+        token_present = bool(isinstance(payload, dict) and str(payload.get("token") or "").strip())
+
+        result["token_present"] = token_present
+
+        if response.status == 200 and token_present:
+            result["ok"] = True
+            return result
+
+        result["error_type"] = "HttpError" if response.status != 200 else "MissingToken"
+
+        return result
+
+    except Exception as exc:  # noqa: BLE001
+        result["elapsed_ms"] = round(
+            (time.monotonic() - started) * 1000,
+            1,
+        )
+        result["error_type"] = type(exc).__name__
+        return result
+
+    finally:
+        if connection is not None:
+            try:
+                connection.close()
+            except Exception:
+                pass
 
 
 def _pesapal_transport_diagnostic(base_url: str) -> dict:
@@ -351,7 +451,11 @@ def pesapal_diagnostic(request):
         )
 
     tls_available = any(
-        probe.get("tls", {}).get("ok") for probe in payload["transport"].get("probes", [])
+        probe.get("tls", {}).get("ok")
+        for probe in payload["transport"].get(
+            "probes",
+            [],
+        )
     )
 
     if not tls_available:
@@ -364,28 +468,27 @@ def pesapal_diagnostic(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    try:
-        token = PesapalClient(
-            config=config,
-        ).authenticate()
-    except Exception as exc:  # noqa: BLE001 - diagnostic reports type only
+    direct_http_auth = _pesapal_direct_http_auth_diagnostic(
+        config,
+    )
+    payload["direct_http_auth"] = direct_http_auth
+
+    if direct_http_auth.get("ok"):
         payload["authentication"] = {
-            "ok": False,
-            "error_type": type(exc).__name__,
+            "ok": True,
+            "error_type": "",
         }
         return Response(
             payload,
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            status=status.HTTP_200_OK,
         )
 
-    authenticated = bool(token)
-
     payload["authentication"] = {
-        "ok": authenticated,
-        "error_type": ("" if authenticated else "MissingToken"),
+        "ok": False,
+        "error_type": ("DirectHttp" + str(direct_http_auth.get("error_type") or "UnknownError")),
     }
 
     return Response(
         payload,
-        status=(status.HTTP_200_OK if authenticated else status.HTTP_503_SERVICE_UNAVAILABLE),
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
     )
