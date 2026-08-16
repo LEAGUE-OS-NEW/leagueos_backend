@@ -19,6 +19,26 @@ from wallets.services.pesapal_config import (
 logger = logging.getLogger(__name__)
 
 
+def _provider_error_summary(provider_error) -> str:
+    if isinstance(provider_error, dict):
+        parts = []
+
+        for key in (
+            "error_type",
+            "type",
+            "code",
+            "message",
+        ):
+            value = str(provider_error.get(key) or "").strip()
+
+            if value:
+                parts.append(f"{key}={value}")
+
+        return " | ".join(parts)[:500]
+
+    return str(provider_error or "").strip()[:500]
+
+
 def _safe_provider_error_summary(details: str) -> str:
     if not details:
         return ""
@@ -31,18 +51,10 @@ def _safe_provider_error_summary(details: str) -> str:
     if not isinstance(data, dict):
         return ""
 
-    provider_error = data.get("error")
+    provider_summary = _provider_error_summary(data.get("error"))
 
-    if isinstance(provider_error, dict):
-        parts = []
-
-        for key in ("type", "code", "message"):
-            value = str(provider_error.get(key) or "").strip()
-
-            if value:
-                parts.append(f"{key}={value}")
-
-        return " | ".join(parts)[:500]
+    if provider_summary:
+        return provider_summary
 
     return str(data.get("message") or "").strip()[:500]
 
@@ -225,7 +237,9 @@ class PesapalClient:
 
         provider_error = data.get("error")
 
-        if provider_error:
+        provider_error_summary = _provider_error_summary(provider_error)
+
+        if provider_error_summary:
             message = (
                 provider_error.get("message")
                 if isinstance(
@@ -238,10 +252,10 @@ class PesapalClient:
             safe_message = str(message or "Pesapal rejected the request.")[:300]
 
             logger.error(
-                "Pesapal provider error " "method=%s path=%s message=%s",
+                "Pesapal provider error " "method=%s path=%s error=%s",
                 method.upper(),
                 path,
-                safe_message,
+                provider_error_summary,
             )
 
             raise PesapalApiError(safe_message)
