@@ -76,6 +76,39 @@ class TestClubEndpoints:
         assert resp.status_code == 200
         assert resp.data["profile"] is None
 
+    def test_club_list_orders_newest_first(self, client):
+        older = ClubFactory(name="Older Club", slug="older-club")
+        newer = ClubFactory(name="Newer Club", slug="newer-club")
+        resp = client.get("/api/v1/clubs/", {"ordering": "-created_at"})
+        assert resp.status_code == 200
+        names = [item["name"] for item in resp.data["results"]]
+        assert names.index(newer.name) < names.index(older.name)
+
+    def test_club_list_search_by_name(self, client):
+        ClubFactory(name="Vipers SC", slug="vipers-sc")
+        ClubFactory(name="KCCA FC", slug="kcca-fc")
+        resp = client.get("/api/v1/clubs/", {"search": "Vipers"})
+        assert resp.status_code == 200
+        names = {item["name"] for item in resp.data["results"]}
+        assert "Vipers SC" in names
+        assert "KCCA FC" not in names
+
+    def test_club_list_includes_sport_and_competition_names(self, client):
+        football = SportFactory(name="Football", code="FOOTBALL")
+        ClubFactory(name="Vipers SC", slug="vipers-sc", sport=football)
+        resp = client.get("/api/v1/clubs/")
+        assert resp.status_code == 200
+        club_data = next(item for item in resp.data["results"] if item["name"] == "Vipers SC")
+        assert club_data["sport_name"] == "Football"
+        assert club_data["logo"] is None
+
+    def test_club_list_no_country_param_error(self, client):
+        # Regression: `country` used to filter on a field that doesn't
+        # exist on Club and would 500 if ever passed.
+        ClubFactory(name="Vipers SC", slug="vipers-sc")
+        resp = client.get("/api/v1/clubs/")
+        assert resp.status_code == 200
+
 
 class TestPlayerEndpoints:
     def test_player_list_returns_athletes(self, client):

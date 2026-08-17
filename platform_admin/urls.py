@@ -5,6 +5,10 @@ from profiles.views import ClubListView
 from platform_admin.views import (
     AdminAuditLogListView,
     AdminDashboardSummaryView,
+    AdminFixtureCompleteView,
+    AdminFixtureListCreateView,
+    AdminFixtureScoreView,
+    AdminFixtureStatusView,
     AdminInvitationAcceptView,
     AdminInvitationListView,
     AdminInvitationRevokeView,
@@ -76,5 +80,21 @@ urlpatterns = [
         "news/<uuid:news_id>/set-trending/",
         AdminNewsSetTrendingView.as_view(),
         name="news-set-trending",
+    ),
+    path("fixtures/", AdminFixtureListCreateView.as_view(), name="fixtures-list-create"),
+    path(
+        "fixtures/<uuid:fixture_id>/status/",
+        AdminFixtureStatusView.as_view(),
+        name="fixture-status",
+    ),
+    path(
+        "fixtures/<uuid:fixture_id>/score/",
+        AdminFixtureScoreView.as_view(),
+        name="fixture-score",
+    ),
+    path(
+        "fixtures/<uuid:fixture_id>/complete/",
+        AdminFixtureCompleteView.as_view(),
+        name="fixture-complete",
     ),
 ]

@@ -406,6 +406,11 @@ class MatchCentre(TimeStampedUUIDModel):
     result = models.CharField(max_length=255, blank=True)
     home_score = models.PositiveSmallIntegerField(null=True, blank=True)
     away_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    clock_display = models.CharField(
+        max_length=24,
+        blank=True,
+        help_text='Free-text live clock, e.g. "75\'", "HT", "Q3 04:15" — set by admin.',
+    )
     attendance = models.PositiveIntegerField(null=True, blank=True)
     venue = models.ForeignKey(
         Venue,

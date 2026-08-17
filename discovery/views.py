@@ -159,7 +159,6 @@ class ClubListView(ListAPIView):
 
         return club_service.get_public_clubs(
             sport=params.get("sport"),
-            country=params.get("country"),
             search=params.get("search"),
             ordering=params.get("ordering", "name"),
         )
@@ -384,7 +383,7 @@ class FixtureDetailView(RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        fixture_service.record_view(instance["id"], user=request.user, request=request)
+        fixture_service.record_view(str(instance.id), user=request.user, request=request)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 

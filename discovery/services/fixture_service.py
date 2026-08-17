@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 
-from django.core.cache import cache
-
 from discovery.models import AuditLog
 from sports.models import SportingEvent
 
@@ -13,11 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class FixtureService:
-    """Service for fixture operations."""
+    """Service for fixture operations.
 
-    @staticmethod
-    def _cache_key(fixture_id: str) -> str:
-        return f"fixture:{fixture_id}"
+    Fixture detail/list are deliberately not cached (unlike ClubService) —
+    they now carry live score/clock data via MatchCentre, and caching that
+    for any meaningful TTL would show stale scores during a live match.
+    """
 
     @classmethod
     def get_public_fixtures(
@@ -33,7 +32,7 @@ class FixtureService:
         """Return verified fixtures with optimized queries."""
         qs = (
             SportingEvent.objects.filter(is_verified=True, sport__is_active=True)
-            .select_related("sport", "competition", "competition__sport")
+            .select_related("sport", "competition", "competition__sport", "match_centre")
             .prefetch_related("event_participants__participant")
         )
 
@@ -54,54 +53,21 @@ class FixtureService:
 
     @classmethod
     def get_public_fixture(cls, fixture_id: str, request=None):
-        """Return a single verified fixture with cache."""
-        cache_key = cls._cache_key(str(fixture_id))
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return cached
-
+        """Return a single verified fixture (model instance, matching
+        get_public_fixtures' shape so one serializer handles both)."""
         try:
-            fixture = (
+            return (
                 SportingEvent.objects.filter(
                     id=fixture_id,
                     is_verified=True,
                     sport__is_active=True,
                 )
-                .select_related("sport", "competition", "competition__sport")
+                .select_related("sport", "competition", "competition__sport", "match_centre")
                 .prefetch_related("event_participants__participant")
                 .get()
             )
         except SportingEvent.DoesNotExist:
             return None
-
-        data = {
-            "id": str(fixture.id),
-            "name": fixture.name,
-            "event_type": fixture.event_type,
-            "status": fixture.status,
-            "starts_at": fixture.starts_at.isoformat() if fixture.starts_at else None,
-            "ends_at": fixture.ends_at.isoformat() if fixture.ends_at else None,
-            "venue": fixture.venue,
-            "country_code": fixture.country_code,
-            "sport": str(fixture.sport_id) if fixture.sport_id else None,
-            "competition": str(fixture.competition_id) if fixture.competition_id else None,
-            "participants": [
-                {
-                    "role": ep.role,
-                    "position": ep.position,
-                    "participant": {
-                        "id": str(ep.participant.id),
-                        "name": ep.participant.name,
-                        "short_name": ep.participant.short_name,
-                        "kind": ep.participant.kind,
-                    },
-                }
-                for ep in fixture.event_participants.all()
-            ],
-        }
-
-        cache.set(cache_key, data, timeout=300)
-        return data
 
     @classmethod
     def get_results(

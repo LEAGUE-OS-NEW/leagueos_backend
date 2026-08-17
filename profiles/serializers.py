@@ -67,10 +67,19 @@ class GenderSerializer(serializers.ModelSerializer):
 class ClubSerializer(serializers.ModelSerializer):
     """Serializer for the Club model."""
 
+    logo = serializers.SerializerMethodField()
+
     class Meta:
         model = Club
-        fields = ["id", "name", "slug", "founded", "is_active"]
+        fields = ["id", "name", "slug", "founded", "logo", "is_active"]
         read_only_fields = fields
+
+    def get_logo(self, obj):
+        if not obj.logo:
+            return None
+        from profiles.services.storage_service import StorageService
+
+        return StorageService.get_public_url(obj.logo.name)
 
 
 class ClubCreateSerializer(serializers.ModelSerializer):

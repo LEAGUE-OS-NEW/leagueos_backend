@@ -15,7 +15,7 @@ from discovery.models import (
 )
 from onboarding.models import UserClubPreference
 from profiles.models import Club
-from sports.models import Competition, Participant, SportingEvent
+from sports.models import Competition, Participant, Sport, SportingEvent
 
 # =============================================================================
 # Search
@@ -112,10 +112,9 @@ class ClubListQuerySerializer(serializers.Serializer):
     """Query parameters for the club list endpoint."""
 
     sport = serializers.UUIDField(required=False)
-    country = serializers.CharField(required=False, max_length=2)
     search = serializers.CharField(required=False, allow_blank=True, max_length=180)
     ordering = serializers.ChoiceField(
-        choices=["name", "-name", "founded", "-founded"],
+        choices=["name", "-name", "founded", "-founded", "created_at", "-created_at"],
         required=False,
         default="name",
     )
@@ -126,6 +125,13 @@ class DiscoveryClubSerializer(serializers.ModelSerializer):
 
     sport = serializers.UUIDField(source="sport_id", read_only=True)
     competition = serializers.UUIDField(source="competition_id", read_only=True)
+    sport_name = serializers.CharField(
+        source="sport.name", read_only=True, allow_null=True, default=None
+    )
+    competition_name = serializers.CharField(
+        source="competition.name", read_only=True, allow_null=True, default=None
+    )
+    logo = serializers.SerializerMethodField()
 
     class Meta:
         model = Club
@@ -134,9 +140,20 @@ class DiscoveryClubSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "sport",
+            "sport_name",
             "competition",
+            "competition_name",
             "founded",
+            "logo",
+            "created_at",
         ]
+
+    def get_logo(self, obj):
+        if not obj.logo:
+            return None
+        from profiles.services.storage_service import StorageService
+
+        return StorageService.get_public_url(obj.logo.name)
 
 
 class ClubProfileSerializer(serializers.Serializer):
@@ -159,8 +176,11 @@ class ClubDetailResponseSerializer(serializers.Serializer):
     name = serializers.CharField()
     slug = serializers.CharField()
     sport = serializers.UUIDField(required=False, allow_null=True)
+    sport_name = serializers.CharField(required=False, allow_null=True)
     competition = serializers.UUIDField(required=False, allow_null=True)
+    competition_name = serializers.CharField(required=False, allow_null=True)
     founded = serializers.IntegerField(required=False, allow_null=True)
+    logo = serializers.CharField(required=False, allow_null=True)
     profile = ClubProfileSerializer(required=False, allow_null=True)
 
 
@@ -269,16 +289,11 @@ class FixtureListQuerySerializer(serializers.Serializer):
     )
 
 
-class FixtureParticipantSerializer(serializers.Serializer):
-    """A participant in a fixture."""
-
-    role = serializers.CharField()
-    position = serializers.IntegerField()
-    participant = serializers.DictField()
-
-
 class FixtureSerializer(serializers.Serializer):
-    """Public fixture serializer."""
+    """Public fixture serializer. Used for both list and detail — both
+    fixture_service.get_public_fixtures/get_public_fixture return real
+    SportingEvent instances with the same select_related/prefetch, so the
+    method fields below work identically for either."""
 
     id = serializers.UUIDField()
     name = serializers.CharField()
@@ -290,7 +305,98 @@ class FixtureSerializer(serializers.Serializer):
     country_code = serializers.CharField(required=False, allow_blank=True)
     sport = serializers.UUIDField(required=False, allow_null=True)
     competition = serializers.UUIDField(required=False, allow_null=True)
-    participants = FixtureParticipantSerializer(many=True, required=False)
+    participants = serializers.SerializerMethodField()
+    home_score = serializers.SerializerMethodField()
+    away_score = serializers.SerializerMethodField()
+    clock_display = serializers.SerializerMethodField()
+
+    def get_participants(self, obj):
+        return [
+            {
+                "role": ep.role,
+                "position": ep.position,
+                "participant": {
+                    "id": str(ep.participant.id),
+                    "name": ep.participant.name,
+                    "short_name": ep.participant.short_name,
+                    "kind": ep.participant.kind,
+                },
+            }
+            for ep in obj.event_participants.all()
+        ]
+
+    def _match_centre(self, obj):
+        from discovery.models import MatchCentre
+
+        try:
+            return obj.match_centre
+        except MatchCentre.DoesNotExist:
+            return None
+
+    def get_home_score(self, obj):
+        match_centre = self._match_centre(obj)
+        return match_centre.home_score if match_centre else None
+
+    def get_away_score(self, obj):
+        match_centre = self._match_centre(obj)
+        return match_centre.away_score if match_centre else None
+
+    def get_clock_display(self, obj):
+        match_centre = self._match_centre(obj)
+        return match_centre.clock_display if match_centre else ""
+
+
+class FixtureCreateSerializer(serializers.Serializer):
+    """Sports Data Admin creating a fixture between two participants."""
+
+    sport = serializers.PrimaryKeyRelatedField(queryset=Sport.objects.filter(is_active=True))
+    competition = serializers.PrimaryKeyRelatedField(
+        queryset=Competition.objects.all(), required=False, allow_null=True, default=None
+    )
+    home_participant = serializers.PrimaryKeyRelatedField(queryset=Participant.objects.all())
+    away_participant = serializers.PrimaryKeyRelatedField(queryset=Participant.objects.all())
+    starts_at = serializers.DateTimeField()
+    venue = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        errors = {}
+        sport = attrs["sport"]
+        competition = attrs.get("competition")
+        home = attrs["home_participant"]
+        away = attrs["away_participant"]
+
+        if competition and competition.sport_id != sport.id:
+            errors["competition"] = "Competition must belong to the selected sport."
+        if home.sport_id != sport.id:
+            errors["home_participant"] = "Home participant must belong to the selected sport."
+        if away.sport_id != sport.id:
+            errors["away_participant"] = "Away participant must belong to the selected sport."
+        if home.id == away.id:
+            errors["away_participant"] = "Home and away participants must be different."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
+
+
+class FixtureStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=[
+            SportingEvent.Status.SCHEDULED,
+            SportingEvent.Status.LIVE,
+            SportingEvent.Status.POSTPONED,
+            SportingEvent.Status.CANCELLED,
+            SportingEvent.Status.ABANDONED,
+        ]
+    )
+
+
+class FixtureScoreSerializer(serializers.Serializer):
+    home_score = serializers.IntegerField(min_value=0)
+    away_score = serializers.IntegerField(min_value=0)
+    clock_display = serializers.CharField(
+        required=False, allow_blank=True, max_length=24, default=""
+    )
 
 
 # =============================================================================

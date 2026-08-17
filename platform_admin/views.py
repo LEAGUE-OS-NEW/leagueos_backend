@@ -15,6 +15,10 @@ from authentication.services.role_service import RoleService, SUPER_ADMIN_ROLE_N
 from authentication.services.session_service import SessionService
 from discovery.models import News
 from discovery.serializers import (
+    FixtureCreateSerializer,
+    FixtureScoreSerializer,
+    FixtureSerializer,
+    FixtureStatusSerializer,
     NewsApproveSerializer,
     NewsComposeSerializer,
     NewsFeaturedSerializer,
@@ -23,7 +27,9 @@ from discovery.serializers import (
     NewsRejectSerializer,
     NewsTrendingSerializer,
 )
+from discovery.services.fixture_admin_service import fixture_admin_service
 from discovery.services.news_moderation_service import news_moderation_service
+from sports.models import SportingEvent
 from platform_admin.serializers import (
     AdminAuditLogSerializer,
     AdminDashboardSummarySerializer,
@@ -1021,4 +1027,127 @@ class AdminNewsSetTrendingView(APIView):
         except DjangoValidationError as exc:
             return Response({"detail": " ".join(exc.messages)}, status=400)
 
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminFixtureListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixtures_list",
+        responses={200: FixtureSerializer(many=True), 403: None},
+    )
+    def get(self, request):
+        if not PermissionService.has_permission(request.user, "view_sports"):
+            return Response(
+                {"detail": "You do not have permission to view fixtures."},
+                status=403,
+            )
+
+        fixtures = fixture_admin_service.list_admin_fixtures()
+        return Response(self.serializer_class(fixtures, many=True).data)
+
+    @extend_schema(
+        operation_id="admin_fixtures_create",
+        request=FixtureCreateSerializer,
+        responses={201: FixtureSerializer, 400: None, 403: None},
+    )
+    def post(self, request):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to create fixtures."},
+                status=403,
+            )
+
+        serializer = FixtureCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        fixture = fixture_admin_service.create_fixture(
+            actor=request.user,
+            **serializer.validated_data,
+        )
+        return Response(self.serializer_class(fixture).data, status=201)
+
+
+class AdminFixtureStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_status_update",
+        request=FixtureStatusSerializer,
+        responses={200: FixtureSerializer, 400: None, 403: None, 404: None},
+    )
+    def patch(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to manage fixtures."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        serializer = FixtureStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = fixture_admin_service.set_status(
+            fixture=fixture,
+            status=serializer.validated_data["status"],
+        )
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminFixtureScoreView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_score_update",
+        request=FixtureScoreSerializer,
+        responses={200: FixtureSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to manage fixtures."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        serializer = FixtureScoreSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = fixture_admin_service.update_score(
+            fixture=fixture,
+            **serializer.validated_data,
+        )
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminFixtureCompleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_complete",
+        responses={200: FixtureSerializer, 403: None, 404: None},
+    )
+    def post(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to manage fixtures."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        updated = fixture_admin_service.complete_fixture(fixture=fixture)
         return Response(self.serializer_class(updated).data)

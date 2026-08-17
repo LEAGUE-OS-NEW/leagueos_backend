@@ -272,7 +272,9 @@ class TestAdminInvitations:
         assert response.status_code == status.HTTP_200_OK
         assert response.data["status"] == "REVOKED"
 
-    def test_accept_invitation_assigns_role_and_logs_in(self, api_client, admin_user, super_admin_user, seeded_roles):
+    def test_accept_invitation_assigns_role_and_logs_in(
+        self, api_client, admin_user, super_admin_user, seeded_roles
+    ):
         from authentication.models import AdminInvitation
 
         authenticate(api_client, super_admin_user)
