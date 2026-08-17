@@ -148,7 +148,7 @@ class DiscoveryClubSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
-    def get_logo(self, obj):
+    def get_logo(self, obj: Club) -> str | None:
         if not obj.logo:
             return None
         from profiles.services.storage_service import StorageService
@@ -320,7 +320,7 @@ class FixtureSerializer(serializers.Serializer):
     away_score = serializers.SerializerMethodField()
     clock_display = serializers.SerializerMethodField()
 
-    def get_participants(self, obj):
+    def get_participants(self, obj: SportingEvent) -> list[dict]:
         return [
             {
                 "role": ep.role,
@@ -335,7 +335,7 @@ class FixtureSerializer(serializers.Serializer):
             for ep in obj.event_participants.all()
         ]
 
-    def _match_centre(self, obj):
+    def _match_centre(self, obj: SportingEvent):
         from discovery.models import MatchCentre
 
         try:
@@ -343,15 +343,15 @@ class FixtureSerializer(serializers.Serializer):
         except MatchCentre.DoesNotExist:
             return None
 
-    def get_home_score(self, obj):
+    def get_home_score(self, obj: SportingEvent) -> int | None:
         match_centre = self._match_centre(obj)
         return match_centre.home_score if match_centre else None
 
-    def get_away_score(self, obj):
+    def get_away_score(self, obj: SportingEvent) -> int | None:
         match_centre = self._match_centre(obj)
         return match_centre.away_score if match_centre else None
 
-    def get_clock_display(self, obj):
+    def get_clock_display(self, obj: SportingEvent) -> str:
         match_centre = self._match_centre(obj)
         return match_centre.clock_display if match_centre else ""
 
@@ -536,7 +536,7 @@ class NewsModerationSerializer(serializers.ModelSerializer):
             "created_by",
         ]
 
-    def get_created_by(self, obj):
+    def get_created_by(self, obj: News) -> dict | None:
         if not obj.created_by_id:
             return None
         return {

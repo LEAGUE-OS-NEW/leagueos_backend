@@ -35,6 +35,8 @@ from clubs.services.staff_service import StaffService
 from clubs.serializers.club_serializers import (
     ClubAdminInviteSerializer,
     ClubAuditLogSerializer,
+    ClubLogoResponseSerializer,
+    ClubLogoUploadSerializer,
     ClubMediaSerializer,
     ClubNewsSerializer,
     ClubProfileVersionSerializer,
@@ -373,6 +375,7 @@ class ClubLogoView(APIView):
 
     parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsClubAdmin]
+    serializer_class = ClubLogoUploadSerializer
 
     def _get_ip_address(self, request) -> str | None:
         forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
@@ -382,6 +385,8 @@ class ClubLogoView(APIView):
 
     @extend_schema(
         summary="Upload or replace a club's logo",
+        request=ClubLogoUploadSerializer,
+        responses={200: ClubLogoResponseSerializer, 400: None, 403: None, 404: None},
         tags=["Clubs"],
     )
     def post(self, request, club_pk=None):
@@ -425,6 +430,7 @@ class ClubLogoView(APIView):
 
     @extend_schema(
         summary="Delete a club's logo",
+        responses={200: None, 403: None, 404: None},
         tags=["Clubs"],
     )
     def delete(self, request, club_pk=None):

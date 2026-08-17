@@ -74,7 +74,7 @@ class ClubSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "slug", "founded", "logo", "is_active"]
         read_only_fields = fields
 
-    def get_logo(self, obj):
+    def get_logo(self, obj: Club) -> str | None:
         if not obj.logo:
             return None
         from profiles.services.storage_service import StorageService
