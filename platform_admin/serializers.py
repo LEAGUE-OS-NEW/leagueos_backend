@@ -112,6 +112,7 @@ class AdminUserRoleUpdateSerializer(serializers.Serializer):
         child=serializers.UUIDField(), allow_empty=True, required=False
     )
     is_active = serializers.BooleanField(required=False)
+    account_status = serializers.ChoiceField(choices=User.AccountStatus.choices, required=False)
 
 
 class AdminAuditLogSerializer(serializers.ModelSerializer):
