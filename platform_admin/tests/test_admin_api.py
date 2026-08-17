@@ -113,7 +113,9 @@ class TestAdminUserDetail:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_deactivate_via_account_status(self, api_client, super_admin_user, admin_user, seeded_roles):
+    def test_deactivate_via_account_status(
+        self, api_client, super_admin_user, admin_user, seeded_roles
+    ):
         RoleService.assign_role(super_admin_user, Role.objects.get(name="Super Admin"))
         authenticate(api_client, super_admin_user)
 
@@ -126,9 +128,13 @@ class TestAdminUserDetail:
         assert response.status_code == status.HTTP_200_OK
         admin_user.refresh_from_db()
         assert admin_user.account_status == User.AccountStatus.DEACTIVATED
-        assert AuditLog.objects.filter(action="ACCOUNT_DEACTIVATED", resource_id=admin_user.id).exists()
+        assert AuditLog.objects.filter(
+            action="ACCOUNT_DEACTIVATED", resource_id=admin_user.id
+        ).exists()
 
-    def test_reactivate_via_account_status(self, api_client, super_admin_user, admin_user, seeded_roles):
+    def test_reactivate_via_account_status(
+        self, api_client, super_admin_user, admin_user, seeded_roles
+    ):
         RoleService.assign_role(super_admin_user, Role.objects.get(name="Super Admin"))
         authenticate(api_client, super_admin_user)
         admin_user.account_status = User.AccountStatus.DEACTIVATED
@@ -143,7 +149,9 @@ class TestAdminUserDetail:
         assert response.status_code == status.HTTP_200_OK
         admin_user.refresh_from_db()
         assert admin_user.account_status == User.AccountStatus.ACTIVE
-        assert AuditLog.objects.filter(action="ACCOUNT_REACTIVATED", resource_id=admin_user.id).exists()
+        assert AuditLog.objects.filter(
+            action="ACCOUNT_REACTIVATED", resource_id=admin_user.id
+        ).exists()
 
     def test_cannot_deactivate_self_via_account_status(self, api_client, super_admin_user):
         authenticate(api_client, super_admin_user)
@@ -162,7 +170,9 @@ class TestAdminUserDetail:
         self, api_client, admin_user, super_admin_user, seeded_roles
     ):
         permission = Permission.objects.get(code="admin.users.manage")
-        UserPermission.objects.create(user=admin_user, permission=permission, granted_by=super_admin_user)
+        UserPermission.objects.create(
+            user=admin_user, permission=permission, granted_by=super_admin_user
+        )
         authenticate(api_client, admin_user)
 
         response = api_client.patch(
