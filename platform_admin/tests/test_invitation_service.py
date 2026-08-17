@@ -2,7 +2,8 @@ import pytest
 from django.core.management import call_command
 from django.utils import timezone
 
-from authentication.models import AdminInvitation, Role, UserRole
+from accounts.models import User
+from authentication.models import AccountSetupToken, AdminInvitation, Role, UserRole
 from authentication.services.invitation_service import InvitationService
 
 from .factories import UserFactory
@@ -14,12 +15,15 @@ def seeded_roles(db):
 
 
 class TestCreateInvitation:
-    def test_create_invitation(self, db, seeded_roles):
+    def test_create_invitation_for_new_login_creates_pending_user_and_setup_token(
+        self, db, seeded_roles
+    ):
         inviter = UserFactory()
         role = Role.objects.get(name="Finance Admin")
 
         invitation = InvitationService.create_invitation(
-            email="newadmin@example.com",
+            login_email="newadmin@example.com",
+            notify_email="notify-newadmin@example.com",
             roles=[role],
             invited_by=inviter,
             expires_in_days=7,
@@ -30,29 +34,65 @@ class TestCreateInvitation:
         assert invitation.token_expires_at > timezone.now()
         assert list(invitation.assigned_roles.all()) == [role]
 
-    def test_duplicate_pending_invitation_rejected(self, db, seeded_roles):
+        user = User.objects.get(email="newadmin@example.com")
+        assert user.account_status == User.AccountStatus.PENDING_INVITATION
+        assert AccountSetupToken.objects.filter(user=user, used_at__isnull=True).exists()
+
+    def test_duplicate_invitation_to_active_user_rejected(self, db, seeded_roles):
         inviter = UserFactory()
+        existing_active_user = UserFactory()
         role = Role.objects.get(name="Finance Admin")
 
         InvitationService.create_invitation(
-            email="dup@example.com",
+            login_email=existing_active_user.email,
+            notify_email="notify-dup@example.com",
             roles=[role],
             invited_by=inviter,
         )
 
         with pytest.raises(ValueError):
             InvitationService.create_invitation(
-                email="dup@example.com",
+                login_email=existing_active_user.email,
+                notify_email="notify-dup@example.com",
                 roles=[role],
                 invited_by=inviter,
             )
 
-    def test_email_is_normalized(self, db, seeded_roles):
+    def test_resend_to_still_pending_login_reuses_invitation_and_issues_fresh_token(
+        self, db, seeded_roles
+    ):
+        inviter = UserFactory()
+        role = Role.objects.get(name="Finance Admin")
+
+        first = InvitationService.create_invitation(
+            login_email="pending@example.com",
+            notify_email="notify-pending@example.com",
+            roles=[role],
+            invited_by=inviter,
+        )
+        user = User.objects.get(email="pending@example.com")
+        first_token = AccountSetupToken.objects.get(user=user, used_at__isnull=True)
+
+        second = InvitationService.create_invitation(
+            login_email="pending@example.com",
+            notify_email="notify-pending@example.com",
+            roles=[role],
+            invited_by=inviter,
+        )
+
+        assert second.id == first.id
+
+        first_token.refresh_from_db()
+        assert first_token.used_at is not None
+        assert AccountSetupToken.objects.filter(user=user, used_at__isnull=True).exists()
+
+    def test_login_email_is_normalized(self, db, seeded_roles):
         inviter = UserFactory()
         role = Role.objects.get(name="Finance Admin")
 
         invitation = InvitationService.create_invitation(
-            email="  MixedCase@Example.COM  ",
+            login_email="  MixedCase@Example.COM  ",
+            notify_email="notify@example.com",
             roles=[role],
             invited_by=inviter,
         )
@@ -67,7 +107,8 @@ class TestAcceptInvitation:
         role = Role.objects.get(name="Finance Admin")
 
         invitation = InvitationService.create_invitation(
-            email=user.email,
+            login_email=user.email,
+            notify_email="notify@example.com",
             roles=[role],
             invited_by=inviter,
         )
@@ -85,7 +126,8 @@ class TestAcceptInvitation:
         role = Role.objects.get(name="Finance Admin")
 
         invitation = InvitationService.create_invitation(
-            email=user.email,
+            login_email=user.email,
+            notify_email="notify@example.com",
             roles=[role],
             invited_by=inviter,
         )
@@ -111,7 +153,8 @@ class TestAcceptInvitation:
         role = Role.objects.get(name="Finance Admin")
 
         invitation = InvitationService.create_invitation(
-            email=user.email,
+            login_email=user.email,
+            notify_email="notify@example.com",
             roles=[role],
             invited_by=inviter,
         )
@@ -128,7 +171,8 @@ class TestRevokeInvitation:
         role = Role.objects.get(name="Finance Admin")
 
         invitation = InvitationService.create_invitation(
-            email="revoke@example.com",
+            login_email="revoke@example.com",
+            notify_email="notify-revoke@example.com",
             roles=[role],
             invited_by=inviter,
         )
@@ -144,7 +188,8 @@ class TestRevokeInvitation:
         role = Role.objects.get(name="Finance Admin")
 
         invitation = InvitationService.create_invitation(
-            email="revoke2@example.com",
+            login_email="revoke2@example.com",
+            notify_email="notify-revoke2@example.com",
             roles=[role],
             invited_by=inviter,
         )
@@ -161,7 +206,8 @@ class TestExpireOldInvitations:
         role = Role.objects.get(name="Finance Admin")
 
         invitation = InvitationService.create_invitation(
-            email="expire@example.com",
+            login_email="expire@example.com",
+            notify_email="notify-expire@example.com",
             roles=[role],
             invited_by=inviter,
         )
