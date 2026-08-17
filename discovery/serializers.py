@@ -303,8 +303,18 @@ class FixtureSerializer(serializers.Serializer):
     ends_at = serializers.DateTimeField(required=False, allow_null=True)
     venue = serializers.CharField(required=False, allow_blank=True)
     country_code = serializers.CharField(required=False, allow_blank=True)
-    sport = serializers.UUIDField(required=False, allow_null=True)
-    competition = serializers.UUIDField(required=False, allow_null=True)
+    # source="*_id" — obj.sport/obj.competition are the related model
+    # instances (this serializer is fed real SportingEvent rows, not
+    # dicts), so a plain UUIDField without a source would render the
+    # instance's __str__ (its name) instead of its id.
+    sport = serializers.UUIDField(source="sport_id", required=False, allow_null=True)
+    sport_name = serializers.CharField(
+        source="sport.name", read_only=True, allow_null=True, default=None
+    )
+    competition = serializers.UUIDField(source="competition_id", required=False, allow_null=True)
+    competition_name = serializers.CharField(
+        source="competition.name", read_only=True, allow_null=True, default=None
+    )
     participants = serializers.SerializerMethodField()
     home_score = serializers.SerializerMethodField()
     away_score = serializers.SerializerMethodField()
