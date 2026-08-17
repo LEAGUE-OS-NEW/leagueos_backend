@@ -199,7 +199,8 @@ class TestAdminInvitations:
         response = api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "newadmin@example.com",
+                "login_email": "newadmin@example.com",
+                "notify_email": "notify-newadmin@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -210,14 +211,20 @@ class TestAdminInvitations:
         assert response.data["email"] == "newadmin@example.com"
         assert AuditLog.objects.filter(action="ADMIN_INVITED").exists()
 
-    def test_duplicate_invitation_rejected(self, api_client, super_admin_user, seeded_roles):
+    def test_duplicate_invitation_to_active_user_rejected(
+        self, api_client, super_admin_user, seeded_roles
+    ):
+        from .factories import UserFactory
+
         authenticate(api_client, super_admin_user)
         role = Role.objects.get(name="Finance Admin")
+        existing_active_user = UserFactory()
 
         api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "dup@example.com",
+                "login_email": existing_active_user.email,
+                "notify_email": "notify-dup@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -227,7 +234,8 @@ class TestAdminInvitations:
         response = api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "dup@example.com",
+                "login_email": existing_active_user.email,
+                "notify_email": "notify-dup@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -243,7 +251,8 @@ class TestAdminInvitations:
         response = api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "newadmin@example.com",
+                "login_email": "newadmin@example.com",
+                "notify_email": "notify-newadmin@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -259,7 +268,8 @@ class TestAdminInvitations:
         create_response = api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "revokeme@example.com",
+                "login_email": "revokeme@example.com",
+                "notify_email": "notify-revokeme@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -283,7 +293,8 @@ class TestAdminInvitations:
         api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": admin_user.email,
+                "login_email": admin_user.email,
+                "notify_email": "notify-existing@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
