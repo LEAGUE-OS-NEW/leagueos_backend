@@ -107,6 +107,7 @@ class MarketEventSummarySerializer(serializers.ModelSerializer):
 class MarketPublicSerializer(serializers.ModelSerializer):
     opening_liquidity_available = serializers.SerializerMethodField()
     opening_reference = serializers.SerializerMethodField()
+    opening_liquidity = serializers.SerializerMethodField()
     is_watchlisted = serializers.BooleanField(read_only=True, default=False)
     event_group = MarketEventSummarySerializer(read_only=True)
     sport = SportPublicSerializer(
@@ -172,7 +173,32 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "trading_snapshot",
             "opening_liquidity_available",
             "opening_reference",
+            "opening_liquidity",
         ]
+
+    @extend_schema_field(serializers.DictField())
+    def get_opening_liquidity(self, obj):
+        config = getattr(
+            obj,
+            "liquidity_configuration",
+            None,
+        )
+
+        if not config:
+            return {
+                "initial_liquidity_ugx": "0.0000",
+                "opening_spread_bps": 0,
+                "activation_status": "UNCONFIGURED",
+            }
+
+        return {
+            "initial_liquidity_ugx": format(
+                config.initial_liquidity_ugx,
+                ".4f",
+            ),
+            "opening_spread_bps": config.opening_spread_bps,
+            "activation_status": config.status,
+        }
 
     @extend_schema_field(serializers.BooleanField())
     def get_opening_liquidity_available(self, obj):

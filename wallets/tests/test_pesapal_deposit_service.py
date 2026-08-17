@@ -11,6 +11,7 @@ from authentication.tests.factories import (
 from wallets.models import (
     DepositIntent,
     LedgerEntry,
+    PaymentProvider,
     PesapalDeposit,
     Wallet,
     WalletTransaction,
@@ -21,9 +22,6 @@ from wallets.services.pesapal_config import (
 )
 from wallets.services.pesapal_deposit_service import (
     PesapalDepositService,
-)
-from wallets.tests.factories import (
-    PaymentProviderFactory,
 )
 
 
@@ -52,9 +50,13 @@ class PesapalDepositServiceTests(TestCase):
             phone_number="+256772123456",
         )
 
-        self.provider = PaymentProviderFactory(
+        self.provider, _ = PaymentProvider.objects.update_or_create(
             code="PESAPAL_SANDBOX",
-            name="Pesapal Sandbox",
+            defaults={
+                "name": "Pesapal Sandbox",
+                "provider_type": PaymentProvider.ProviderType.GENERIC,
+                "is_active": True,
+            },
         )
 
         self.client = Mock()

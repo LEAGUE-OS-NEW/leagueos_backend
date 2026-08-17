@@ -250,6 +250,330 @@ class WithdrawalRequestLifecycleTests(TestCase):
         )
 
 
+class WithdrawalStateTransitionTests(TestCase):
+    def setUp(self):
+        self.user = UserFactory(
+            is_verified=True,
+            is_active=True,
+        )
+        self.actor = UserFactory(
+            is_active=True,
+        )
+        self.wallet = WalletFactory(
+            user=self.user,
+            currency="UGX",
+            available_balance=Decimal("100000.0000"),
+            reserved_balance=Decimal("0.0000"),
+        )
+        self.destination = {"mobile_money_number": "0777123456"}
+
+    def create_request(self):
+        return WalletService.create_withdrawal_request(
+            user=self.user,
+            amount=Decimal("20000.0000"),
+            currency="UGX",
+            destination=self.destination,
+            idempotency_key=uuid4(),
+        )
+
+    def approve(self, withdrawal):
+        return WalletService.approve_withdrawal(
+            withdrawal_id=withdrawal.id,
+            actor=self.actor,
+        )
+
+    def test_manual_approval_keeps_funds_reserved(self):
+        withdrawal = self.create_request()
+
+        approved = self.approve(withdrawal)
+
+        approved.refresh_from_db()
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            approved.status,
+            WithdrawalRequest.Status.APPROVED,
+        )
+        self.assertEqual(
+            approved.approval_mode,
+            WithdrawalRequest.ApprovalMode.MANUAL,
+        )
+        self.assertEqual(
+            approved.approved_by_id,
+            self.actor.id,
+        )
+        self.assertIsNotNone(approved.approved_at)
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("80000.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("20000.0000"),
+        )
+
+        # Replaying approval is a no-op.
+        self.approve(approved)
+
+        self.assertEqual(
+            AuditLog.objects.filter(
+                action="WITHDRAWAL_APPROVED",
+                related_object_id=approved.id,
+            ).count(),
+            1,
+        )
+
+    def test_rejection_releases_reserved_funds_once(self):
+        withdrawal = self.create_request()
+
+        rejected = WalletService.reject_withdrawal(
+            withdrawal_id=withdrawal.id,
+            actor=self.actor,
+            reason="Manual review rejected payout.",
+        )
+
+        rejected.refresh_from_db()
+        rejected.transaction.refresh_from_db()
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            rejected.status,
+            WithdrawalRequest.Status.REJECTED,
+        )
+        self.assertEqual(
+            rejected.transaction.status,
+            WalletTransaction.Status.CANCELLED,
+        )
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("100000.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+
+        WalletService.reject_withdrawal(
+            withdrawal_id=rejected.id,
+            actor=self.actor,
+            reason="Manual review rejected payout.",
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("100000.0000"),
+        )
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                transaction=rejected.transaction,
+                entry_type=LedgerEntry.EntryType.RELEASE,
+            ).count(),
+            1,
+        )
+
+    def test_processing_requires_approval(self):
+        withdrawal = self.create_request()
+
+        with self.assertRaises(ValidationError):
+            WalletService.mark_withdrawal_processing(
+                withdrawal_id=withdrawal.id,
+                actor=self.actor,
+            )
+
+        self.approve(withdrawal)
+
+        processing = WalletService.mark_withdrawal_processing(
+            withdrawal_id=withdrawal.id,
+            actor=self.actor,
+        )
+
+        processing.refresh_from_db()
+
+        self.assertEqual(
+            processing.status,
+            WithdrawalRequest.Status.PROCESSING,
+        )
+        self.assertEqual(
+            AuditLog.objects.filter(
+                action="WITHDRAWAL_PROCESSING",
+                related_object_id=processing.id,
+            ).count(),
+            1,
+        )
+
+        WalletService.mark_withdrawal_processing(
+            withdrawal_id=processing.id,
+            actor=self.actor,
+        )
+
+        self.assertEqual(
+            AuditLog.objects.filter(
+                action="WITHDRAWAL_PROCESSING",
+                related_object_id=processing.id,
+            ).count(),
+            1,
+        )
+
+    def test_completion_consumes_reserved_funds_once(self):
+        withdrawal = self.create_request()
+        self.approve(withdrawal)
+        processing = WalletService.mark_withdrawal_processing(
+            withdrawal_id=withdrawal.id,
+            actor=self.actor,
+        )
+
+        completed = WalletService.complete_withdrawal(
+            withdrawal_id=processing.id,
+            actor=self.actor,
+            provider_reference="MTN-PAYOUT-123",
+        )
+
+        completed.refresh_from_db()
+        completed.transaction.refresh_from_db()
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            completed.status,
+            WithdrawalRequest.Status.COMPLETED,
+        )
+        self.assertEqual(
+            completed.transaction.status,
+            WalletTransaction.Status.COMPLETED,
+        )
+        self.assertEqual(
+            completed.transaction.provider_reference,
+            "MTN-PAYOUT-123",
+        )
+        self.assertIsNotNone(completed.transaction.completed_at)
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("80000.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+
+        debit = LedgerEntry.objects.get(
+            transaction=completed.transaction,
+            entry_type=LedgerEntry.EntryType.DEBIT,
+        )
+
+        self.assertEqual(
+            debit.credit_account,
+            LedgerEntry.AccountType.PROVIDER_PAYABLE,
+        )
+
+        WalletService.complete_withdrawal(
+            withdrawal_id=completed.id,
+            actor=self.actor,
+            provider_reference="MTN-PAYOUT-123",
+        )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                transaction=completed.transaction,
+                entry_type=LedgerEntry.EntryType.DEBIT,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            AuditLog.objects.filter(
+                action="WITHDRAWAL_COMPLETED",
+                related_object_id=completed.id,
+            ).count(),
+            1,
+        )
+
+    def test_failed_payout_returns_reserved_funds_once(self):
+        withdrawal = self.create_request()
+        self.approve(withdrawal)
+
+        failed = WalletService.fail_withdrawal(
+            withdrawal_id=withdrawal.id,
+            actor=self.actor,
+            reason="Provider payout failed.",
+        )
+
+        failed.refresh_from_db()
+        failed.transaction.refresh_from_db()
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            failed.status,
+            WithdrawalRequest.Status.FAILED,
+        )
+        self.assertEqual(
+            failed.failure_reason,
+            "Provider payout failed.",
+        )
+        self.assertEqual(
+            failed.transaction.status,
+            WalletTransaction.Status.FAILED,
+        )
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("100000.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("0.0000"),
+        )
+
+        WalletService.fail_withdrawal(
+            withdrawal_id=failed.id,
+            actor=self.actor,
+            reason="Provider payout failed.",
+        )
+
+        self.assertEqual(
+            LedgerEntry.objects.filter(
+                transaction=failed.transaction,
+                entry_type=LedgerEntry.EntryType.RELEASE,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            AuditLog.objects.filter(
+                action="WITHDRAWAL_FAILED",
+                related_object_id=failed.id,
+            ).count(),
+            1,
+        )
+
+    def test_completion_requires_processing_state(self):
+        withdrawal = self.create_request()
+
+        with self.assertRaises(ValidationError):
+            WalletService.complete_withdrawal(
+                withdrawal_id=withdrawal.id,
+                actor=self.actor,
+                provider_reference="MTN-PAYOUT-INVALID",
+            )
+
+        self.wallet.refresh_from_db()
+
+        self.assertEqual(
+            self.wallet.available_balance,
+            Decimal("80000.0000"),
+        )
+        self.assertEqual(
+            self.wallet.reserved_balance,
+            Decimal("20000.0000"),
+        )
+
+
 @override_settings(
     WALLET_WITHDRAWAL_AUTO_APPROVAL_ENABLED=True,
     WALLET_WITHDRAWAL_AUTO_APPROVAL_MAX_SINGLE_UGX=Decimal("250000"),

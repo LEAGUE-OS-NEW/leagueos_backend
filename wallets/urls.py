@@ -2,6 +2,15 @@
 
 from django.urls import path
 
+from wallets.admin_views import (
+    AdminWithdrawalApproveView,
+    AdminWithdrawalCompleteView,
+    AdminWithdrawalDetailView,
+    AdminWithdrawalFailView,
+    AdminWithdrawalListView,
+    AdminWithdrawalProcessingView,
+    AdminWithdrawalRejectView,
+)
 from wallets.views import (
     DepositCallbackView,
     DepositIntentDetailView,
@@ -50,6 +59,42 @@ urlpatterns = [
         "withdrawals/<uuid:request_id>/",
         WithdrawalRequestDetailView.as_view(),
         name="withdrawal-request-detail",
+    ),
+    # Finance Admin withdrawals
+    path(
+        "admin/withdrawals/",
+        AdminWithdrawalListView.as_view(),
+        name="admin-withdrawal-list",
+    ),
+    path(
+        "admin/withdrawals/<uuid:request_id>/",
+        AdminWithdrawalDetailView.as_view(),
+        name="admin-withdrawal-detail",
+    ),
+    path(
+        "admin/withdrawals/<uuid:request_id>/approve/",
+        AdminWithdrawalApproveView.as_view(),
+        name="admin-withdrawal-approve",
+    ),
+    path(
+        "admin/withdrawals/<uuid:request_id>/reject/",
+        AdminWithdrawalRejectView.as_view(),
+        name="admin-withdrawal-reject",
+    ),
+    path(
+        "admin/withdrawals/<uuid:request_id>/processing/",
+        AdminWithdrawalProcessingView.as_view(),
+        name="admin-withdrawal-processing",
+    ),
+    path(
+        "admin/withdrawals/<uuid:request_id>/complete/",
+        AdminWithdrawalCompleteView.as_view(),
+        name="admin-withdrawal-complete",
+    ),
+    path(
+        "admin/withdrawals/<uuid:request_id>/fail/",
+        AdminWithdrawalFailView.as_view(),
+        name="admin-withdrawal-fail",
     ),
     # Transactions & Receipts
     path("transactions/", TransactionListView.as_view(), name="transaction-list"),

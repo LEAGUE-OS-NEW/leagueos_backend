@@ -7,13 +7,57 @@ separate LIVE safety switch is explicitly enabled.
 
 from __future__ import annotations
 
+import http.client
 import json
+import logging
 from urllib import error, parse, request
 
 from wallets.services.pesapal_config import (
     PesapalConfig,
     get_pesapal_config,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _provider_error_summary(provider_error) -> str:
+    if isinstance(provider_error, dict):
+        parts = []
+
+        for key in (
+            "error_type",
+            "type",
+            "code",
+            "message",
+        ):
+            value = str(provider_error.get(key) or "").strip()
+
+            if value:
+                parts.append(f"{key}={value}")
+
+        return " | ".join(parts)[:500]
+
+    return str(provider_error or "").strip()[:500]
+
+
+def _safe_provider_error_summary(details: str) -> str:
+    if not details:
+        return ""
+
+    try:
+        data = json.loads(details)
+    except json.JSONDecodeError:
+        return ""
+
+    if not isinstance(data, dict):
+        return ""
+
+    provider_summary = _provider_error_summary(data.get("error"))
+
+    if provider_summary:
+        return provider_summary
+
+    return str(data.get("message") or "").strip()[:500]
 
 
 class PesapalApiError(RuntimeError):
@@ -149,9 +193,44 @@ class PesapalClient:
             except Exception:
                 details = ""
 
-            raise PesapalApiError("Pesapal HTTP error " f"{exc.code}: {details}") from exc
+            provider_summary = _safe_provider_error_summary(details)
+
+            logger.error(
+                "Pesapal API HTTP error " "method=%s path=%s status=%s " "provider_error=%s",
+                method.upper(),
+                path,
+                exc.code,
+                provider_summary or "unavailable",
+            )
+
+            raise PesapalApiError(f"Pesapal HTTP error {exc.code}.") from exc
+
         except error.URLError as exc:
-            raise PesapalApiError("Could not reach Pesapal.") from exc
+            reason = getattr(
+                exc,
+                "reason",
+                None,
+            )
+
+            logger.error(
+                "Pesapal API transport error " "method=%s path=%s " "reason_type=%s reason=%s",
+                method.upper(),
+                path,
+                type(reason).__name__,
+                str(reason or "")[:300],
+            )
+
+            raise PesapalApiError("Could not reach Pesapal " f"during {path}.") from exc
+
+        except (OSError, http.client.HTTPException) as exc:
+            logger.error(
+                "Pesapal API low-level transport error " "method=%s path=%s error_type=%s",
+                method.upper(),
+                path,
+                type(exc).__name__,
+            )
+
+            raise PesapalApiError("Could not reach Pesapal " f"during {path}.") from exc
 
         if not raw:
             return {}
@@ -159,11 +238,19 @@ class PesapalClient:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
+            logger.error(
+                "Pesapal invalid JSON response " "method=%s path=%s",
+                method.upper(),
+                path,
+            )
+
             raise PesapalApiError("Pesapal returned invalid JSON.") from exc
 
         provider_error = data.get("error")
 
-        if provider_error:
+        provider_error_summary = _provider_error_summary(provider_error)
+
+        if provider_error_summary:
             message = (
                 provider_error.get("message")
                 if isinstance(
@@ -173,6 +260,15 @@ class PesapalClient:
                 else str(provider_error)
             )
 
-            raise PesapalApiError(message or "Pesapal rejected the request.")
+            safe_message = str(message or "Pesapal rejected the request.")[:300]
+
+            logger.error(
+                "Pesapal provider error " "method=%s path=%s error=%s",
+                method.upper(),
+                path,
+                provider_error_summary,
+            )
+
+            raise PesapalApiError(safe_message)
 
         return data
