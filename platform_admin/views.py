@@ -13,6 +13,7 @@ from authentication.services.invitation_service import InvitationService
 from authentication.services.permission_service import PermissionService
 from authentication.services.role_service import RoleService, SUPER_ADMIN_ROLE_NAME
 from authentication.services.session_service import SessionService
+from authentication.services.user_admin_service import UserAdminService
 from discovery.models import News
 from discovery.serializers import (
     FixtureCreateSerializer,
@@ -216,6 +217,25 @@ class AdminUserDetailView(APIView):
                     metadata={"target_user_id": str(user.id), "email": user.email},
                     request=request,
                 )
+
+        if "account_status" in serializer.validated_data:
+            new_status = serializer.validated_data["account_status"]
+            if new_status != user.account_status:
+                status_methods = {
+                    User.AccountStatus.DEACTIVATED: UserAdminService.deactivate_user,
+                    User.AccountStatus.SUSPENDED: UserAdminService.suspend_user,
+                    User.AccountStatus.ACTIVE: UserAdminService.activate_user,
+                }
+                method = status_methods.get(new_status)
+                if method is None:
+                    return Response(
+                        {"detail": f"Cannot set account status to {new_status} this way."},
+                        status=400,
+                    )
+                try:
+                    method(actor=request.user, user=user)
+                except PermissionError as exc:
+                    return Response({"detail": str(exc)}, status=403)
 
         current_roles = set(
             UserRole.objects.filter(user=user, is_active=True).values_list("role_id", flat=True)

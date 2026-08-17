@@ -3,8 +3,8 @@ from django.core.management import call_command
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from accounts.models import AuditLog
-from authentication.models import Role, UserRole
+from accounts.models import AuditLog, User
+from authentication.models import Permission, Role, UserPermission, UserRole
 from authentication.services.role_service import RoleService
 
 from .factories import (
@@ -112,6 +112,68 @@ class TestAdminUserDetail:
         response = api_client.get("/api/v1/admin/users/00000000-0000-0000-0000-000000000000/")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_deactivate_via_account_status(self, api_client, super_admin_user, admin_user, seeded_roles):
+        RoleService.assign_role(super_admin_user, Role.objects.get(name="Super Admin"))
+        authenticate(api_client, super_admin_user)
+
+        response = api_client.patch(
+            f"/api/v1/admin/users/{admin_user.id}/",
+            {"account_status": "DEACTIVATED"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        admin_user.refresh_from_db()
+        assert admin_user.account_status == User.AccountStatus.DEACTIVATED
+        assert AuditLog.objects.filter(action="ACCOUNT_DEACTIVATED", resource_id=admin_user.id).exists()
+
+    def test_reactivate_via_account_status(self, api_client, super_admin_user, admin_user, seeded_roles):
+        RoleService.assign_role(super_admin_user, Role.objects.get(name="Super Admin"))
+        authenticate(api_client, super_admin_user)
+        admin_user.account_status = User.AccountStatus.DEACTIVATED
+        admin_user.save(update_fields=["account_status"])
+
+        response = api_client.patch(
+            f"/api/v1/admin/users/{admin_user.id}/",
+            {"account_status": "ACTIVE"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        admin_user.refresh_from_db()
+        assert admin_user.account_status == User.AccountStatus.ACTIVE
+        assert AuditLog.objects.filter(action="ACCOUNT_REACTIVATED", resource_id=admin_user.id).exists()
+
+    def test_cannot_deactivate_self_via_account_status(self, api_client, super_admin_user):
+        authenticate(api_client, super_admin_user)
+
+        response = api_client.patch(
+            f"/api/v1/admin/users/{super_admin_user.id}/",
+            {"account_status": "DEACTIVATED"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        super_admin_user.refresh_from_db()
+        assert super_admin_user.account_status != User.AccountStatus.DEACTIVATED
+
+    def test_cannot_deactivate_superuser_via_account_status(
+        self, api_client, admin_user, super_admin_user, seeded_roles
+    ):
+        permission = Permission.objects.get(code="admin.users.manage")
+        UserPermission.objects.create(user=admin_user, permission=permission, granted_by=super_admin_user)
+        authenticate(api_client, admin_user)
+
+        response = api_client.patch(
+            f"/api/v1/admin/users/{super_admin_user.id}/",
+            {"account_status": "DEACTIVATED"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        super_admin_user.refresh_from_db()
+        assert super_admin_user.account_status != User.AccountStatus.DEACTIVATED
 
 
 class TestAdminUserRoles:
