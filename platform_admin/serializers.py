@@ -5,7 +5,8 @@ from authentication.models import AdminInvitation, Permission, Role
 
 
 class AdminInvitationCreateSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    login_email = serializers.EmailField()
+    notify_email = serializers.EmailField()
     role_ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=False)
     expires_in_days = serializers.IntegerField(min_value=1, max_value=30, default=7)
 

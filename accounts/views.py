@@ -21,10 +21,11 @@ from accounts.serializers import (
 )
 from accounts.services.email_service import EmailService
 from accounts.services.otp_service import OTPService
-from authentication.models import Role
+from authentication.models import AdminInvitation, Role
 from authentication.serializers import AuthTokenResponseSerializer
 from authentication.services.account_setup_service import AccountSetupService
 from authentication.services.auth_context_service import AuthContextService
+from authentication.services.invitation_service import InvitationService
 from authentication.services.role_service import RoleService
 from authentication.services.session_service import SessionService
 from authentication.services.token_service import TokenService
@@ -302,7 +303,10 @@ class AccountSetupCompleteView(APIView):
     If a pending StaffInvitation exists for this email (the club-admin
     invite path — see ClubAdminInvitationService), also accepts it in the
     same request so the invitee lands with their ClubWorkspace + Club Admin
-    role already granted, instead of a second manual step.
+    role already granted, instead of a second manual step. Same idea for a
+    pending AdminInvitation (the platform-role admin path — see
+    InvitationService.create_invitation), so a newly set-up Compliance/
+    Finance/etc admin lands with their role already granted too.
     """
 
     serializer_class = AccountSetupCompleteSerializer
@@ -339,6 +343,17 @@ class AccountSetupCompleteView(APIView):
         )
         if pending_invitation:
             StaffService.accept_invitation(token=pending_invitation.token, user=user)
+
+        pending_admin_invitation = (
+            AdminInvitation.objects.filter(
+                email__iexact=user.email,
+                status=AdminInvitation.Status.PENDING,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if pending_admin_invitation:
+            InvitationService.accept_invitation(pending_admin_invitation.token, user)
 
         ip_address = get_client_ip(request) or "127.0.0.1"
         user_agent = request.META.get("HTTP_USER_AGENT", "")

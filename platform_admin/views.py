@@ -472,7 +472,8 @@ class AdminInvitationListView(APIView):
 
         try:
             invitation = InvitationService.create_invitation(
-                email=serializer.validated_data["email"],
+                login_email=serializer.validated_data["login_email"],
+                notify_email=serializer.validated_data["notify_email"],
                 roles=list(roles),
                 invited_by=request.user,
                 expires_in_days=serializer.validated_data["expires_in_days"],

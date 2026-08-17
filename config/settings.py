@@ -429,6 +429,11 @@ ACCOUNT_SETUP_URL = env("ACCOUNT_SETUP_URL", default="http://localhost:5173/acce
 # EmailService.send_admin_invitation_email.
 ADMIN_INVITE_URL = env("ADMIN_INVITE_URL", default="http://localhost:5173/accept-admin-invite")
 
+# Frontend page that consumes a StaffInvitation token (?token=...) for a
+# club-staff invite (non-admin roles). Referenced by
+# EmailService.send_staff_invitation_email.
+STAFF_INVITE_URL = env("STAFF_INVITE_URL", default="http://localhost:5173/accept-invite")
+
 
 # Registration and OTP Settings
 REGISTRATION_OTP_CHANNEL = env("REGISTRATION_OTP_CHANNEL", default="EMAIL").upper()
