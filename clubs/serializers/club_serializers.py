@@ -325,6 +325,20 @@ class ClubAdminInviteSerializer(serializers.Serializer):
     notify_email = serializers.EmailField()
 
 
+class ClubLogoUploadSerializer(serializers.Serializer):
+    """Request body for ClubLogoView.post."""
+
+    logo = serializers.ImageField(max_length=None, use_url=False, required=True)
+
+
+class ClubLogoResponseSerializer(serializers.Serializer):
+    """Response body for ClubLogoView.post."""
+
+    success = serializers.BooleanField()
+    logo_url = serializers.CharField()
+    updated_at = serializers.CharField()
+
+
 class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory

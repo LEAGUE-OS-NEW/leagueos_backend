@@ -13,9 +13,27 @@ from authentication.services.invitation_service import InvitationService
 from authentication.services.permission_service import PermissionService
 from authentication.services.role_service import RoleService, SUPER_ADMIN_ROLE_NAME
 from authentication.services.session_service import SessionService
+from discovery.models import News
+from discovery.serializers import (
+    FixtureCreateSerializer,
+    FixtureScoreSerializer,
+    FixtureSerializer,
+    FixtureStatusSerializer,
+    NewsApproveSerializer,
+    NewsComposeSerializer,
+    NewsFeaturedSerializer,
+    NewsModerationSerializer,
+    NewsModerationUpdateSerializer,
+    NewsRejectSerializer,
+    NewsTrendingSerializer,
+)
+from discovery.services.fixture_admin_service import fixture_admin_service
+from discovery.services.news_moderation_service import news_moderation_service
+from sports.models import SportingEvent
 from platform_admin.serializers import (
     AdminAuditLogSerializer,
     AdminDashboardSummarySerializer,
+    AdminInvitationAcceptSerializer,
     AdminInvitationCreateSerializer,
     AdminInvitationReadSerializer,
     AdminPermissionSerializer,
@@ -513,6 +531,39 @@ class AdminInvitationRevokeView(APIView):
                 status=400,
             )
 
+        return Response(AdminInvitationReadSerializer(invitation).data)
+
+
+class AdminInvitationAcceptView(APIView):
+    """Accepts a platform-role AdminInvitation by token, assigning its
+    roles to the already-authenticated requesting user (unlike club-admin
+    invites, this path never creates a new account — see
+    ClubAdminInvitationService for that case)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = AdminInvitationReadSerializer
+
+    @extend_schema(
+        operation_id="admin_invitation_accept",
+        request=AdminInvitationAcceptSerializer,
+        responses={200: AdminInvitationReadSerializer, 400: None},
+    )
+    def post(self, request):
+        serializer = AdminInvitationAcceptSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        invitation = InvitationService.accept_invitation(
+            serializer.validated_data["token"],
+            request.user,
+        )
+        if invitation is None:
+            return Response(
+                {"detail": "This invitation is invalid, expired, or already used."},
+                status=400,
+            )
+
+        return Response(AdminInvitationReadSerializer(invitation).data)
+
         AuditService.record(
             request.user,
             "ADMIN_INVITED",
@@ -716,3 +767,387 @@ class AdminDashboardSummaryView(APIView):
 
         serializer = self.serializer_class(data)
         return Response(serializer.data)
+
+
+class AdminNewsComposeView(APIView):
+    """Staff Compose News — create-and-publish directly (no club, no review
+    step). Distinct from the club submission -> queue -> approve pipeline."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NewsModerationSerializer
+
+    @extend_schema(
+        operation_id="admin_news_compose",
+        request=NewsComposeSerializer,
+        responses={201: NewsModerationSerializer, 400: None, 403: None},
+    )
+    def post(self, request):
+        if not PermissionService.has_permission(request.user, "manage_news"):
+            return Response(
+                {"detail": "You do not have permission to publish news."},
+                status=403,
+            )
+
+        serializer = NewsComposeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        news = news_moderation_service.compose_and_publish(
+            created_by=request.user,
+            **serializer.validated_data,
+        )
+        return Response(self.serializer_class(news).data, status=201)
+
+
+class AdminNewsQueueListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NewsModerationSerializer
+
+    @extend_schema(
+        operation_id="admin_news_queue_list",
+        responses={200: NewsModerationSerializer(many=True)},
+    )
+    def get(self, request):
+        if not PermissionService.has_permission(request.user, "view_news"):
+            return Response(
+                {"detail": "You do not have permission to view the news queue."},
+                status=403,
+            )
+
+        queue = news_moderation_service.list_queue()
+        return Response(self.serializer_class(queue, many=True).data)
+
+
+class AdminNewsPublishedListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NewsModerationSerializer
+
+    @extend_schema(
+        operation_id="admin_news_published_list",
+        responses={200: NewsModerationSerializer(many=True)},
+    )
+    def get(self, request):
+        if not PermissionService.has_permission(request.user, "view_news"):
+            return Response(
+                {"detail": "You do not have permission to view published news."},
+                status=403,
+            )
+
+        published = news_moderation_service.list_published()
+        return Response(self.serializer_class(published, many=True).data)
+
+
+class AdminNewsDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NewsModerationSerializer
+
+    @extend_schema(
+        operation_id="admin_news_detail",
+        responses={200: NewsModerationSerializer, 404: None},
+    )
+    def get(self, request, news_id):
+        if not PermissionService.has_permission(request.user, "view_news"):
+            return Response(
+                {"detail": "You do not have permission to view news."},
+                status=403,
+            )
+
+        news = News.objects.filter(id=news_id).first()
+        if not news:
+            return Response({"detail": "Article not found."}, status=404)
+
+        return Response(self.serializer_class(news).data)
+
+    @extend_schema(
+        operation_id="admin_news_update",
+        request=NewsModerationUpdateSerializer,
+        responses={200: NewsModerationSerializer, 400: None, 403: None, 404: None},
+    )
+    def patch(self, request, news_id):
+        if not PermissionService.has_permission(request.user, "manage_news"):
+            return Response(
+                {"detail": "You do not have permission to edit news."},
+                status=403,
+            )
+
+        news = News.objects.filter(id=news_id).first()
+        if not news:
+            return Response({"detail": "Article not found."}, status=404)
+
+        serializer = NewsModerationUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        updated = news_moderation_service.update_story(news=news, **serializer.validated_data)
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminNewsApproveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NewsModerationSerializer
+
+    @extend_schema(
+        operation_id="admin_news_approve",
+        request=NewsApproveSerializer,
+        responses={200: NewsModerationSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, news_id):
+        if not PermissionService.has_permission(request.user, "manage_news"):
+            return Response(
+                {"detail": "You do not have permission to approve news."},
+                status=403,
+            )
+
+        news = News.objects.filter(id=news_id).first()
+        if not news:
+            return Response({"detail": "Article not found."}, status=404)
+
+        serializer = NewsApproveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            approved = news_moderation_service.approve(
+                news=news,
+                actor=request.user,
+                is_top_story=serializer.validated_data["is_top_story"],
+                is_trending=serializer.validated_data["is_trending"],
+            )
+        except DjangoValidationError as exc:
+            return Response({"detail": " ".join(exc.messages)}, status=400)
+
+        AuditService.record(
+            request.user,
+            "NEWS_APPROVED",
+            resource_type="news",
+            resource_id=approved.id,
+            metadata={"title": approved.title},
+            request=request,
+        )
+
+        return Response(self.serializer_class(approved).data)
+
+
+class AdminNewsRejectView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NewsModerationSerializer
+
+    @extend_schema(
+        operation_id="admin_news_reject",
+        request=NewsRejectSerializer,
+        responses={200: NewsModerationSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, news_id):
+        if not PermissionService.has_permission(request.user, "manage_news"):
+            return Response(
+                {"detail": "You do not have permission to reject news."},
+                status=403,
+            )
+
+        news = News.objects.filter(id=news_id).first()
+        if not news:
+            return Response({"detail": "Article not found."}, status=404)
+
+        serializer = NewsRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        rejected = news_moderation_service.reject(
+            news=news,
+            actor=request.user,
+            reason=serializer.validated_data["reason"],
+        )
+
+        AuditService.record(
+            request.user,
+            "NEWS_REJECTED",
+            resource_type="news",
+            resource_id=rejected.id,
+            metadata={"title": rejected.title, "reason": rejected.rejection_reason},
+            request=request,
+        )
+
+        return Response(self.serializer_class(rejected).data)
+
+
+class AdminNewsSetFeaturedView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NewsModerationSerializer
+
+    @extend_schema(
+        operation_id="admin_news_set_featured",
+        request=NewsFeaturedSerializer,
+        responses={200: NewsModerationSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, news_id):
+        if not PermissionService.has_permission(request.user, "manage_news"):
+            return Response(
+                {"detail": "You do not have permission to curate news."},
+                status=403,
+            )
+
+        news = News.objects.filter(id=news_id).first()
+        if not news:
+            return Response({"detail": "Article not found."}, status=404)
+
+        serializer = NewsFeaturedSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = news_moderation_service.set_featured(
+            news=news,
+            is_featured=serializer.validated_data["is_featured"],
+        )
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminNewsSetTrendingView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = NewsModerationSerializer
+
+    @extend_schema(
+        operation_id="admin_news_set_trending",
+        request=NewsTrendingSerializer,
+        responses={200: NewsModerationSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, news_id):
+        if not PermissionService.has_permission(request.user, "manage_news"):
+            return Response(
+                {"detail": "You do not have permission to curate news."},
+                status=403,
+            )
+
+        news = News.objects.filter(id=news_id).first()
+        if not news:
+            return Response({"detail": "Article not found."}, status=404)
+
+        serializer = NewsTrendingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            updated = news_moderation_service.set_trending(
+                news=news,
+                is_trending=serializer.validated_data["is_trending"],
+            )
+        except DjangoValidationError as exc:
+            return Response({"detail": " ".join(exc.messages)}, status=400)
+
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminFixtureListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixtures_list",
+        responses={200: FixtureSerializer(many=True), 403: None},
+    )
+    def get(self, request):
+        if not PermissionService.has_permission(request.user, "view_sports"):
+            return Response(
+                {"detail": "You do not have permission to view fixtures."},
+                status=403,
+            )
+
+        fixtures = fixture_admin_service.list_admin_fixtures()
+        return Response(self.serializer_class(fixtures, many=True).data)
+
+    @extend_schema(
+        operation_id="admin_fixtures_create",
+        request=FixtureCreateSerializer,
+        responses={201: FixtureSerializer, 400: None, 403: None},
+    )
+    def post(self, request):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to create fixtures."},
+                status=403,
+            )
+
+        serializer = FixtureCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        fixture = fixture_admin_service.create_fixture(
+            actor=request.user,
+            **serializer.validated_data,
+        )
+        return Response(self.serializer_class(fixture).data, status=201)
+
+
+class AdminFixtureStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_status_update",
+        request=FixtureStatusSerializer,
+        responses={200: FixtureSerializer, 400: None, 403: None, 404: None},
+    )
+    def patch(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to manage fixtures."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        serializer = FixtureStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = fixture_admin_service.set_status(
+            fixture=fixture,
+            status=serializer.validated_data["status"],
+        )
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminFixtureScoreView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_score_update",
+        request=FixtureScoreSerializer,
+        responses={200: FixtureSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to manage fixtures."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        serializer = FixtureScoreSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = fixture_admin_service.update_score(
+            fixture=fixture,
+            **serializer.validated_data,
+        )
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminFixtureCompleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_complete",
+        responses={200: FixtureSerializer, 403: None, 404: None},
+    )
+    def post(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to manage fixtures."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        updated = fixture_admin_service.complete_fixture(fixture=fixture)
+        return Response(self.serializer_class(updated).data)

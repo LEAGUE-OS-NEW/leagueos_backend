@@ -47,25 +47,25 @@ class AdminWithdrawalReadSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
 
-    def get_user_email(self, withdrawal):
+    def get_user_email(self, withdrawal: WithdrawalRequest) -> str:
         return withdrawal.wallet.user.email
 
-    def get_currency(self, withdrawal):
+    def get_currency(self, withdrawal: WithdrawalRequest) -> str:
         return withdrawal.wallet.currency
 
-    def get_approved_by_email(self, withdrawal):
+    def get_approved_by_email(self, withdrawal: WithdrawalRequest) -> str | None:
         if withdrawal.approved_by_id is None:
             return None
 
         return withdrawal.approved_by.email
 
-    def get_transaction_status(self, withdrawal):
+    def get_transaction_status(self, withdrawal: WithdrawalRequest) -> str | None:
         if withdrawal.transaction_id is None:
             return None
 
         return withdrawal.transaction.status
 
-    def get_provider_reference(self, withdrawal):
+    def get_provider_reference(self, withdrawal: WithdrawalRequest) -> str:
         if withdrawal.transaction_id is None:
             return ""
 

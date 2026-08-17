@@ -422,6 +422,13 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@leagueos.com")
 # EmailService.send_account_setup_email / send_club_admin_setup_email.
 ACCOUNT_SETUP_URL = env("ACCOUNT_SETUP_URL", default="http://localhost:5173/accept-invite")
 
+# Frontend page that consumes an AdminInvitation token (?token=...) for an
+# already-registered user accepting a platform-role invite (Compliance
+# Admin, Finance Admin, etc.) — distinct from ACCOUNT_SETUP_URL, which is
+# for a brand-new login that doesn't have an account yet. Referenced by
+# EmailService.send_admin_invitation_email.
+ADMIN_INVITE_URL = env("ADMIN_INVITE_URL", default="http://localhost:5173/accept-admin-invite")
+
 
 # Registration and OTP Settings
 REGISTRATION_OTP_CHANNEL = env("REGISTRATION_OTP_CHANNEL", default="EMAIL").upper()

@@ -995,6 +995,7 @@ class ClubAuditLog(TimeStampedUUIDModel):
         ("BRANDING_CHANGED", "Branding changed"),
         ("MEDIA_UPLOADED", "Media uploaded"),
         ("NEWS_PUBLISHED", "News published"),
+        ("NEWS_SUBMITTED", "News submitted for review"),
         ("MEMBERSHIP_CREATED", "Membership created"),
         ("TICKET_CREATED", "Ticket created"),
         ("PRODUCT_CREATED", "Product created"),

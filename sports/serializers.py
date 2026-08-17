@@ -1,3 +1,4 @@
+from django.utils.text import slugify
 from rest_framework import serializers
 
 from sports.models import (
@@ -130,6 +131,43 @@ class CompetitionListQuerySerializer(serializers.Serializer):
         allow_blank=False,
         max_length=180,
     )
+
+
+class ParticipantCreateSerializer(serializers.ModelSerializer):
+    """Lets the fixture-creation admin UI add a participant (team) inline
+    when a club doesn't have a matching one yet. Same admin.clubs.manage
+    gate as SportCreateSerializer/CompetitionCreateSerializer above."""
+
+    sport = serializers.PrimaryKeyRelatedField(queryset=Sport.objects.filter(is_active=True))
+
+    class Meta:
+        model = Participant
+        fields = ["id", "sport", "kind", "name", "short_name", "slug", "country_code", "is_active"]
+        read_only_fields = ["id"]
+        extra_kwargs = {
+            # sport/kind/country_code/slug form a DB-level unique-together
+            # constraint, which DRF auto-detects and otherwise marks every
+            # participating field as required — giving them defaults here
+            # is what makes them genuinely optional on input.
+            "slug": {"required": False, "default": ""},
+            "short_name": {"required": False},
+            "country_code": {"required": False, "default": ""},
+            "kind": {"default": Participant.Kind.TEAM},
+        }
+
+    def create(self, validated_data):
+        if not validated_data.get("slug"):
+            base_slug = slugify(validated_data["name"])
+            slug = base_slug
+            suffix = 1
+            while Participant.objects.filter(sport=validated_data["sport"], slug=slug).exists():
+                suffix += 1
+                slug = f"{base_slug}-{suffix}"
+            validated_data["slug"] = slug
+        # Admin-authored participants are verified on creation — same
+        # rationale as CompetitionCreateSerializer.is_verified above.
+        validated_data["is_verified"] = True
+        return super().create(validated_data)
 
 
 class ParticipantListQuerySerializer(serializers.Serializer):

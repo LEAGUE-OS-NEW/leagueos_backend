@@ -23,8 +23,10 @@ env/
 
 # Django
 db.sqlite3
+smoketest.db
 staticfiles/
 media/
+private_media/
 *.log
 
 # IDE

@@ -10,6 +10,10 @@ class AdminInvitationCreateSerializer(serializers.Serializer):
     expires_in_days = serializers.IntegerField(min_value=1, max_value=30, default=7)
 
 
+class AdminInvitationAcceptSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+
 class AdminInvitationReadSerializer(serializers.ModelSerializer):
     assigned_roles = serializers.SlugRelatedField(many=True, read_only=True, slug_field="name")
     invited_by_email = serializers.EmailField(source="invited_by.email", read_only=True)

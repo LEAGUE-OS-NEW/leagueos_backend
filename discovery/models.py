@@ -326,6 +326,7 @@ class News(TimeStampedUUIDModel):
         db_index=True,
     )
     is_featured = models.BooleanField(default=False, db_index=True)
+    is_trending = models.BooleanField(default=False, db_index=True)
     is_verified = models.BooleanField(default=False, db_index=True)
     published_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
@@ -337,12 +338,14 @@ class News(TimeStampedUUIDModel):
     )
     source_name = models.CharField(max_length=120, blank=True)
     source_reference = models.CharField(max_length=255, blank=True)
+    rejection_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-published_at", "-created_at"]
         indexes = [
             models.Index(fields=["status", "is_verified", "published_at"]),
             models.Index(fields=["is_featured", "status", "published_at"]),
+            models.Index(fields=["is_trending", "status", "published_at"]),
             models.Index(fields=["category", "status", "published_at"]),
             models.Index(fields=["club", "status", "published_at"]),
             models.Index(fields=["competition", "status", "published_at"]),
@@ -403,6 +406,11 @@ class MatchCentre(TimeStampedUUIDModel):
     result = models.CharField(max_length=255, blank=True)
     home_score = models.PositiveSmallIntegerField(null=True, blank=True)
     away_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    clock_display = models.CharField(
+        max_length=24,
+        blank=True,
+        help_text='Free-text live clock, e.g. "75\'", "HT", "Q3 04:15" — set by admin.',
+    )
     attendance = models.PositiveIntegerField(null=True, blank=True)
     venue = models.ForeignKey(
         Venue,

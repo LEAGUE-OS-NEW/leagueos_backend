@@ -252,6 +252,69 @@ class TestAdminInvitations:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_revoke_invitation(self, api_client, super_admin_user, seeded_roles):
+        authenticate(api_client, super_admin_user)
+        role = Role.objects.get(name="Finance Admin")
+
+        create_response = api_client.post(
+            "/api/v1/admin/invitations/",
+            {
+                "email": "revokeme@example.com",
+                "role_ids": [str(role.id)],
+                "expires_in_days": 7,
+            },
+            format="json",
+        )
+        invitation_id = create_response.data["id"]
+
+        response = api_client.post(f"/api/v1/admin/invitations/{invitation_id}/revoke/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["status"] == "REVOKED"
+
+    def test_accept_invitation_assigns_role_and_logs_in(
+        self, api_client, admin_user, super_admin_user, seeded_roles
+    ):
+        from authentication.models import AdminInvitation
+
+        authenticate(api_client, super_admin_user)
+        role = Role.objects.get(name="Finance Admin")
+
+        api_client.post(
+            "/api/v1/admin/invitations/",
+            {
+                "email": admin_user.email,
+                "role_ids": [str(role.id)],
+                "expires_in_days": 7,
+            },
+            format="json",
+        )
+        invitation = AdminInvitation.objects.get(email=admin_user.email)
+
+        api_client.credentials()
+        authenticate(api_client, admin_user)
+
+        response = api_client.post(
+            "/api/v1/admin/invitations/accept/",
+            {"token": invitation.token},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["status"] == "ACCEPTED"
+        assert UserRole.objects.filter(user=admin_user, role=role, is_active=True).exists()
+
+    def test_accept_invalid_invitation_token(self, api_client, admin_user, seeded_roles):
+        authenticate(api_client, admin_user)
+
+        response = api_client.post(
+            "/api/v1/admin/invitations/accept/",
+            {"token": "not-a-real-token"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
 
 class TestAdminAudit:
     def test_audit_list_requires_permission(self, api_client, admin_user):

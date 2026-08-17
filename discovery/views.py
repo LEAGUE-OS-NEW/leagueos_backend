@@ -20,6 +20,7 @@ from discovery.serializers import (
     FixtureSerializer,
     FollowSerializer,
     MatchCentreSerializer,
+    NewsCategorySerializer,
     NewsListQuerySerializer,
     NewsSerializer,
     PlayerDetailResponseSerializer,
@@ -158,7 +159,6 @@ class ClubListView(ListAPIView):
 
         return club_service.get_public_clubs(
             sport=params.get("sport"),
-            country=params.get("country"),
             search=params.get("search"),
             ordering=params.get("ordering", "name"),
         )
@@ -383,7 +383,7 @@ class FixtureDetailView(RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        fixture_service.record_view(instance["id"], user=request.user, request=request)
+        fixture_service.record_view(str(instance.id), user=request.user, request=request)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -419,6 +419,25 @@ class ResultListView(ListAPIView):
 # =============================================================================
 # News
 # =============================================================================
+
+
+@extend_schema_view(
+    get=extend_schema(
+        responses=NewsCategorySerializer(many=True),
+        tags=["Discovery"],
+    )
+)
+class NewsCategoryListView(ListAPIView):
+    """Public, active news categories — used to populate the submit/compose
+    category picker on both the club and admin sides."""
+
+    permission_classes = [AllowAny]
+    serializer_class = NewsCategorySerializer
+
+    def get_queryset(self):
+        from discovery.models import NewsCategory
+
+        return NewsCategory.objects.filter(is_active=True).order_by("display_order", "name")
 
 
 @extend_schema_view(
