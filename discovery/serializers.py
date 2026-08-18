@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from discovery.models import (
@@ -118,6 +119,7 @@ class ClubListQuerySerializer(serializers.Serializer):
         required=False,
         default="name",
     )
+    has_admin = serializers.BooleanField(required=False)
 
 
 class DiscoveryClubSerializer(serializers.ModelSerializer):
@@ -366,6 +368,7 @@ class FixtureCreateSerializer(serializers.Serializer):
     home_participant = serializers.PrimaryKeyRelatedField(queryset=Participant.objects.all())
     away_participant = serializers.PrimaryKeyRelatedField(queryset=Participant.objects.all())
     starts_at = serializers.DateTimeField()
+    ends_at = serializers.DateTimeField(required=False, allow_null=True)
     venue = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate(self, attrs):
@@ -374,6 +377,8 @@ class FixtureCreateSerializer(serializers.Serializer):
         competition = attrs.get("competition")
         home = attrs["home_participant"]
         away = attrs["away_participant"]
+        starts_at = attrs["starts_at"]
+        ends_at = attrs.get("ends_at")
 
         if competition and competition.sport_id != sport.id:
             errors["competition"] = "Competition must belong to the selected sport."
@@ -383,10 +388,29 @@ class FixtureCreateSerializer(serializers.Serializer):
             errors["away_participant"] = "Away participant must belong to the selected sport."
         if home.id == away.id:
             errors["away_participant"] = "Home and away participants must be different."
+        if starts_at < timezone.now():
+            errors["starts_at"] = "Kickoff time cannot be in the past."
+        if ends_at and ends_at < starts_at:
+            errors["ends_at"] = "Anticipated end time cannot be earlier than kickoff."
 
         if errors:
             raise serializers.ValidationError(errors)
         return attrs
+
+
+class FixtureRescheduleSerializer(serializers.Serializer):
+    """Sports Data Admin editing a fixture's kickoff time, venue, and/or
+    anticipated end time — typically after postponing it. Partial: any
+    subset of these fields may be sent."""
+
+    starts_at = serializers.DateTimeField(required=False)
+    venue = serializers.CharField(required=False, allow_blank=True)
+    ends_at = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate_starts_at(self, value):
+        if value < timezone.now():
+            raise serializers.ValidationError("Kickoff time cannot be in the past.")
+        return value
 
 
 class FixtureStatusSerializer(serializers.Serializer):
