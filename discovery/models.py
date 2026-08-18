@@ -286,6 +286,9 @@ class News(TimeStampedUUIDModel):
     slug = models.SlugField(max_length=320, unique=True, blank=True)
     summary = models.TextField(blank=True)
     body = models.TextField()
+    image = models.TextField(blank=True)
+    author = models.CharField(max_length=180, blank=True)
+    avatar = models.TextField(blank=True)
     category = models.ForeignKey(
         NewsCategory,
         on_delete=models.PROTECT,
@@ -356,6 +359,9 @@ class News(TimeStampedUUIDModel):
 
     def save(self, *args, **kwargs):
         self.title = self.title.strip()
+        self.image = self.image.strip()
+        self.author = self.author.strip()
+        self.avatar = self.avatar.strip()
         self.source_name = self.source_name.strip()
         self.source_reference = self.source_reference.strip()
         if not self.slug:
