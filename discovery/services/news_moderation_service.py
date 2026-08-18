@@ -22,14 +22,38 @@ class NewsModerationService:
     """Service for news submission and moderation."""
 
     @staticmethod
+    def _default_author(*, club=None, created_by=None) -> str:
+        if club is not None and getattr(club, "name", ""):
+            return club.name.strip()
+        if created_by is not None:
+            full_name = f"{created_by.first_name} {created_by.last_name}".strip()
+            return full_name or getattr(created_by, "email", "") or "LeagueOS"
+        return "LeagueOS"
+
+    @staticmethod
     def submit_for_review(
-        *, club, title, summary, body, category, created_by, sport=None, competition=None
+        *,
+        club,
+        title,
+        summary,
+        body,
+        image="",
+        author="",
+        avatar="",
+        category,
+        created_by,
+        sport=None,
+        competition=None,
     ):
         """Create a club-submitted article awaiting Sports Data / Super Admin review."""
         news = News(
             title=title,
             summary=summary,
             body=body,
+            image=image or "",
+            author=author
+            or NewsModerationService._default_author(club=club, created_by=created_by),
+            avatar=avatar or "",
             category=category,
             sport=sport,
             competition=competition,
@@ -44,7 +68,17 @@ class NewsModerationService:
 
     @staticmethod
     def compose_and_publish(
-        *, title, summary, body, category, created_by, sport=None, competition=None
+        *,
+        title,
+        summary,
+        body,
+        image="",
+        author="",
+        avatar="",
+        category,
+        created_by,
+        sport=None,
+        competition=None,
     ):
         """Staff (Sports Data / Super Admin) writing and publishing an
         original article directly — no club, no review step."""
@@ -52,6 +86,9 @@ class NewsModerationService:
             title=title,
             summary=summary,
             body=body,
+            image=image or "",
+            author=author or NewsModerationService._default_author(created_by=created_by),
+            avatar=avatar or "",
             category=category,
             sport=sport,
             competition=competition,
@@ -77,7 +114,7 @@ class NewsModerationService:
     def list_published():
         """Return live articles, most recently published first."""
         return (
-            News.objects.filter(status=News.Status.PUBLISHED)
+            News.objects.filter(status=News.Status.PUBLISHED, published_at__lte=timezone.now())
             .select_related("category", "sport", "competition", "club")
             .order_by("-published_at")
         )
@@ -86,7 +123,17 @@ class NewsModerationService:
     def update_story(*, news, **fields):
         """Edit an article's content/classification — used by the Edit Story flow
         before approval, and can also correct an already-published article."""
-        for field in ("title", "summary", "body", "category", "sport", "competition"):
+        for field in (
+            "title",
+            "summary",
+            "body",
+            "image",
+            "author",
+            "avatar",
+            "category",
+            "sport",
+            "competition",
+        ):
             if field in fields:
                 setattr(news, field, fields[field])
         news.full_clean()
