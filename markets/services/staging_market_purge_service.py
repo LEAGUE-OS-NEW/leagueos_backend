@@ -41,7 +41,7 @@ from wallets.models import (
     WithdrawalRequest,
 )
 
-CONFIRMATION_PHRASE = "PURGE_36_STAGING_MARKETS_KEEP_4"
+CONFIRMATION_PHRASE = "PURGE_42_STAGING_MARKETS_KEEP_4"
 
 
 class StagingMarketPurgeError(ValueError):
@@ -71,14 +71,20 @@ def _snapshot_sets():
     if len(keepers) != 4:
         raise StagingMarketPurgeError("Snapshot must contain exactly four keepers.")
 
-    if len(purge) != 36:
-        raise StagingMarketPurgeError("Snapshot must contain exactly 36 purge targets.")
+    expected_purge_count = SOURCE_TOTAL_MARKETS - len(keepers)
+
+    if len(purge) != expected_purge_count:
+        raise StagingMarketPurgeError(
+            "Snapshot purge target count does " "not match SOURCE_TOTAL_MARKETS."
+        )
 
     if keepers & purge:
         raise StagingMarketPurgeError("Keeper and purge UUIDs overlap.")
 
     if len(keepers | purge) != SOURCE_TOTAL_MARKETS:
-        raise StagingMarketPurgeError("Snapshot does not contain exactly 40 markets.")
+        raise StagingMarketPurgeError(
+            "Snapshot market count does not " "match SOURCE_TOTAL_MARKETS."
+        )
 
     return keepers, purge
 
@@ -440,7 +446,7 @@ def build_purge_preflight(
     can_execute = (
         snapshot_matches
         and len(keepers & market_ids) == 4
-        and len(purge & market_ids) == 36
+        and len(purge & market_ids) == len(purge)
         and actor_ready
     )
 
@@ -615,7 +621,7 @@ def apply_staging_market_purge(
     return {
         "snapshot_version": SNAPSHOT_VERSION,
         "snapshot_digest": SNAPSHOT_DIGEST,
-        "deleted_market_count": 36,
+        "deleted_market_count": len(purge),
         "remaining_market_count": 4,
         "voided_market_count": len(
             report.voided_market_ids,

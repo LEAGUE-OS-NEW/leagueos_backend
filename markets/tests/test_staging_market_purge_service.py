@@ -49,6 +49,7 @@ from markets.services.staging_market_purge_snapshot import (
     KEEPER_IDS,
     PURGE_IDS,
     SNAPSHOT_DIGEST,
+    SOURCE_TOTAL_MARKETS,
 )
 from markets.tests.wallet_test_support import (
     fund_market_wallet,
@@ -174,7 +175,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
                 visible=False,
             )
 
-    def test_preflight_matches_exact_40_market_snapshot(
+    def test_preflight_matches_exact_market_snapshot(
         self,
     ):
         self.seed_snapshot()
@@ -184,7 +185,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
         self.assertTrue(result["snapshot_matches_database"])
         self.assertEqual(
             result["database_market_count"],
-            40,
+            SOURCE_TOTAL_MARKETS,
         )
         self.assertEqual(
             result["keeper_count"],
@@ -192,7 +193,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
         )
         self.assertEqual(
             result["purge_target_count"],
-            36,
+            len(PURGE_IDS),
         )
         self.assertEqual(
             result["unexpected_market_ids"],
@@ -207,7 +208,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
             [],
         )
 
-    def test_apply_deletes_exact_36_and_preserves_payments(
+    def test_apply_deletes_exact_snapshot_and_preserves_payments(
         self,
     ):
         self.seed_snapshot()
@@ -230,7 +231,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
 
         self.assertEqual(
             result["deleted_market_count"],
-            36,
+            len(PURGE_IDS),
         )
         self.assertEqual(
             result["remaining_market_count"],
@@ -302,7 +303,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
 
         self.assertEqual(
             Market.objects.count(),
-            40,
+            SOURCE_TOTAL_MARKETS,
         )
 
         with self.assertRaises(StagingMarketPurgeError):
@@ -314,7 +315,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
 
         self.assertEqual(
             Market.objects.count(),
-            40,
+            SOURCE_TOTAL_MARKETS,
         )
 
     def test_new_market_causes_full_abort_instead_of_being_touched(
@@ -341,7 +342,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
 
         self.assertEqual(
             Market.objects.count(),
-            41,
+            SOURCE_TOTAL_MARKETS + 1,
         )
 
         self.assertTrue(
@@ -355,7 +356,7 @@ class StagingMarketPurgeSnapshotTests(TestCase):
             Market.objects.filter(
                 id__in=PURGE_IDS,
             ).count(),
-            36,
+            len(PURGE_IDS),
         )
 
 
