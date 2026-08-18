@@ -51,10 +51,8 @@ class NewsModerationService:
             summary=summary,
             body=body,
             image=image or "",
-            author=author or NewsModerationService._default_author(
-                club=club,
-                created_by=created_by,
-            ),
+            author=author
+            or NewsModerationService._default_author(club=club, created_by=created_by),
             avatar=avatar or "",
             category=category,
             sport=sport,
