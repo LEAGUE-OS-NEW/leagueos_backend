@@ -89,7 +89,7 @@ class TestFixtureListCreate:
                 "sport": str(sport.id),
                 "home_participant": str(team.id),
                 "away_participant": str(team.id),
-                "starts_at": timezone.now().isoformat(),
+                "starts_at": (timezone.now() + timezone.timedelta(days=1)).isoformat(),
             },
             format="json",
         )
@@ -107,7 +107,7 @@ class TestFixtureListCreate:
                 "sport": str(sport.id),
                 "home_participant": str(home.id),
                 "away_participant": str(away.id),
-                "starts_at": timezone.now().isoformat(),
+                "starts_at": (timezone.now() + timezone.timedelta(days=1)).isoformat(),
             },
             format="json",
         )
@@ -129,7 +129,7 @@ class TestFixtureStatusScoreComplete:
                 "sport": str(sport.id),
                 "home_participant": str(home.id),
                 "away_participant": str(away.id),
-                "starts_at": timezone.now().isoformat(),
+                "starts_at": (timezone.now() + timezone.timedelta(days=1)).isoformat(),
             },
             format="json",
         )
