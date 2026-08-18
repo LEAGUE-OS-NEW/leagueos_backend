@@ -21,7 +21,7 @@ class ClubService:
         return f"club:{club_id}"
 
     @classmethod
-    def get_public_clubs(cls, sport=None, search=None, ordering="name"):
+    def get_public_clubs(cls, sport=None, search=None, ordering="name", has_admin=None):
         """Return published, verified, active clubs."""
         qs = Club.objects.filter(is_active=True).select_related("sport", "competition")
 
@@ -29,6 +29,12 @@ class ClubService:
             qs = qs.filter(sport_id=sport)
         if search:
             qs = qs.filter(Q(name__icontains=search) | Q(slug__icontains=search))
+        if has_admin:
+            qs = qs.filter(
+                workspaces__role="ADMIN",
+                workspaces__is_active=True,
+                workspaces__accepted_at__isnull=False,
+            ).distinct()
 
         return qs.order_by(ordering)
 

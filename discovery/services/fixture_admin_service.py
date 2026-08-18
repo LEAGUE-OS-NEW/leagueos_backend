@@ -18,7 +18,15 @@ class FixtureAdminService:
     @staticmethod
     @transaction.atomic
     def create_fixture(
-        *, sport, competition, home_participant, away_participant, starts_at, venue, actor
+        *,
+        sport,
+        competition,
+        home_participant,
+        away_participant,
+        starts_at,
+        venue,
+        actor,
+        ends_at=None,
     ):
         """Create a fixture between two participants. Admin-authored
         fixtures are verified immediately (no separate review step),
@@ -30,6 +38,7 @@ class FixtureAdminService:
             competition=competition,
             name=name,
             starts_at=starts_at,
+            ends_at=ends_at,
             venue=venue,
             status=SportingEvent.Status.SCHEDULED,
             is_verified=True,
@@ -65,6 +74,24 @@ class FixtureAdminService:
     def set_status(*, fixture, status):
         fixture.status = status
         fixture.save(update_fields=["status", "updated_at"])
+        return fixture
+
+    @staticmethod
+    def reschedule(*, fixture, starts_at=None, venue=None, ends_at=None):
+        """Update a fixture's kickoff time, venue, and/or anticipated end
+        time. Only the fields actually provided are changed — typically
+        used to correct a postponed fixture's original schedule."""
+        update_fields = ["updated_at"]
+        if starts_at is not None:
+            fixture.starts_at = starts_at
+            update_fields.append("starts_at")
+        if venue is not None:
+            fixture.venue = venue
+            update_fields.append("venue")
+        if ends_at is not None:
+            fixture.ends_at = ends_at
+            update_fields.append("ends_at")
+        fixture.save(update_fields=update_fields)
         return fixture
 
     @staticmethod

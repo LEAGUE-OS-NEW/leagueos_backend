@@ -7,6 +7,7 @@ from platform_admin.views import (
     AdminDashboardSummaryView,
     AdminFixtureCompleteView,
     AdminFixtureListCreateView,
+    AdminFixtureRescheduleView,
     AdminFixtureScoreView,
     AdminFixtureStatusView,
     AdminInvitationAcceptView,
@@ -86,6 +87,11 @@ urlpatterns = [
         "fixtures/<uuid:fixture_id>/status/",
         AdminFixtureStatusView.as_view(),
         name="fixture-status",
+    ),
+    path(
+        "fixtures/<uuid:fixture_id>/reschedule/",
+        AdminFixtureRescheduleView.as_view(),
+        name="fixture-reschedule",
     ),
     path(
         "fixtures/<uuid:fixture_id>/score/",

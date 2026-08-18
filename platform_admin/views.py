@@ -17,6 +17,7 @@ from authentication.services.user_admin_service import UserAdminService
 from discovery.models import News
 from discovery.serializers import (
     FixtureCreateSerializer,
+    FixtureRescheduleSerializer,
     FixtureScoreSerializer,
     FixtureSerializer,
     FixtureStatusSerializer,
@@ -1117,6 +1118,51 @@ class AdminFixtureStatusView(APIView):
         updated = fixture_admin_service.set_status(
             fixture=fixture,
             status=serializer.validated_data["status"],
+        )
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminFixtureRescheduleView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_reschedule",
+        request=FixtureRescheduleSerializer,
+        responses={200: FixtureSerializer, 400: None, 403: None, 404: None},
+    )
+    def patch(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to manage fixtures."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        serializer = FixtureRescheduleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        starts_at = data.get("starts_at")
+        venue = data.get("venue")
+        ends_at = data.get("ends_at")
+
+        effective_starts_at = starts_at or fixture.starts_at
+        effective_ends_at = ends_at if ends_at is not None else fixture.ends_at
+        if effective_ends_at and effective_ends_at < effective_starts_at:
+            return Response(
+                {"detail": "Anticipated end time cannot be earlier than kickoff."},
+                status=400,
+            )
+
+        updated = fixture_admin_service.reschedule(
+            fixture=fixture,
+            starts_at=starts_at,
+            venue=venue,
+            ends_at=ends_at,
         )
         return Response(self.serializer_class(updated).data)
 

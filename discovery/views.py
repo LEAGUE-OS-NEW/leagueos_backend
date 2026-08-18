@@ -161,6 +161,7 @@ class ClubListView(ListAPIView):
             sport=params.get("sport"),
             search=params.get("search"),
             ordering=params.get("ordering", "name"),
+            has_admin=params.get("has_admin"),
         )
 
 
