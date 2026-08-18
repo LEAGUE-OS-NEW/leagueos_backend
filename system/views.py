@@ -21,16 +21,10 @@ from rest_framework.response import Response
 from markets.services.staging_catalogue_audit_service import (
     build_staging_market_catalogue_audit,
 )
-from markets.services.staging_catalogue_cleanup_service import (
-    StagingCatalogueCleanupError,
-    apply_staging_catalogue_cleanup,
-)
 from system.serializers import (
     HealthCheckSerializer,
     MarketCatalogueAuditSerializer,
     PesapalDiagnosticSerializer,
-    StagingMarketCleanupRequestSerializer,
-    StagingMarketCleanupResponseSerializer,
 )
 from wallets.services.pesapal_config import get_pesapal_config
 
@@ -532,62 +526,5 @@ def market_catalogue_audit(request):
 
     return Response(
         build_staging_market_catalogue_audit(),
-        status=status.HTTP_200_OK,
-    )
-
-
-@extend_schema(
-    request=StagingMarketCleanupRequestSerializer,
-    responses={
-        200: StagingMarketCleanupResponseSerializer,
-    },
-    summary="Apply audited staging market cleanup",
-    tags=["System"],
-)
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def market_catalogue_cleanup(request):
-    """
-    Execute the fixed 2026-08-18 staging cleanup snapshot.
-
-    Markets created after the snapshot are never selected.
-    """
-    review_enabled = getattr(
-        settings,
-        "REVIEW_WORKFLOW_TOOLS_ENABLED",
-        False,
-    )
-
-    actor_email = str(request.user.email or "").lower()
-
-    if not (review_enabled and actor_email == "market.ops.local@leagueos.test"):
-        return Response(
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    serializer = StagingMarketCleanupRequestSerializer(
-        data=request.data,
-    )
-
-    if not serializer.is_valid():
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    try:
-        result = apply_staging_catalogue_cleanup(
-            confirmation=serializer.validated_data["confirmation"],
-        )
-    except StagingCatalogueCleanupError as exc:
-        return Response(
-            {
-                "detail": str(exc),
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    return Response(
-        result,
         status=status.HTTP_200_OK,
     )
