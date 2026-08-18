@@ -182,20 +182,3 @@ class MarketCatalogueAuditSerializer(serializers.Serializer):
     rows = MarketCatalogueAuditRowSerializer(
         many=True,
     )
-
-
-class StagingMarketCleanupRequestSerializer(serializers.Serializer):
-    confirmation = serializers.CharField()
-
-
-class StagingMarketCleanupResponseSerializer(serializers.Serializer):
-    snapshot_version = serializers.CharField()
-    already_applied = serializers.BooleanField()
-    global_total_before = serializers.IntegerField()
-    global_total_after = serializers.IntegerField()
-    deleted_market_count = serializers.IntegerField()
-    deleted_liquidity_configuration_count = serializers.IntegerField()
-    newly_hidden_count = serializers.IntegerField()
-    newly_visible_keeper_count = serializers.IntegerField()
-    snapshot_remaining_count = serializers.IntegerField()
-    snapshot_visible_count = serializers.IntegerField()
