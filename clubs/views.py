@@ -633,7 +633,12 @@ class ClubMatchDataUploadView(APIView):
     @extend_schema(
         tags=["Club Match Data"],
         summary="Upload match player statistics CSV",
-        request={"multipart/form-data": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}},
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {"file": {"type": "string", "format": "binary"}},
+            }
+        },
         responses={
             202: {"description": "Import accepted; fantasy scoring scheduled."},
             400: {"description": "Validation failure with row-level errors."},
@@ -724,5 +729,5 @@ def _get_club_or_404(club_pk):
 
     try:
         return Club.objects.get(id=club_pk)
-    except Club.DoesNotExist:
-        raise Http404(f"Club {club_pk} not found.")
+    except Club.DoesNotExist as err:
+        raise Http404(f"Club {club_pk} not found.") from err

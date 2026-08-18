@@ -40,7 +40,9 @@ class MatchDataUploadSerializer(serializers.Serializer):
 class MatchDataRowErrorSerializer(serializers.Serializer):
     """Represents a single row-level validation error in the response."""
 
-    row = serializers.IntegerField(help_text="1-based row number in the CSV data (excluding header).")
+    row = serializers.IntegerField(
+        help_text="1-based row number in the CSV data (excluding header)."
+    )
     errors = serializers.ListField(
         child=serializers.CharField(),
         help_text="List of error messages for this row.",

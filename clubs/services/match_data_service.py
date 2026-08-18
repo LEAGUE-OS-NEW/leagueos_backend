@@ -176,22 +176,6 @@ def _resolve_player(
         )
 
     # Player must belong to one of the teams in this fixture
-    fixture_participant_ids = set(
-        EventParticipant.objects.filter(event=fixture).values_list(
-            "participant_id", flat=True
-        )
-    )
-    player_team_ids = set(
-        Participant.objects.filter(
-            player_profile__club__isnull=False,
-            sport=fixture.sport,
-            kind=Participant.Kind.TEAM,
-        ).filter(
-            # teams whose club has players matching this player
-            player_profile__club__player_profiles__participant=player,
-        ).values_list("id", flat=True)
-    )
-
     # Relaxed check: player's sport matches AND fixture has participants from
     # the same sport — we accept the player belongs to this fixture's sport
     # as sufficient (team membership via EventParticipant is TEAM-level, not
@@ -271,11 +255,11 @@ def _validate_all_rows(
         if not any(cell.strip() for cell in row):
             continue
 
-        def _get(col: str) -> str:
+        def _get(col: str, _row: list[str] = row) -> str:
             idx = col_index.get(col)
-            if idx is None or idx >= len(row):
+            if idx is None or idx >= len(_row):
                 return ""
-            return row[idx].strip()
+            return _row[idx].strip()
 
         fixture_id_str = _get("fixture_id")
         player_id_str = _get("player_id")
@@ -574,7 +558,10 @@ def import_csv_for_club(
         )
     except Exception:  # noqa: BLE001
         # Audit failure must never roll back a successful import
-        logger.exception("Failed to write audit log for match data upload (ingestion %s)", ingestion.id)
+        logger.exception(
+            "Failed to write audit log for match data upload (ingestion %s)",
+            ingestion.id,
+        )
 
     return MatchDataImportResult(
         success=True,

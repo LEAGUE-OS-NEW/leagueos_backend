@@ -229,7 +229,11 @@ class TestScoreAffectedGameweeks:
     def test_fixture_with_no_gameweek_does_not_fail(self):
         """Fixture that belongs to no FantasyGameweek → scored=0, no_gameweek reported."""
         uid = _uid()
-        sport = Sport.objects.create(name=f"NoGW_{uid}", slug=f"no-gw-{uid}", code=f"NG{uid[:4].upper()}")
+        sport = Sport.objects.create(
+            name=f"NoGW_{uid}",
+            slug=f"no-gw-{uid}",
+            code=f"NG{uid[:4].upper()}",
+        )
         comp = Competition.objects.create(sport=sport, name=f"NoGW Comp {uid}", country_code="UG")
         now = timezone.now()
         fixture = SportingEvent.objects.create(
@@ -459,8 +463,6 @@ class TestCompleteIngestionBridge:
         def patched_import(name, *args, **kwargs):
             mod = real_import(name, *args, **kwargs)
             if name == "fantasy.tasks":
-                original_task = mod.score_affected_gameweeks
-
                 class FakeTask:
                     def delay(self, ids):
                         dispatched.append(ids)
@@ -474,8 +476,6 @@ class TestCompleteIngestionBridge:
 
         # Reset and use a direct approach: subclass SportsFeedService to expose _dispatch
         captured: list[list] = []
-
-        original_on_commit = None
 
         def fake_on_commit(func):
             # Execute the callback immediately (mimics what Django does after commit)

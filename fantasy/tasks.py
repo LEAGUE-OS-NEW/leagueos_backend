@@ -19,7 +19,7 @@ The task:
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 try:
     from celery import shared_task

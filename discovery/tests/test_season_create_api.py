@@ -147,7 +147,9 @@ class SeasonAdminCreateTests(APITestCase):
         )
         payload_base = {"sport": str(self.sport.id), "name": "Shared Season Name"}
         r1 = self.client.post(
-            SEASON_CREATE_URL, {**payload_base, "competition": str(self.competition.id)}, format="json"
+            SEASON_CREATE_URL,
+            {**payload_base, "competition": str(self.competition.id)},
+            format="json",
         )
         r2 = self.client.post(
             SEASON_CREATE_URL, {**payload_base, "competition": str(comp2.id)}, format="json"

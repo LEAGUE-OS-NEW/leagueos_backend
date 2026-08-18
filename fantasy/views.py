@@ -894,8 +894,6 @@ class MatchStatisticViewSet(viewsets.ViewSet):
         points breakdown from FantasyPlayerGameweekPoints (if scored), and
         the review status from FantasyStatisticReview.
         """
-        from decimal import Decimal
-
         # Gather all MatchPlayerStatistic records for this player+fixture.
         match_centre = getattr(fixture, "match_centre", None)
         stats = []
@@ -1294,7 +1292,11 @@ class MatchStatisticViewSet(viewsets.ViewSet):
             ],
             "review_status": review.status if review else "PENDING",
             "review_id": str(review.id) if review else None,
-            "approved_at": review.approved_at.isoformat() if review and review.approved_at else None,
+            "approved_at": (
+                review.approved_at.isoformat()
+                if review and review.approved_at
+                else None
+            ),
         })
 
     # ── correct ────────────────────────────────────────────────────────────
