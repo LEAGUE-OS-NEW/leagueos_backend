@@ -550,6 +550,8 @@ class NewsModerationSerializer(serializers.ModelSerializer):
     """Full detail for the review queue, published list, and Edit Story —
     exposes fields the public NewsSerializer intentionally omits."""
 
+    category_code = serializers.CharField(source="category.code", read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
     created_by = serializers.SerializerMethodField()
 
     class Meta:
