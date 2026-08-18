@@ -21,9 +21,13 @@ from rest_framework.response import Response
 from markets.services.staging_catalogue_audit_service import (
     build_staging_market_catalogue_audit,
 )
+from markets.services.staging_market_purge_service import (
+    build_purge_preflight,
+)
 from system.serializers import (
     HealthCheckSerializer,
     MarketCatalogueAuditSerializer,
+    MarketPurgePreflightSerializer,
     PesapalDiagnosticSerializer,
 )
 from wallets.services.pesapal_config import get_pesapal_config
@@ -526,5 +530,44 @@ def market_catalogue_audit(request):
 
     return Response(
         build_staging_market_catalogue_audit(),
+        status=status.HTTP_200_OK,
+    )
+
+
+@extend_schema(
+    request=None,
+    responses=MarketPurgePreflightSerializer,
+    summary="Final staging market purge preflight",
+    tags=["System"],
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def market_purge_preflight(request):
+    """
+    Read-only preflight for the exact audited
+    40-to-4 staging market purge.
+
+    This endpoint never changes market, wallet,
+    payment, or ledger data.
+    """
+    review_enabled = getattr(
+        settings,
+        "REVIEW_WORKFLOW_TOOLS_ENABLED",
+        False,
+    )
+
+    actor_email = str(request.user.email or "").lower()
+
+    permitted_actor = actor_email == "superadmin.local@leagueos.test"
+
+    if not (review_enabled and permitted_actor):
+        return Response(
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    return Response(
+        build_purge_preflight(
+            actor=request.user,
+        ),
         status=status.HTTP_200_OK,
     )

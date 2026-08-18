@@ -182,3 +182,58 @@ class MarketCatalogueAuditSerializer(serializers.Serializer):
     rows = MarketCatalogueAuditRowSerializer(
         many=True,
     )
+
+
+class MarketPurgePaymentCountsSerializer(serializers.Serializer):
+    wallet_transactions = serializers.IntegerField()
+    deposit_intents = serializers.IntegerField()
+    pesapal_deposits = serializers.IntegerField()
+    withdrawal_requests = serializers.IntegerField()
+
+
+class MarketPurgePreflightSerializer(serializers.Serializer):
+    snapshot_version = serializers.CharField()
+    snapshot_digest = serializers.CharField()
+
+    database_market_count = serializers.IntegerField()
+    snapshot_matches_database = serializers.BooleanField()
+
+    keeper_count = serializers.IntegerField()
+    purge_target_count = serializers.IntegerField()
+
+    unexpected_market_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+    missing_snapshot_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+
+    unsettled_financial_market_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+    settled_market_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+    void_required_market_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+
+    actor_email = serializers.EmailField(
+        allow_blank=True,
+    )
+    actor_creator_conflict_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+
+    actor_has_resolution_permission = serializers.BooleanField(
+        allow_null=True,
+    )
+    actor_has_refund_permission = serializers.BooleanField(
+        allow_null=True,
+    )
+
+    can_execute = serializers.BooleanField()
+
+    affected_ledger_entry_count = serializers.IntegerField()
+    payment_counts = MarketPurgePaymentCountsSerializer()
+    ledger_entry_count = serializers.IntegerField()
