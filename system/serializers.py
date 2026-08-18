@@ -102,3 +102,68 @@ class PesapalDiagnosticSerializer(serializers.Serializer):
         required=False,
     )
     authentication = PesapalDiagnosticAuthenticationSerializer()
+
+
+class MarketCatalogueAuditHistorySerializer(serializers.Serializer):
+    order_count = serializers.IntegerField()
+    fill_count = serializers.IntegerField()
+    position_count = serializers.IntegerField()
+    complete_set_issuance_count = serializers.IntegerField()
+    collateral_entry_count = serializers.IntegerField()
+    status_transition_count = serializers.IntegerField()
+    watchlist_count = serializers.IntegerField()
+    recent_view_count = serializers.IntegerField()
+    has_liquidity_configuration = serializers.BooleanField()
+    liquidity_status = serializers.CharField(
+        allow_blank=True,
+    )
+    initial_liquidity_ugx = serializers.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        allow_null=True,
+    )
+    has_collateral_pool = serializers.BooleanField()
+    locked_collateral = serializers.DecimalField(
+        max_digits=20,
+        decimal_places=4,
+        allow_null=True,
+    )
+    has_settlement = serializers.BooleanField()
+
+
+class MarketCatalogueAuditRowSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    question = serializers.CharField()
+    sport = serializers.CharField()
+    category = serializers.CharField()
+    status = serializers.CharField()
+    is_featured = serializers.BooleanField()
+    is_catalog_visible = serializers.BooleanField()
+    created_at = serializers.DateTimeField()
+    classification = serializers.CharField()
+    history = MarketCatalogueAuditHistorySerializer()
+
+
+class MarketCatalogueCanonicalGroupSerializer(serializers.Serializer):
+    question = serializers.CharField()
+    candidate_count = serializers.IntegerField()
+    candidate_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+    needs_keeper_selection = serializers.BooleanField()
+
+
+class MarketCatalogueAuditSerializer(serializers.Serializer):
+    canonical_questions = serializers.ListField(
+        child=serializers.CharField(),
+    )
+    total_markets = serializers.IntegerField()
+    summary = serializers.DictField(
+        child=serializers.IntegerField(),
+    )
+    canonical_groups = MarketCatalogueCanonicalGroupSerializer(
+        many=True,
+    )
+    rows = MarketCatalogueAuditRowSerializer(
+        many=True,
+    )

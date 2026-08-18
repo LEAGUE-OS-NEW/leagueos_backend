@@ -18,8 +18,12 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from markets.services.staging_catalogue_audit_service import (
+    build_staging_market_catalogue_audit,
+)
 from system.serializers import (
     HealthCheckSerializer,
+    MarketCatalogueAuditSerializer,
     PesapalDiagnosticSerializer,
 )
 from wallets.services.pesapal_config import get_pesapal_config
@@ -491,4 +495,36 @@ def pesapal_diagnostic(request):
     return Response(
         payload,
         status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+@extend_schema(
+    request=None,
+    responses=MarketCatalogueAuditSerializer,
+    summary="Staging market catalogue audit",
+    tags=["System"],
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def market_catalogue_audit(request):
+    """
+    Read-only staging catalogue audit.
+
+    The endpoint never changes market state or catalogue visibility.
+    """
+    review_enabled = getattr(
+        settings,
+        "REVIEW_WORKFLOW_TOOLS_ENABLED",
+        False,
+    )
+    synthetic_actor = str(request.user.email or "").lower().endswith("@leagueos.test")
+
+    if not (review_enabled and synthetic_actor):
+        return Response(
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    return Response(
+        build_staging_market_catalogue_audit(),
+        status=status.HTTP_200_OK,
     )

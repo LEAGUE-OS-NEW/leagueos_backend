@@ -139,6 +139,47 @@ class PublicMarketAPITests(APITestCase):
             str(self.open_market.id),
         )
 
+    def test_catalog_hidden_market_is_excluded_from_list_but_detail_remains_available(
+        self,
+    ):
+        self.open_market.is_catalog_visible = False
+        self.open_market.save(
+            update_fields=[
+                "is_catalog_visible",
+            ]
+        )
+
+        list_response = self.client.get(
+            reverse("markets:market-list"),
+        )
+
+        self.assertEqual(
+            list_response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(
+            list_response.data["count"],
+            0,
+        )
+
+        detail_response = self.client.get(
+            reverse(
+                "markets:market-detail",
+                kwargs={
+                    "market_id": self.open_market.id,
+                },
+            )
+        )
+
+        self.assertEqual(
+            detail_response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertEqual(
+            detail_response.data["id"],
+            str(self.open_market.id),
+        )
+
     def test_market_list_can_filter_public_status(self):
         response = self.client.get(
             reverse("markets:market-list"),
