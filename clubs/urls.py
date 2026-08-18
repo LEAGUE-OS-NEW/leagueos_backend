@@ -9,6 +9,9 @@ from clubs.views import (
     ClubAdminInviteView,
     ClubAuditLogViewSet,
     ClubLogoView,
+    ClubFixtureListView,
+    ClubMatchDataTemplateView,
+    ClubMatchDataUploadView,
     ClubMediaViewSet,
     ClubNewsViewSet,
     ClubProfileVersionViewSet,
@@ -206,5 +209,21 @@ urlpatterns = [
             {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
         ),
         name="staff-invitation-detail",
+    ),
+    # ── Match Data Upload ─────────────────────────────────────────────────
+    path(
+        "<uuid:club_pk>/match-data/fixtures/",
+        ClubFixtureListView.as_view(),
+        name="club-match-data-fixtures",
+    ),
+    path(
+        "<uuid:club_pk>/match-data/upload/",
+        ClubMatchDataUploadView.as_view(),
+        name="club-match-data-upload",
+    ),
+    path(
+        "<uuid:club_pk>/match-data/template/",
+        ClubMatchDataTemplateView.as_view(),
+        name="club-match-data-template",
     ),
 ]

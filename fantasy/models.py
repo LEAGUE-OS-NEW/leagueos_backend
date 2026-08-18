@@ -466,3 +466,66 @@ class FantasyTeamGameweekScore(UUIDTimeStampedModel):
 
     def __str__(self):
         return f"{self.team} - {self.gameweek}: {self.total_points}"
+
+
+class FantasyStatisticReview(UUIDTimeStampedModel):
+    """
+    Fantasy-side lightweight approval record for a player's statistics in a fixture.
+
+    Created automatically the first time match statistics are viewed/processed
+    for a given (fantasy_competition, fixture, participant) combination.
+    Admin can approve after reviewing and optionally correcting the raw stats.
+
+    This model lives entirely in the Fantasy app and does NOT modify
+    MatchPlayerStatistic or the discovery/clubs pipeline.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending Review"
+        APPROVED = "APPROVED", "Approved"
+
+    fantasy_competition = models.ForeignKey(
+        FantasyCompetition,
+        on_delete=models.CASCADE,
+        related_name="statistic_reviews",
+    )
+    fixture = models.ForeignKey(
+        SportingEvent,
+        on_delete=models.CASCADE,
+        related_name="fantasy_statistic_reviews",
+    )
+    participant = models.ForeignKey(
+        Participant,
+        on_delete=models.PROTECT,
+        related_name="fantasy_statistic_reviews",
+    )
+    status = models.CharField(
+        max_length=12,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fantasy_statistic_approvals",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["fantasy_competition", "fixture", "participant"],
+                name="unique_fantasy_statistic_review",
+            )
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return (
+            f"{self.participant} @ {self.fixture} "
+            f"[{self.fantasy_competition}] — {self.status}"
+        )

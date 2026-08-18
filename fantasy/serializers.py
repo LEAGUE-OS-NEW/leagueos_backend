@@ -4,7 +4,7 @@ from django.db.models import Sum
 from rest_framework import serializers
 
 from django.utils import timezone
-from sports.models import SportingEvent
+from sports.models import Participant, SportingEvent
 
 from .models import (
     FantasyCompetition,
@@ -310,6 +310,84 @@ class PlayerPointsSerializer(serializers.ModelSerializer):
     class Meta:
         model = FantasyPlayerGameweekPoints
         fields = "__all__"
+
+
+class MatchPlayerStatisticCreateSerializer(serializers.Serializer):
+    """
+    Serializer for admin-initiated test match statistics.
+
+    Accepts a fixture (SportingEvent UUID) and a participant (Participant UUID)
+    rather than requiring the caller to know the MatchCentre ID.  The view
+    handles the get_or_create of MatchCentre internally.
+    """
+
+    fixture = serializers.PrimaryKeyRelatedField(
+        queryset=SportingEvent.objects.all(),
+        help_text="UUID of the SportingEvent (fixture) this statistic belongs to.",
+    )
+    participant = serializers.PrimaryKeyRelatedField(
+        queryset=Participant.objects.filter(kind="ATHLETE"),
+        help_text="UUID of the Participant (athlete) who recorded the statistic.",
+    )
+    stat_type = serializers.CharField(
+        max_length=100,
+        help_text="Statistic type code, e.g. GOALS, ASSISTS. Must be valid for the sport.",
+    )
+    value = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Numeric value for the statistic (must be >= 0).",
+    )
+
+    # ── validation ────────────────────────────────────────────────────────────
+
+    def validate_stat_type(self, value):
+        return value.strip().upper()
+
+    def validate_value(self, value):
+        from decimal import Decimal
+
+        if value < Decimal("0"):
+            raise serializers.ValidationError("Value must be zero or greater.")
+        return value
+
+    def validate(self, attrs):
+        fixture = attrs["fixture"]
+        stat_type = attrs["stat_type"]
+        participant = attrs["participant"]
+
+        # Determine sport via the fixture — prefer direct FK, fall back to competition
+        sport = (
+            getattr(fixture, "sport", None)
+            or (fixture.competition.sport if fixture.competition_id else None)
+        )
+        if sport is None:
+            raise serializers.ValidationError(
+                {"fixture": "Cannot determine sport for this fixture."}
+            )
+
+        catalogue = statistic_catalogue(sport)
+        if not catalogue:
+            raise serializers.ValidationError(
+                {"fixture": f"No statistic catalogue defined for sport '{sport}'."}
+            )
+        if stat_type not in catalogue:
+            raise serializers.ValidationError(
+                {
+                    "stat_type": (
+                        f"'{stat_type}' is not a valid statistic type for {sport}. "
+                        f"Allowed: {', '.join(sorted(catalogue.keys()))}."
+                    )
+                }
+            )
+
+        # Participant must belong to the same sport as the fixture
+        if participant.sport_id != sport.id:
+            raise serializers.ValidationError(
+                {"participant": "Participant sport does not match the fixture sport."}
+            )
+
+        return attrs
 
 
 class CorrectionSerializer(serializers.ModelSerializer):

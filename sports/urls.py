@@ -20,6 +20,15 @@ urlpatterns = [
         CompetitionListView.as_view(),
         name="competition-list",
     ),
+    # Dedicated writable endpoint used by the admin UI to create canonical
+    # competitions. The public-facing /competitions/ route is served by the
+    # discovery app (GET-only ListAPIView), so this distinct path avoids the
+    # URL shadowing conflict.
+    path(
+        "admin/sports/competitions/",
+        CompetitionListView.as_view(),
+        name="admin-competition-create",
+    ),
     path(
         "participants/",
         ParticipantListView.as_view(),
