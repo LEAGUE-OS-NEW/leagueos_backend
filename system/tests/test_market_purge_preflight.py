@@ -54,13 +54,19 @@ def test_preflight_hidden_from_other_synthetic_accounts():
 
 @pytest.mark.django_db
 @override_settings(REVIEW_WORKFLOW_TOOLS_ENABLED=True)
-@patch("system.views.build_purge_preflight")
-def test_preflight_uses_exact_superadmin_actor(
-    build_preflight,
-):
-    user = make_user(
+@pytest.mark.parametrize(
+    "email",
+    (
         "superadmin.local@leagueos.test",
-    )
+        "results.local@leagueos.test",
+    ),
+)
+@patch("system.views.build_purge_preflight")
+def test_preflight_uses_exact_approved_actor(
+    build_preflight,
+    email,
+):
+    user = make_user(email)
 
     build_preflight.return_value = {
         "snapshot_version": "test-v1",

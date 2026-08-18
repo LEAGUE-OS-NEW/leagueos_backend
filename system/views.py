@@ -558,7 +558,10 @@ def market_purge_preflight(request):
 
     actor_email = str(request.user.email or "").lower()
 
-    permitted_actor = actor_email == "superadmin.local@leagueos.test"
+    permitted_actor = actor_email in {
+        "superadmin.local@leagueos.test",
+        "results.local@leagueos.test",
+    }
 
     if not (review_enabled and permitted_actor):
         return Response(
