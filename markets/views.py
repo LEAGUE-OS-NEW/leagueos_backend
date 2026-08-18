@@ -68,6 +68,18 @@ def public_market_queryset(user=None):
     return queryset.annotate(is_watchlisted=Value(False, output_field=BooleanField()))
 
 
+def catalogue_market_queryset(user=None):
+    """
+    Public markets that should appear in browse/discovery surfaces.
+
+    Historical markets can remain publicly addressable by ID while being
+    removed from the active catalogue.
+    """
+    return public_market_queryset(user).filter(
+        is_catalog_visible=True,
+    )
+
+
 class MarketCategoryListView(ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = MarketCategoryPublicSerializer
@@ -91,6 +103,11 @@ class MarketCategoryListView(ListAPIView):
 class PublicMarketQuerysetMixin:
     def get_public_queryset(self):
         return public_market_queryset(self.request.user)
+
+    def get_catalogue_queryset(self):
+        return catalogue_market_queryset(
+            self.request.user,
+        )
 
 
 class MarketListView(
@@ -125,7 +142,7 @@ class MarketListView(
 
         market_status = filters.get("status") or Market.Status.OPEN
 
-        queryset = self.get_public_queryset().filter(
+        queryset = self.get_catalogue_queryset().filter(
             status=market_status,
         )
 

@@ -16,7 +16,7 @@ from markets.serializers import MarketPublicSerializer
 from markets.services.discovery_common import ACTIVE_DISCOVERABLE_MARKET_STATUSES
 from markets.services.recent_view_service import MarketRecentViewService
 from markets.services.watchlist_service import MarketWatchlistService
-from markets.views import public_market_queryset
+from markets.views import catalogue_market_queryset
 from system.pagination import PublicCatalogPagination
 
 
@@ -50,7 +50,7 @@ class MarketWatchlistView(ListAPIView):
     pagination_class = PublicCatalogPagination
 
     def get_queryset(self):
-        visible_ids = public_market_queryset(self.request.user).values("id")
+        visible_ids = catalogue_market_queryset(self.request.user).values("id")
         return preference_market_relations(
             MarketWatchlistEntry.objects.filter(
                 participant=self.request.user, market_id__in=visible_ids
@@ -75,7 +75,7 @@ class MarketWatchlistItemView(GenericAPIView):
                 {"code": "market_watchlist_market_unavailable"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        market = public_market_queryset(request.user).get(pk=row.market_id)
+        market = catalogue_market_queryset(request.user).get(pk=row.market_id)
         row.market = market
         return Response(
             MarketWatchlistEntrySerializer(row).data,
@@ -100,7 +100,7 @@ class MarketRecentlyViewedView(ListAPIView):
     pagination_class = PublicCatalogPagination
 
     def get_queryset(self):
-        markets = public_market_queryset(self.request.user)
+        markets = catalogue_market_queryset(self.request.user)
         return (
             preference_market_relations(
                 MarketRecentView.objects.filter(
@@ -138,7 +138,7 @@ class MarketRecentlyViewedItemView(GenericAPIView):
                 {"code": "market_recent_view_market_unavailable"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        row.market = public_market_queryset(request.user).get(pk=row.market_id)
+        row.market = catalogue_market_queryset(request.user).get(pk=row.market_id)
         return Response(
             MarketRecentViewSerializer(row).data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
@@ -167,7 +167,7 @@ class MarketDiscoveryView(GenericAPIView):
             )
         limit = query.validated_data["section_limit"]
         related_limit = 10 if "section_limit" not in request.query_params else limit
-        markets = public_market_queryset(request.user)
+        markets = catalogue_market_queryset(request.user)
         visible_ids = markets.values("id")
         watchlist = list(
             preference_market_relations(
