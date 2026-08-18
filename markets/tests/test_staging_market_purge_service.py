@@ -23,6 +23,7 @@ from markets.models import (
     MarketScope,
     MarketSettlement,
     MarketStatusTransition,
+    MarketVoidRefund,
 )
 from markets.services.catalog_service import (
     MarketCatalogService,
@@ -224,7 +225,8 @@ class StagingMarketPurgeSnapshotTests(TestCase):
         )
 
         result = apply_staging_market_purge(
-            actor=self.actor,
+            resolution_actor=self.actor,
+            refund_actor=self.actor,
             confirmation=CONFIRMATION_PHRASE,
             snapshot_digest=SNAPSHOT_DIGEST,
         )
@@ -296,7 +298,8 @@ class StagingMarketPurgeSnapshotTests(TestCase):
 
         with self.assertRaises(StagingMarketPurgeError):
             apply_staging_market_purge(
-                actor=self.actor,
+                resolution_actor=self.actor,
+                refund_actor=self.actor,
                 confirmation="WRONG",
                 snapshot_digest=(SNAPSHOT_DIGEST),
             )
@@ -308,7 +311,8 @@ class StagingMarketPurgeSnapshotTests(TestCase):
 
         with self.assertRaises(StagingMarketPurgeError):
             apply_staging_market_purge(
-                actor=self.actor,
+                resolution_actor=self.actor,
+                refund_actor=self.actor,
                 confirmation=(CONFIRMATION_PHRASE),
                 snapshot_digest="WRONG",
             )
@@ -335,7 +339,8 @@ class StagingMarketPurgeSnapshotTests(TestCase):
 
         with self.assertRaises(StagingMarketPurgeError):
             apply_staging_market_purge(
-                actor=self.actor,
+                resolution_actor=self.actor,
+                refund_actor=self.actor,
                 confirmation=(CONFIRMATION_PHRASE),
                 snapshot_digest=(SNAPSHOT_DIGEST),
             )
@@ -545,7 +550,8 @@ class StagingMarketPurgeFinancialTests(TestCase):
 
         _unwind_market_if_required(
             market_id=market.id,
-            actor=self.actor,
+            resolution_actor=self.actor,
+            refund_actor=self.actor,
             report=report,
         )
 
@@ -659,6 +665,83 @@ class StagingMarketPurgeFinancialTests(TestCase):
             Decimal("1000000.0000"),
         )
 
+    def test_unwind_uses_separate_resolution_and_refund_actors(
+        self,
+    ):
+        verify_permission = PermissionFactory(
+            name="verify_results",
+            resource="market",
+            action="verify",
+        )
+
+        verification_role = RoleFactory(
+            name="Purge Result Verification",
+            display_name="Purge Result Verification",
+        )
+
+        RolePermissionFactory(
+            role=verification_role,
+            permission=verify_permission,
+        )
+
+        resolution_actor = UserFactory()
+
+        UserRoleFactory(
+            user=resolution_actor,
+            role=verification_role,
+        )
+
+        market = self.open_with_liquidity(
+            self.create_market(
+                question=("Will split-authority cleanup work?"),
+            )
+        )
+
+        report = PurgeReport()
+
+        _unwind_market_if_required(
+            market_id=market.id,
+            resolution_actor=resolution_actor,
+            refund_actor=self.actor,
+            report=report,
+        )
+
+        market.refresh_from_db()
+
+        refund = MarketVoidRefund.objects.get(
+            market=market,
+        )
+
+        self.assertEqual(
+            market.status,
+            Market.Status.VOIDED,
+        )
+
+        self.assertEqual(
+            market.resolved_by_id,
+            resolution_actor.id,
+        )
+
+        self.assertEqual(
+            refund.executed_by_id,
+            self.actor.id,
+        )
+
+        self.assertNotEqual(
+            market.resolved_by_id,
+            refund.executed_by_id,
+        )
+
+        self.assertEqual(
+            report.voided_market_ids,
+            [str(market.id)],
+        )
+
+        self.assertEqual(
+            report.refunded_market_ids,
+            [str(market.id)],
+        )
+
     def test_resolved_settlement_is_not_refunded_again_before_purge(
         self,
     ):
@@ -705,7 +788,8 @@ class StagingMarketPurgeFinancialTests(TestCase):
 
         _unwind_market_if_required(
             market_id=market.id,
-            actor=self.actor,
+            resolution_actor=self.actor,
+            refund_actor=self.actor,
             report=report,
         )
 

@@ -181,7 +181,8 @@ def _market_has_unsettled_financial_state(
 def _unwind_market_if_required(
     *,
     market_id,
-    actor,
+    resolution_actor,
+    refund_actor,
     report,
 ):
     market = Market.objects.select_for_update().get(id=market_id)
@@ -208,7 +209,7 @@ def _unwind_market_if_required(
     if market.status == Market.Status.VOIDED:
         refunded = MarketVoidRefundService.refund_void_market(
             market_id=market.id,
-            actor=actor,
+            actor=refund_actor,
         )
 
         report.refunded_market_ids.append(str(refunded.market_id))
@@ -223,7 +224,7 @@ def _unwind_market_if_required(
 
     voided = MarketResolutionService.void(
         market_id=market.id,
-        actor=actor,
+        actor=resolution_actor,
         notes=("Staging-only cleanup of obsolete " "synthetic market data."),
         evidence=("Verified 2026-08-18 staging purge " "snapshot."),
     )
@@ -232,7 +233,7 @@ def _unwind_market_if_required(
 
     refunded = MarketVoidRefundService.refund_void_market(
         market_id=voided.id,
-        actor=actor,
+        actor=refund_actor,
     )
 
     report.refunded_market_ids.append(str(refunded.market_id))
@@ -484,7 +485,8 @@ def build_purge_preflight(
 @transaction.atomic
 def apply_staging_market_purge(
     *,
-    actor,
+    resolution_actor,
+    refund_actor,
     confirmation,
     snapshot_digest,
 ):
@@ -525,7 +527,8 @@ def apply_staging_market_purge(
     for market_id in sorted(purge):
         _unwind_market_if_required(
             market_id=market_id,
-            actor=actor,
+            resolution_actor=resolution_actor,
+            refund_actor=refund_actor,
             report=report,
         )
 
