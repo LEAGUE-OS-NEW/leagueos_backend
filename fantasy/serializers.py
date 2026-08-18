@@ -357,9 +357,8 @@ class MatchPlayerStatisticCreateSerializer(serializers.Serializer):
         participant = attrs["participant"]
 
         # Determine sport via the fixture — prefer direct FK, fall back to competition
-        sport = (
-            getattr(fixture, "sport", None)
-            or (fixture.competition.sport if fixture.competition_id else None)
+        sport = getattr(fixture, "sport", None) or (
+            fixture.competition.sport if fixture.competition_id else None
         )
         if sport is None:
             raise serializers.ValidationError(

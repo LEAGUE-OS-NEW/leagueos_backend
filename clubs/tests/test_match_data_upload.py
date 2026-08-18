@@ -55,7 +55,6 @@ from profiles.models import Club
 from sports.models import Competition, EventParticipant, Participant, Sport, SportingEvent
 from discovery.models import Season
 
-
 # ============================================================================
 # Shared factories / helpers
 # ============================================================================
@@ -133,6 +132,7 @@ def _make_player(sport: Sport, club: Club | None = None) -> Participant:
     )
     if club is not None:
         from discovery.models import PlayerProfile
+
         try:
             PlayerProfile.objects.create(participant=player, club=club, position="FWD")
         except Exception:
@@ -208,12 +208,16 @@ def test_successful_csv_upload_creates_statistics():
     fixture = _make_fixture(sport, comp)
     _link_player_to_fixture(player, fixture)
 
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(player.id),
-        "stat_type": "GOALS",
-        "value": "2",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(player.id),
+                "stat_type": "GOALS",
+                "value": "2",
+            }
+        ]
+    )
     result = import_csv_for_club(csv_file, club)
 
     assert result.success is True
@@ -276,12 +280,16 @@ def test_invalid_player_uuid_produces_row_error():
     valid_player = _make_player(sport, club)
     _link_player_to_fixture(valid_player, fixture)
 
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(uuid.uuid4()),  # random — does not exist
-        "stat_type": "GOALS",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(uuid.uuid4()),  # random — does not exist
+                "stat_type": "GOALS",
+                "value": "1",
+            }
+        ]
+    )
     result = import_csv_for_club(csv_file, club)
     assert result.success is False
     assert len(result.row_errors) == 1
@@ -315,12 +323,16 @@ def test_player_from_wrong_sport_rejected():
     valid_player = _make_player(sport, club)
     _link_player_to_fixture(valid_player, fixture)
 
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(wrong_player.id),
-        "stat_type": "GOALS",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(wrong_player.id),
+                "stat_type": "GOALS",
+                "value": "1",
+            }
+        ]
+    )
     result = import_csv_for_club(csv_file, club)
     assert result.success is False
     assert len(result.row_errors) == 1
@@ -343,12 +355,16 @@ def test_invalid_stat_type_rejected():
     fixture = _make_fixture(sport, comp)
     _link_player_to_fixture(player, fixture)
 
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(player.id),
-        "stat_type": "INVALID_STAT_XYZ",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(player.id),
+                "stat_type": "INVALID_STAT_XYZ",
+                "value": "1",
+            }
+        ]
+    )
     result = import_csv_for_club(csv_file, club)
     assert result.success is False
     assert len(result.row_errors) == 1
@@ -413,11 +429,14 @@ def test_duplicate_upload_is_idempotent():
     assert result2.success is True
 
     # Exactly one MatchPlayerStatistic row — no duplicate
-    assert MatchPlayerStatistic.objects.filter(
-        match_centre__fixture=fixture,
-        participant=player,
-        stat_type="GOALS",
-    ).count() == 1
+    assert (
+        MatchPlayerStatistic.objects.filter(
+            match_centre__fixture=fixture,
+            participant=player,
+            stat_type="GOALS",
+        ).count()
+        == 1
+    )
 
 
 # ============================================================================
@@ -437,24 +456,32 @@ def test_reupload_with_correction_updates_value():
 
     # First upload: value=1
     result1 = import_csv_for_club(
-        _make_csv([{
-            "fixture_id": str(fixture.id),
-            "player_id": str(player.id),
-            "stat_type": "GOALS",
-            "value": "1",
-        }]),
+        _make_csv(
+            [
+                {
+                    "fixture_id": str(fixture.id),
+                    "player_id": str(player.id),
+                    "stat_type": "GOALS",
+                    "value": "1",
+                }
+            ]
+        ),
         club,
     )
     assert result1.success is True
 
     # Second upload: corrected value=3
     result2 = import_csv_for_club(
-        _make_csv([{
-            "fixture_id": str(fixture.id),
-            "player_id": str(player.id),
-            "stat_type": "GOALS",
-            "value": "3",
-        }]),
+        _make_csv(
+            [
+                {
+                    "fixture_id": str(fixture.id),
+                    "player_id": str(player.id),
+                    "stat_type": "GOALS",
+                    "value": "3",
+                }
+            ]
+        ),
         club,
     )
     assert result2.success is True
@@ -482,12 +509,16 @@ def test_unauthenticated_upload_returns_401():
 
     client = APIClient()
     url = reverse("clubs:club-match-data-upload", kwargs={"club_pk": club.id})
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(uuid.uuid4()),
-        "stat_type": "GOALS",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(uuid.uuid4()),
+                "stat_type": "GOALS",
+                "value": "1",
+            }
+        ]
+    )
     response = client.post(url, {"file": csv_file}, format="multipart")
     assert response.status_code == 401
 
@@ -506,12 +537,16 @@ def test_non_admin_staff_upload_returns_403():
     client = APIClient()
     client.force_authenticate(user=user)
     url = reverse("clubs:club-match-data-upload", kwargs={"club_pk": club.id})
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(uuid.uuid4()),
-        "stat_type": "GOALS",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(uuid.uuid4()),
+                "stat_type": "GOALS",
+                "value": "1",
+            }
+        ]
+    )
     response = client.post(url, {"file": csv_file}, format="multipart")
     assert response.status_code == 403
 
@@ -537,12 +572,16 @@ def test_wrong_club_admin_cannot_upload():
     client = APIClient()
     client.force_authenticate(user=user)
     url = reverse("clubs:club-match-data-upload", kwargs={"club_pk": club_a.id})
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(uuid.uuid4()),
-        "stat_type": "GOALS",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(uuid.uuid4()),
+                "stat_type": "GOALS",
+                "value": "1",
+            }
+        ]
+    )
     response = client.post(url, {"file": csv_file}, format="multipart")
     assert response.status_code == 403
 
@@ -567,18 +606,22 @@ def test_fixture_from_wrong_club_rejected():
 
     # club_a tries to upload for that fixture
     player_a = _make_player(sport, club_a)
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(player_a.id),
-        "stat_type": "GOALS",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(player_a.id),
+                "stat_type": "GOALS",
+                "value": "1",
+            }
+        ]
+    )
     result = import_csv_for_club(csv_file, club_a)
     assert result.success is False
     # Error must mention that the fixture doesn't involve their club
-    all_errors = " ".join(
-        e for err in result.row_errors for e in err.get("errors", [])
-    ) + result.message
+    all_errors = (
+        " ".join(e for err in result.row_errors for e in err.get("errors", [])) + result.message
+    )
     assert "club" in all_errors.lower() or "fixture" in all_errors.lower()
 
 
@@ -597,12 +640,16 @@ def test_successful_upload_calls_complete_ingestion():
     fixture = _make_fixture(sport, comp)
     _link_player_to_fixture(player, fixture)
 
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(player.id),
-        "stat_type": "GOALS",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(player.id),
+                "stat_type": "GOALS",
+                "value": "1",
+            }
+        ]
+    )
 
     # Import succeeds and the ingestion record is COMPLETED with fixture metadata
     result = import_csv_for_club(csv_file, club)
@@ -639,12 +686,16 @@ def test_upload_dispatches_score_affected_gameweeks_via_on_commit():
         with patch("fantasy.tasks.score_affected_gameweeks") as mock_task:
             mock_task.delay = lambda ids: dispatched.append(ids)
             result = import_csv_for_club(
-                _make_csv([{
-                    "fixture_id": str(fixture.id),
-                    "player_id": str(player.id),
-                    "stat_type": "GOALS",
-                    "value": "1",
-                }]),
+                _make_csv(
+                    [
+                        {
+                            "fixture_id": str(fixture.id),
+                            "player_id": str(player.id),
+                            "stat_type": "GOALS",
+                            "value": "1",
+                        }
+                    ]
+                ),
                 club,
             )
 
@@ -668,7 +719,11 @@ def test_finalized_gameweek_not_rescored_after_upload():
     _ensure_provider()
     d = _make_domain()
     sport, comp, club, player, fixture = (
-        d["sport"], d["competition"], d["club"], d["player"], d["fixture"]
+        d["sport"],
+        d["competition"],
+        d["club"],
+        d["player"],
+        d["fixture"],
     )
 
     uid = _uid()
@@ -701,12 +756,16 @@ def test_finalized_gameweek_not_rescored_after_upload():
     with patch("fantasy.services.score_gameweek") as mock_sg:
         with patch("django.db.transaction.on_commit", side_effect=lambda f: f()):
             result = import_csv_for_club(
-                _make_csv([{
-                    "fixture_id": str(fixture.id),
-                    "player_id": str(player.id),
-                    "stat_type": "GOALS",
-                    "value": "1",
-                }]),
+                _make_csv(
+                    [
+                        {
+                            "fixture_id": str(fixture.id),
+                            "player_id": str(player.id),
+                            "stat_type": "GOALS",
+                            "value": "1",
+                        }
+                    ]
+                ),
                 club,
             )
 
@@ -724,7 +783,11 @@ def test_fixture_in_multiple_gameweeks_scores_each():
     _ensure_provider()
     d = _make_domain()
     sport, comp, club, player, fixture = (
-        d["sport"], d["competition"], d["club"], d["player"], d["fixture"]
+        d["sport"],
+        d["competition"],
+        d["club"],
+        d["player"],
+        d["fixture"],
     )
 
     uid = _uid()
@@ -744,14 +807,22 @@ def test_fixture_in_multiple_gameweeks_scores_each():
     )
     now = timezone.now()
     gw1 = FantasyGameweek.objects.create(
-        fantasy_competition=fantasy, number=1, name=f"GW1_{uid}",
-        starts_at=now - timedelta(days=2), deadline_at=now + timedelta(hours=1),
-        ends_at=now + timedelta(days=2), status="SCORING",
+        fantasy_competition=fantasy,
+        number=1,
+        name=f"GW1_{uid}",
+        starts_at=now - timedelta(days=2),
+        deadline_at=now + timedelta(hours=1),
+        ends_at=now + timedelta(days=2),
+        status="SCORING",
     )
     gw2 = FantasyGameweek.objects.create(
-        fantasy_competition=fantasy, number=2, name=f"GW2_{uid}",
-        starts_at=now - timedelta(days=1), deadline_at=now + timedelta(hours=2),
-        ends_at=now + timedelta(days=3), status="SCORING",
+        fantasy_competition=fantasy,
+        number=2,
+        name=f"GW2_{uid}",
+        starts_at=now - timedelta(days=1),
+        deadline_at=now + timedelta(hours=2),
+        ends_at=now + timedelta(days=3),
+        status="SCORING",
     )
     gw1.fixtures.add(fixture)
     gw2.fixtures.add(fixture)
@@ -764,12 +835,16 @@ def test_fixture_in_multiple_gameweeks_scores_each():
     with patch("fantasy.services.score_gameweek", side_effect=fake_score_gw):
         with patch("django.db.transaction.on_commit", side_effect=lambda f: f()):
             result = import_csv_for_club(
-                _make_csv([{
-                    "fixture_id": str(fixture.id),
-                    "player_id": str(player.id),
-                    "stat_type": "GOALS",
-                    "value": "2",
-                }]),
+                _make_csv(
+                    [
+                        {
+                            "fixture_id": str(fixture.id),
+                            "player_id": str(player.id),
+                            "stat_type": "GOALS",
+                            "value": "2",
+                        }
+                    ]
+                ),
                 club,
             )
 
@@ -813,9 +888,12 @@ def test_failed_validation_rolls_back_entirely():
 
     assert result.success is False
     # Nothing should have been written
-    assert MatchPlayerStatistic.objects.filter(
-        match_centre__fixture=fixture, participant=player
-    ).count() == 0
+    assert (
+        MatchPlayerStatistic.objects.filter(
+            match_centre__fixture=fixture, participant=player
+        ).count()
+        == 0
+    )
 
 
 # ============================================================================
@@ -909,12 +987,16 @@ def test_http_upload_success_returns_202():
     client.force_authenticate(user=user)
     url = reverse("clubs:club-match-data-upload", kwargs={"club_pk": club.id})
 
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(player.id),
-        "stat_type": "GOALS",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(player.id),
+                "stat_type": "GOALS",
+                "value": "1",
+            }
+        ]
+    )
 
     response = client.post(url, {"file": csv_file}, format="multipart")
     assert response.status_code == 202
@@ -939,12 +1021,16 @@ def test_http_upload_validation_failure_returns_400():
     client.force_authenticate(user=user)
     url = reverse("clubs:club-match-data-upload", kwargs={"club_pk": club.id})
 
-    csv_file = _make_csv([{
-        "fixture_id": str(fixture.id),
-        "player_id": str(player.id),
-        "stat_type": "NOT_A_REAL_STAT",
-        "value": "1",
-    }])
+    csv_file = _make_csv(
+        [
+            {
+                "fixture_id": str(fixture.id),
+                "player_id": str(player.id),
+                "stat_type": "NOT_A_REAL_STAT",
+                "value": "1",
+            }
+        ]
+    )
 
     response = client.post(url, {"file": csv_file}, format="multipart")
     assert response.status_code == 400

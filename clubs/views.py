@@ -556,16 +556,14 @@ class ClubFixtureListView(APIView):
 
         # Collect all participant IDs (ATHLETE + TEAM) linked to this club
         athlete_ids = set(
-            Participant.objects.filter(
-                player_profile__club=club
-            ).values_list("id", flat=True)
+            Participant.objects.filter(player_profile__club=club).values_list("id", flat=True)
         )
 
         # Events where any of the club's athletes participate directly
         fixture_ids_via_athletes = set(
-            EventParticipant.objects.filter(
-                participant_id__in=athlete_ids
-            ).values_list("event_id", flat=True)
+            EventParticipant.objects.filter(participant_id__in=athlete_ids).values_list(
+                "event_id", flat=True
+            )
         )
 
         # Events in the club's league (ClubProfile.league)
@@ -574,9 +572,7 @@ class ClubFixtureListView(APIView):
         fixture_ids_via_league: set = set()
         if league_id:
             fixture_ids_via_league = set(
-                SportingEvent.objects.filter(
-                    competition_id=league_id
-                ).values_list("id", flat=True)
+                SportingEvent.objects.filter(competition_id=league_id).values_list("id", flat=True)
             )
 
         all_fixture_ids = fixture_ids_via_athletes | fixture_ids_via_league

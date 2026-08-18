@@ -91,9 +91,7 @@ def score_affected_gameweeks(self, fixture_ids: Sequence[str]) -> dict:
     from fantasy.services import score_gameweek
 
     if not fixture_ids:
-        logger.info(
-            "score_affected_gameweeks: called with empty fixture_ids list — nothing to do."
-        )
+        logger.info("score_affected_gameweeks: called with empty fixture_ids list — nothing to do.")
         return {"scored": 0, "skipped_finalized": 0, "no_gameweek": 0, "fixture_ids": []}
 
     logger.info(

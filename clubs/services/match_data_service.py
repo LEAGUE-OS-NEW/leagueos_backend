@@ -121,20 +121,17 @@ def _resolve_fixture(fixture_id_str: str, club: Club) -> SportingEvent | str:
     # PlayerProfile whose club matches, OR the fixture's competition
     # matches the club profile's league.
     club_participant_ids = set(
-        Participant.objects.filter(
-            player_profile__club=club
-        ).values_list("id", flat=True)
+        Participant.objects.filter(player_profile__club=club).values_list("id", flat=True)
     )
 
     fixture_participant_ids = set(
-        EventParticipant.objects.filter(event=fixture).values_list(
-            "participant_id", flat=True
-        )
+        EventParticipant.objects.filter(event=fixture).values_list("participant_id", flat=True)
     )
 
     # Also accept when the fixture's competition matches the club's league
     try:
         from discovery.models import ClubProfile
+
         club_profile = ClubProfile.objects.filter(club=club).first()
         club_league_id = club_profile.league_id if club_profile and club_profile.league_id else None
     except Exception:  # noqa: BLE001
@@ -155,9 +152,7 @@ def _resolve_fixture(fixture_id_str: str, club: Club) -> SportingEvent | str:
     return fixture
 
 
-def _resolve_player(
-    player_id_str: str, fixture: SportingEvent
-) -> Participant | str:
+def _resolve_player(player_id_str: str, fixture: SportingEvent) -> Participant | str:
     """Return the Participant (ATHLETE) or an error string."""
     try:
         player = Participant.objects.select_related("sport").get(
@@ -469,8 +464,7 @@ def import_csv_for_club(
         )
     except SportsFeedProvider.DoesNotExist:
         logger.error(
-            "SportsFeedProvider '%s' does not exist. "
-            "Run the clubs data migration to create it.",
+            "SportsFeedProvider '%s' does not exist. " "Run the clubs data migration to create it.",
             CLUB_ADMIN_CSV_PROVIDER_CODE,
         )
         return MatchDataImportResult(
@@ -595,16 +589,20 @@ def generate_csv_template(sport=None) -> str:
     else:
         example_stat = "GOALS"
 
-    writer.writerow([
-        "<SportingEvent UUID>",
-        "<Participant UUID>",
-        example_stat,
-        "1",
-    ])
-    writer.writerow([
-        "<SportingEvent UUID>",
-        "<Participant UUID>",
-        example_stat,
-        "2",
-    ])
+    writer.writerow(
+        [
+            "<SportingEvent UUID>",
+            "<Participant UUID>",
+            example_stat,
+            "1",
+        ]
+    )
+    writer.writerow(
+        [
+            "<SportingEvent UUID>",
+            "<Participant UUID>",
+            example_stat,
+            "2",
+        ]
+    )
     return output.getvalue()

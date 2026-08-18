@@ -56,9 +56,7 @@ class CompetitionAdminCreateTests(APITestCase):
             "is_active": True,
         }
         response = self.client.post(COMP_CREATE_URL, payload, format="json")
-        self.assertEqual(
-            response.status_code, status.HTTP_201_CREATED, response.data
-        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
 
     def test_slug_auto_generated_from_name_when_omitted(self):
         """When slug is omitted the model save() derives it from name."""

@@ -41,7 +41,6 @@ from discovery.models import Season
 from profiles.models import Club
 from sports.models import Competition, Participant, Sport, SportingEvent
 
-
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
 
@@ -74,11 +73,10 @@ def football_domain(db):
     club = Club.objects.create(name="Test Club")
 
     # Alex — the primary test player
-    alex_participant = Participant.objects.create(
-        sport=sport, kind="ATHLETE", name="Alex"
-    )
+    alex_participant = Participant.objects.create(sport=sport, kind="ATHLETE", name="Alex")
     try:
         from discovery.models import PlayerProfile
+
         PlayerProfile.objects.create(participant=alex_participant, club=club, position="FWD")
     except Exception:
         pass
@@ -91,9 +89,7 @@ def football_domain(db):
     )
 
     # Second player to fill the squad
-    other_participant = Participant.objects.create(
-        sport=sport, kind="ATHLETE", name="Other Player"
-    )
+    other_participant = Participant.objects.create(sport=sport, kind="ATHLETE", name="Other Player")
     other_fp = FantasyPlayer.objects.create(
         fantasy_competition=fantasy,
         player=other_participant,
@@ -260,9 +256,7 @@ def test_create_stat_invalid_participant_uuid(client, football_domain):
 def test_create_stat_participant_is_not_athlete(client, football_domain):
     """Non-athlete Participant (e.g. a club) is rejected by the queryset filter."""
     sport = football_domain["sport"]
-    team_participant = Participant.objects.create(
-        sport=sport, kind="CLUB", name="Some Club"
-    )
+    team_participant = Participant.objects.create(sport=sport, kind="CLUB", name="Some Club")
     payload = _payload(football_domain)
     payload["participant"] = str(team_participant.id)
     resp = client.post(URL, payload, format="json")
@@ -292,9 +286,7 @@ def test_create_stat_negative_value_rejected(client, football_domain):
 def test_create_stat_participant_sport_mismatch(client, football_domain):
     """Participant from a different sport → 400."""
     other_sport = Sport.objects.create(name="Basketball", slug="basketball", code="BB")
-    basketball_player = Participant.objects.create(
-        sport=other_sport, kind="ATHLETE", name="Baller"
-    )
+    basketball_player = Participant.objects.create(sport=other_sport, kind="ATHLETE", name="Baller")
     payload = _payload(football_domain)
     payload["participant"] = str(basketball_player.id)
     resp = client.post(URL, payload, format="json")
@@ -319,10 +311,13 @@ def test_create_stat_duplicate_returns_400(client, football_domain):
     assert "already exists" in resp2.data["detail"].lower()
 
     # Exactly one stat in the DB
-    assert MatchPlayerStatistic.objects.filter(
-        participant=football_domain["alex_participant"],
-        stat_type="GOALS",
-    ).count() == 1
+    assert (
+        MatchPlayerStatistic.objects.filter(
+            participant=football_domain["alex_participant"],
+            stat_type="GOALS",
+        ).count()
+        == 1
+    )
 
 
 # ── list endpoint tests ───────────────────────────────────────────────────────
@@ -431,9 +426,9 @@ def test_alex_scores_6_points_after_recalculate(client, football_domain):
         gameweek=gameweek,
         fantasy_player=domain["alex_fp"],
     )
-    assert points_record.base_points == Decimal("6"), (
-        f"Expected 6 base points (2 goals × 3 pts), got {points_record.base_points}"
-    )
+    assert points_record.base_points == Decimal(
+        "6"
+    ), f"Expected 6 base points (2 goals × 3 pts), got {points_record.base_points}"
     assert points_record.total_points == Decimal("6")
     assert points_record.statistics_available is True
 
@@ -471,6 +466,6 @@ def test_scoring_engine_untouched(client, football_domain):
 
     sig = inspect.signature(sg)
     params = list(sig.parameters.keys())
-    assert params == ["gameweek"], (
-        f"score_gameweek() signature changed — expected ['gameweek'], got {params}"
-    )
+    assert params == [
+        "gameweek"
+    ], f"score_gameweek() signature changed — expected ['gameweek'], got {params}"

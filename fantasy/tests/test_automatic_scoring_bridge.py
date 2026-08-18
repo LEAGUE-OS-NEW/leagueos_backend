@@ -45,7 +45,6 @@ from profiles.models import Club
 from sports.models import Competition, Participant, Sport, SportingEvent
 from discovery.models import Season
 
-
 # ── shared helpers ─────────────────────────────────────────────────────────────
 
 
@@ -79,12 +78,8 @@ def _make_fantasy_domain(*, gw_status="SCORING", gw_number=None):
         slug=f"football-{uid}",
         code=f"FB{uid[:4].upper()}",
     )
-    competition = Competition.objects.create(
-        sport=sport, name=f"League_{uid}", country_code="UG"
-    )
-    season = Season.objects.create(
-        sport=sport, competition=competition, name=f"2026_{uid}"
-    )
+    competition = Competition.objects.create(sport=sport, name=f"League_{uid}", country_code="UG")
+    season = Season.objects.create(sport=sport, competition=competition, name=f"2026_{uid}")
     fantasy = FantasyCompetition.objects.create(
         competition=competition,
         season=season,
@@ -107,6 +102,7 @@ def _make_fantasy_domain(*, gw_status="SCORING", gw_number=None):
     alex = Participant.objects.create(sport=sport, kind="ATHLETE", name=f"Alex_{uid}")
     try:
         from discovery.models import PlayerProfile
+
         PlayerProfile.objects.create(participant=alex, club=club, position="FWD")
     except Exception:
         pass
@@ -165,6 +161,7 @@ def _add_scoring_rule(fantasy, stat_type="GOALS", points="3"):
 
 def _add_team_with_alex_captain(domain):
     from django.contrib.auth import get_user_model
+
     User = get_user_model()
     uid = _uid()
     user = User.objects.create_user(
@@ -237,8 +234,11 @@ class TestScoreAffectedGameweeks:
         comp = Competition.objects.create(sport=sport, name=f"NoGW Comp {uid}", country_code="UG")
         now = timezone.now()
         fixture = SportingEvent.objects.create(
-            sport=sport, competition=comp, name=f"Orphan_{uid}",
-            starts_at=now, status="COMPLETED",
+            sport=sport,
+            competition=comp,
+            name=f"Orphan_{uid}",
+            starts_at=now,
+            status="COMPLETED",
         )
         result = score_affected_gameweeks(None, [str(fixture.id)])
         assert result["scored"] == 0
@@ -321,28 +321,20 @@ class TestScoreAffectedGameweeks:
 
         # First execution
         score_affected_gameweeks(None, [str(domain["fixture"].id)])
-        points_after_first = FantasyPlayerGameweekPoints.objects.filter(
-            gameweek=gameweek
-        ).count()
-        scores_after_first = FantasyTeamGameweekScore.objects.filter(
-            gameweek=gameweek
-        ).count()
+        points_after_first = FantasyPlayerGameweekPoints.objects.filter(gameweek=gameweek).count()
+        scores_after_first = FantasyTeamGameweekScore.objects.filter(gameweek=gameweek).count()
 
         # Second execution (simulated retry)
         score_affected_gameweeks(None, [str(domain["fixture"].id)])
-        points_after_second = FantasyPlayerGameweekPoints.objects.filter(
-            gameweek=gameweek
-        ).count()
-        scores_after_second = FantasyTeamGameweekScore.objects.filter(
-            gameweek=gameweek
-        ).count()
+        points_after_second = FantasyPlayerGameweekPoints.objects.filter(gameweek=gameweek).count()
+        scores_after_second = FantasyTeamGameweekScore.objects.filter(gameweek=gameweek).count()
 
-        assert points_after_first == points_after_second, (
-            "Retry created duplicate FantasyPlayerGameweekPoints rows"
-        )
-        assert scores_after_first == scores_after_second, (
-            "Retry created duplicate FantasyTeamGameweekScore rows"
-        )
+        assert (
+            points_after_first == points_after_second
+        ), "Retry created duplicate FantasyPlayerGameweekPoints rows"
+        assert (
+            scores_after_first == scores_after_second
+        ), "Retry created duplicate FantasyTeamGameweekScore rows"
 
     def test_alex_goals_2_with_rule_3_gives_6_points(self):
         """
@@ -364,9 +356,9 @@ class TestScoreAffectedGameweeks:
             gameweek=gameweek,
             fantasy_player=domain["alex_fp"],
         )
-        assert points.base_points == Decimal("6"), (
-            f"Expected 6 pts (2 goals × 3), got {points.base_points}"
-        )
+        assert points.base_points == Decimal(
+            "6"
+        ), f"Expected 6 pts (2 goals × 3), got {points.base_points}"
         assert points.total_points == Decimal("6")
         assert points.statistics_available is True
 
@@ -442,9 +434,7 @@ class TestCompleteIngestionBridge:
         with patch("fantasy.tasks.score_affected_gameweeks") as mock_task:
             mock_task.delay = bad_delay
             # Should NOT propagate — the exception is swallowed inside _dispatch
-            SportsFeedService.complete_ingestion(
-                ingestion, fixture_ids=[str(uuid.uuid4())]
-            )
+            SportsFeedService.complete_ingestion(ingestion, fixture_ids=[str(uuid.uuid4())])
 
         ingestion.refresh_from_db()
         assert ingestion.status == SportsFeedIngestion.Status.COMPLETED
@@ -463,6 +453,7 @@ class TestCompleteIngestionBridge:
         def patched_import(name, *args, **kwargs):
             mod = real_import(name, *args, **kwargs)
             if name == "fantasy.tasks":
+
                 class FakeTask:
                     def delay(self, ids):
                         dispatched.append(ids)
@@ -484,9 +475,7 @@ class TestCompleteIngestionBridge:
         with patch("django.db.transaction.on_commit", side_effect=fake_on_commit):
             with patch("fantasy.tasks.score_affected_gameweeks") as mock_task:
                 mock_task.delay = lambda ids: captured.append(ids)
-                SportsFeedService.complete_ingestion(
-                    ingestion, fixture_ids=[fixture_uuid]
-                )
+                SportsFeedService.complete_ingestion(ingestion, fixture_ids=[fixture_uuid])
 
         assert captured, "Task was not dispatched"
         for item in captured[0]:
@@ -512,10 +501,8 @@ class TestCompleteIngestionBridge:
         with patch("django.db.transaction.on_commit", side_effect=fake_on_commit):
             with patch("fantasy.tasks.score_affected_gameweeks") as mock_task:
                 mock_task.delay = lambda ids: captured.append(ids)
-                SportsFeedService.complete_ingestion(
-                    ingestion, fixture_ids=[fixture_id]
-                )
+                SportsFeedService.complete_ingestion(ingestion, fixture_ids=[fixture_id])
 
-        assert captured == [[fixture_id]], (
-            f"Expected dispatch with [{fixture_id!r}], got {captured}"
-        )
+        assert captured == [
+            [fixture_id]
+        ], f"Expected dispatch with [{fixture_id!r}], got {captured}"

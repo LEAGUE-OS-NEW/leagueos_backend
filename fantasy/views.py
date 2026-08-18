@@ -96,9 +96,7 @@ class CompetitionViewSet(viewsets.ModelViewSet):
         )
         # Fetch all existing FantasyCompetition (competition, season) pairs so the
         # frontend can warn the admin before they attempt a duplicate submission.
-        taken = FantasyCompetition.objects.values(
-            "competition_id", "season_id", "id", "name"
-        )
+        taken = FantasyCompetition.objects.values("competition_id", "season_id", "id", "name")
         return Response(
             {
                 "competitions": [
@@ -389,9 +387,9 @@ class PlayerViewSet(viewsets.ModelViewSet):
         # so the dropdown only ever shows athletes that haven't been added yet.
         # This is competition-specific: an athlete excluded from Competition A
         # will still appear for Competition B if they haven't been added there.
-        already_pooled = FantasyPlayer.objects.filter(
-            fantasy_competition=competition
-        ).values_list("player_id", flat=True)
+        already_pooled = FantasyPlayer.objects.filter(fantasy_competition=competition).values_list(
+            "player_id", flat=True
+        )
 
         athletes = (
             Participant.objects.filter(
@@ -828,9 +826,7 @@ class CorrectionViewSet(viewsets.ModelViewSet):
             from django.contrib.auth import get_user_model
 
             actor = get_user_model().objects.order_by("pk").first()
-        correction = serializer.save(
-            actor=actor, previous_value=player_points.total_points
-        )
+        correction = serializer.save(actor=actor, previous_value=player_points.total_points)
         player_points.correction_points = correction.new_value - player_points.base_points
         player_points.total_points = correction.new_value
         player_points.save(update_fields=["correction_points", "total_points", "updated_at"])
@@ -994,13 +990,11 @@ class MatchStatisticViewSet(viewsets.ViewSet):
         """
         competition_id = request.query_params.get("competition")
         if not competition_id:
-            return Response(
-                {"detail": "competition query parameter is required."}, status=400
-            )
+            return Response({"detail": "competition query parameter is required."}, status=400)
         try:
-            fantasy_comp = FantasyCompetition.objects.select_related(
-                "competition"
-            ).get(pk=competition_id)
+            fantasy_comp = FantasyCompetition.objects.select_related("competition").get(
+                pk=competition_id
+            )
         except (FantasyCompetition.DoesNotExist, ValueError):
             return Response({"detail": "Fantasy competition not found."}, status=404)
 
@@ -1013,9 +1007,7 @@ class MatchStatisticViewSet(viewsets.ViewSet):
         gameweek_id = request.query_params.get("gameweek")
         if gameweek_id:
             try:
-                gw = FantasyGameweek.objects.get(
-                    pk=gameweek_id, fantasy_competition=fantasy_comp
-                )
+                gw = FantasyGameweek.objects.get(pk=gameweek_id, fantasy_competition=fantasy_comp)
                 fixture_qs = fixture_qs.filter(id__in=gw.fixtures.values_list("id", flat=True))
             except (FantasyGameweek.DoesNotExist, ValueError):
                 return Response({"detail": "Gameweek not found."}, status=404)
@@ -1025,14 +1017,15 @@ class MatchStatisticViewSet(viewsets.ViewSet):
             fixture_qs = fixture_qs.filter(id=fixture_filter)
 
         # Find all (participant, fixture) pairs that have at least one stat.
-        stat_qs = MatchPlayerStatistic.objects.filter(
-            match_centre__fixture__in=fixture_qs
-        ).select_related(
-            "match_centre__fixture",
-            "participant__player_profile__club",
-        ).values(
-            "participant_id", "match_centre__fixture_id"
-        ).distinct()
+        stat_qs = (
+            MatchPlayerStatistic.objects.filter(match_centre__fixture__in=fixture_qs)
+            .select_related(
+                "match_centre__fixture",
+                "participant__player_profile__club",
+            )
+            .values("participant_id", "match_centre__fixture_id")
+            .distinct()
+        )
 
         participant_filter = request.query_params.get("participant")
         if participant_filter:
@@ -1049,15 +1042,13 @@ class MatchStatisticViewSet(viewsets.ViewSet):
 
         participants = {
             str(p.id): p
-            for p in Participant.objects.filter(
-                id__in=participant_ids
-            ).select_related("player_profile__club")
+            for p in Participant.objects.filter(id__in=participant_ids).select_related(
+                "player_profile__club"
+            )
         }
         fixtures = {
             str(f.id): f
-            for f in SportingEvent.objects.filter(
-                id__in=fixture_ids
-            ).select_related("match_centre")
+            for f in SportingEvent.objects.filter(id__in=fixture_ids).select_related("match_centre")
         }
 
         # Pre-fetch review statuses.
@@ -1080,9 +1071,9 @@ class MatchStatisticViewSet(viewsets.ViewSet):
         }
         # Gameweeks for fixture→gameweek mapping.
         fixture_to_gameweek = {}
-        for gw in FantasyGameweek.objects.filter(
-            fantasy_competition=fantasy_comp
-        ).prefetch_related("fixtures"):
+        for gw in FantasyGameweek.objects.filter(fantasy_competition=fantasy_comp).prefetch_related(
+            "fixtures"
+        ):
             for f in gw.fixtures.all():
                 fixture_to_gameweek[str(f.id)] = gw
 
@@ -1133,29 +1124,35 @@ class MatchStatisticViewSet(viewsets.ViewSet):
                     breakdown = pts_record.breakdown or []
 
             profile = getattr(participant, "player_profile", None)
-            rows.append({
-                "participant_id": pid,
-                "participant_name": participant.name,
-                "club": profile.club.name if profile and profile.club else None,
-                "club_id": str(profile.club.id) if profile and profile.club else None,
-                "fixture_id": fid,
-                "fixture_name": fixture.name,
-                "fixture_status": fixture.status,
-                "gameweek": {
-                    "id": str(gameweek.id),
-                    "name": gameweek.name,
-                    "number": gameweek.number,
-                    "status": gameweek.status,
-                } if gameweek else None,
-                "stats": [
-                    {"id": str(s["id"]), "stat_type": s["stat_type"], "value": str(s["value"])}
-                    for s in stat_list
-                ],
-                "fantasy_points": fantasy_points,
-                "breakdown": breakdown,
-                "review_status": review_status,
-                "review_id": review_id,
-            })
+            rows.append(
+                {
+                    "participant_id": pid,
+                    "participant_name": participant.name,
+                    "club": profile.club.name if profile and profile.club else None,
+                    "club_id": str(profile.club.id) if profile and profile.club else None,
+                    "fixture_id": fid,
+                    "fixture_name": fixture.name,
+                    "fixture_status": fixture.status,
+                    "gameweek": (
+                        {
+                            "id": str(gameweek.id),
+                            "name": gameweek.name,
+                            "number": gameweek.number,
+                            "status": gameweek.status,
+                        }
+                        if gameweek
+                        else None
+                    ),
+                    "stats": [
+                        {"id": str(s["id"]), "stat_type": s["stat_type"], "value": str(s["value"])}
+                        for s in stat_list
+                    ],
+                    "fantasy_points": fantasy_points,
+                    "breakdown": breakdown,
+                    "review_status": review_status,
+                    "review_id": review_id,
+                }
+            )
 
         return Response(rows)
 
@@ -1178,9 +1175,7 @@ class MatchStatisticViewSet(viewsets.ViewSet):
         """
         competition_id = request.query_params.get("competition")
         if not competition_id:
-            return Response(
-                {"detail": "competition query parameter is required."}, status=400
-            )
+            return Response({"detail": "competition query parameter is required."}, status=400)
         try:
             fantasy_comp = FantasyCompetition.objects.select_related("competition").get(
                 pk=competition_id
@@ -1194,9 +1189,9 @@ class MatchStatisticViewSet(viewsets.ViewSet):
             return Response({"detail": "Fixture not found."}, status=404)
 
         try:
-            participant = Participant.objects.select_related(
-                "player_profile__club"
-            ).get(pk=participant_id)
+            participant = Participant.objects.select_related("player_profile__club").get(
+                pk=participant_id
+            )
         except (Participant.DoesNotExist, ValueError):
             return Response({"detail": "Participant not found."}, status=404)
 
@@ -1263,41 +1258,45 @@ class MatchStatisticViewSet(viewsets.ViewSet):
             "name": fantasy_comp.name,
         }
 
-        return Response({
-            "participant_id": str(participant.id),
-            "participant_name": participant.name,
-            "club": profile.club.name if profile and profile.club else None,
-            "club_id": str(profile.club.id) if profile and profile.club else None,
-            "fixture_id": str(fixture.id),
-            "fixture_name": fixture.name,
-            "fixture_status": fixture.status,
-            "competition": competition_data,
-            "gameweek": {
-                "id": str(gameweek.id),
-                "name": gameweek.name,
-                "number": gameweek.number,
-                "status": gameweek.status,
-            } if gameweek else None,
-            "stats": [
-                {"id": str(s["id"]), "stat_type": s["stat_type"], "value": str(s["value"])}
-                for s in stats
-            ],
-            "fantasy_points": fantasy_points,
-            "base_points": base_points,
-            "correction_points": correction_points,
-            "breakdown": breakdown,
-            "scoring_rules": [
-                {"statistic_type": r["statistic_type"], "points": str(r["points"])}
-                for r in scoring_rules
-            ],
-            "review_status": review.status if review else "PENDING",
-            "review_id": str(review.id) if review else None,
-            "approved_at": (
-                review.approved_at.isoformat()
-                if review and review.approved_at
-                else None
-            ),
-        })
+        return Response(
+            {
+                "participant_id": str(participant.id),
+                "participant_name": participant.name,
+                "club": profile.club.name if profile and profile.club else None,
+                "club_id": str(profile.club.id) if profile and profile.club else None,
+                "fixture_id": str(fixture.id),
+                "fixture_name": fixture.name,
+                "fixture_status": fixture.status,
+                "competition": competition_data,
+                "gameweek": (
+                    {
+                        "id": str(gameweek.id),
+                        "name": gameweek.name,
+                        "number": gameweek.number,
+                        "status": gameweek.status,
+                    }
+                    if gameweek
+                    else None
+                ),
+                "stats": [
+                    {"id": str(s["id"]), "stat_type": s["stat_type"], "value": str(s["value"])}
+                    for s in stats
+                ],
+                "fantasy_points": fantasy_points,
+                "base_points": base_points,
+                "correction_points": correction_points,
+                "breakdown": breakdown,
+                "scoring_rules": [
+                    {"statistic_type": r["statistic_type"], "points": str(r["points"])}
+                    for r in scoring_rules
+                ],
+                "review_status": review.status if review else "PENDING",
+                "review_id": str(review.id) if review else None,
+                "approved_at": (
+                    review.approved_at.isoformat() if review and review.approved_at else None
+                ),
+            }
+        )
 
     # ── correct ────────────────────────────────────────────────────────────
 
@@ -1335,9 +1334,9 @@ class MatchStatisticViewSet(viewsets.ViewSet):
             return Response({"detail": "value must be zero or greater."}, status=400)
 
         try:
-            stat = MatchPlayerStatistic.objects.select_related(
-                "match_centre__fixture"
-            ).get(pk=stat_id)
+            stat = MatchPlayerStatistic.objects.select_related("match_centre__fixture").get(
+                pk=stat_id
+            )
         except (MatchPlayerStatistic.DoesNotExist, ValueError):
             return Response({"detail": "Statistic not found."}, status=404)
 
@@ -1347,23 +1346,23 @@ class MatchStatisticViewSet(viewsets.ViewSet):
 
         # Re-run scoring for every Fantasy gameweek that includes this fixture.
         fixture = stat.match_centre.fixture
-        affected_gameweeks = list(
-            FantasyGameweek.objects.filter(fixtures=fixture)
-        )
+        affected_gameweeks = list(FantasyGameweek.objects.filter(fixtures=fixture))
         for gameweek in affected_gameweeks:
             score_gameweek(gameweek)
 
-        return Response({
-            "stat_id": str(stat.id),
-            "stat_type": stat.stat_type,
-            "participant_id": str(stat.participant_id),
-            "fixture_id": str(fixture.id),
-            "fixture_name": fixture.name,
-            "old_value": str(old_value),
-            "new_value": str(stat.value),
-            "reason": reason,
-            "gameweeks_rescored": [str(gw.id) for gw in affected_gameweeks],
-        })
+        return Response(
+            {
+                "stat_id": str(stat.id),
+                "stat_type": stat.stat_type,
+                "participant_id": str(stat.participant_id),
+                "fixture_id": str(fixture.id),
+                "fixture_name": fixture.name,
+                "old_value": str(old_value),
+                "new_value": str(stat.value),
+                "reason": reason,
+                "gameweeks_rescored": [str(gw.id) for gw in affected_gameweeks],
+            }
+        )
 
     # ── approve ────────────────────────────────────────────────────────────
 
@@ -1409,6 +1408,7 @@ class MatchStatisticViewSet(viewsets.ViewSet):
         actor = request.user if request.user.is_authenticated else None
         if actor is None:
             from django.contrib.auth import get_user_model
+
             actor = get_user_model().objects.order_by("pk").first()
 
         review, _ = FantasyStatisticReview.objects.get_or_create(
@@ -1423,12 +1423,16 @@ class MatchStatisticViewSet(viewsets.ViewSet):
         review.notes = request.data.get("notes", review.notes)
         review.save(update_fields=["status", "approved_at", "approved_by", "notes", "updated_at"])
 
-        return Response({
-            "review_id": str(review.id),
-            "status": review.status,
-            "approved_at": review.approved_at.isoformat(),
-            "approved_by": actor.get_full_name().strip() or actor.get_username() if actor else None,
-        })
+        return Response(
+            {
+                "review_id": str(review.id),
+                "status": review.status,
+                "approved_at": review.approved_at.isoformat(),
+                "approved_by": (
+                    actor.get_full_name().strip() or actor.get_username() if actor else None
+                ),
+            }
+        )
 
     # ── test data entry (kept for dev / secondary use) ─────────────────────
 

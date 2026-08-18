@@ -526,6 +526,5 @@ class FantasyStatisticReview(UUIDTimeStampedModel):
 
     def __str__(self):
         return (
-            f"{self.participant} @ {self.fixture} "
-            f"[{self.fantasy_competition}] — {self.status}"
+            f"{self.participant} @ {self.fixture} " f"[{self.fantasy_competition}] — {self.status}"
         )
