@@ -131,6 +131,14 @@ class MarketCatalogueAuditHistorySerializer(serializers.Serializer):
     has_settlement = serializers.BooleanField()
 
 
+class MarketCatalogueDeletionBlockerSerializer(serializers.Serializer):
+    accessor = serializers.CharField()
+    model = serializers.CharField()
+    on_delete = serializers.CharField()
+    count = serializers.IntegerField()
+    reason = serializers.CharField()
+
+
 class MarketCatalogueAuditRowSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     question = serializers.CharField()
@@ -141,6 +149,10 @@ class MarketCatalogueAuditRowSerializer(serializers.Serializer):
     is_catalog_visible = serializers.BooleanField()
     created_at = serializers.DateTimeField()
     classification = serializers.CharField()
+    deletion_safety = serializers.CharField()
+    deletion_blockers = MarketCatalogueDeletionBlockerSerializer(
+        many=True,
+    )
     history = MarketCatalogueAuditHistorySerializer()
 
 
@@ -159,6 +171,9 @@ class MarketCatalogueAuditSerializer(serializers.Serializer):
     )
     total_markets = serializers.IntegerField()
     summary = serializers.DictField(
+        child=serializers.IntegerField(),
+    )
+    deletion_summary = serializers.DictField(
         child=serializers.IntegerField(),
     )
     canonical_groups = MarketCatalogueCanonicalGroupSerializer(
