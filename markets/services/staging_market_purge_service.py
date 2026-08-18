@@ -8,6 +8,10 @@ from django.db import transaction
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL
 
+from authentication.services.permission_service import (
+    PermissionService,
+)
+
 from markets.models import (
     Market,
     MarketCollateralPool,
@@ -341,7 +345,10 @@ def _delete_market_graph(
     report.deleted_by_model[label] += before
 
 
-def build_purge_preflight():
+def build_purge_preflight(
+    *,
+    actor=None,
+):
     keepers, purge = _snapshot_sets()
 
     market_ids = {
@@ -378,6 +385,65 @@ def build_purge_preflight():
         )
     ]
 
+    settled_set = set(
+        settled_ids,
+    )
+
+    unsettled_rows = list(
+        Market.objects.filter(
+            id__in=unsettled_ids,
+        ).values(
+            "id",
+            "status",
+            "created_by_id",
+        )
+    )
+
+    void_required_ids = sorted(
+        str(row["id"])
+        for row in unsettled_rows
+        if (str(row["id"]) not in settled_set and row["status"] != Market.Status.VOIDED)
+    )
+
+    actor_creator_conflict_ids = []
+
+    if actor is not None:
+        actor_creator_conflict_ids = sorted(
+            str(row["id"])
+            for row in unsettled_rows
+            if (str(row["id"]) in void_required_ids and row["created_by_id"] == actor.id)
+        )
+
+    actor_has_resolution_permission = None
+    actor_has_refund_permission = None
+
+    if actor is not None:
+        actor_has_resolution_permission = PermissionService.has_any_permission(
+            actor,
+            (MarketResolutionService.RESULT_VERIFICATION_PERMISSIONS),
+        )
+
+        actor_has_refund_permission = PermissionService.has_permission(
+            actor,
+            (MarketVoidRefundService.APPROVE_PERMISSION),
+        )
+
+    snapshot_matches = market_ids == expected_ids
+
+    actor_ready = (
+        actor is not None
+        and actor_has_resolution_permission
+        and actor_has_refund_permission
+        and not actor_creator_conflict_ids
+    )
+
+    can_execute = (
+        snapshot_matches
+        and len(keepers & market_ids) == 4
+        and len(purge & market_ids) == 36
+        and actor_ready
+    )
+
     return {
         "snapshot_version": SNAPSHOT_VERSION,
         "snapshot_digest": SNAPSHOT_DIGEST,
@@ -393,6 +459,12 @@ def build_purge_preflight():
         ),
         "unsettled_financial_market_ids": unsettled_ids,
         "settled_market_ids": sorted(settled_ids),
+        "void_required_market_ids": void_required_ids,
+        "actor_email": (str(actor.email or "") if actor is not None else ""),
+        "actor_creator_conflict_ids": actor_creator_conflict_ids,
+        "actor_has_resolution_permission": actor_has_resolution_permission,
+        "actor_has_refund_permission": actor_has_refund_permission,
+        "can_execute": can_execute,
         "affected_ledger_entry_count": len(
             _affected_ledger_ids(
                 purge,
