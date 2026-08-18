@@ -290,53 +290,6 @@ class Command(BaseCommand):
             )
             self._configure_market(fresh, actor, options)
 
-    def _reschedule_long_horizon(self, market, close_at, now, actor, options):
-        market.opens_at = min(market.opens_at or now, now)
-        market.closes_at = close_at
-        market.settles_by = close_at + timedelta(hours=48)
-        market.face_value_ugx = 10000
-        market.full_clean()
-        market.save(
-            update_fields=["opens_at", "closes_at", "settles_by", "face_value_ugx", "updated_at"]
-        )
-        self._configure_market(market, actor, options)
-
-    def _replace_long_horizon(self, market, close_at, now, actor, options):
-        target = {"competition": market.competition, "participant": market.participant}
-        lookup = {
-            "question": market.question,
-            "scope_type": market.scope_type,
-            "sporting_event__isnull": True,
-            "competition": market.competition,
-            "participant": market.participant,
-            "closes_at__gt": now,
-        }
-        fresh = Market.objects.filter(**lookup).exclude(pk=market.pk).order_by("created_at").first()
-        if fresh is None:
-            fresh = MarketCatalogService.create_market(
-                sport=market.sport,
-                category=market.category,
-                template=market.template,
-                scope_type=market.scope_type,
-                sporting_event=None,
-                competition=target["competition"],
-                participant=target["participant"],
-                question=market.question,
-                description=market.description,
-                rules=market.rules,
-                resolution_source=market.resolution_source,
-                resolution_criteria=market.resolution_criteria,
-                face_value_ugx=10000,
-                status=Market.Status.DRAFT,
-                opens_at=now,
-                closes_at=close_at,
-                settles_by=close_at + timedelta(hours=48),
-                created_by=actor or market.created_by,
-                yes_label=market.outcomes.get(side="YES").label,
-                no_label=market.outcomes.get(side="NO").label,
-            )
-        self._configure_market(fresh, actor, options)
-
     @staticmethod
     def _configure_market(market, actor, options):
         probability = YES_PROBABILITIES.get(market.question)
