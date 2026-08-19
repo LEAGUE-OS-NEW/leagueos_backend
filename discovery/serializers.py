@@ -13,6 +13,7 @@ from discovery.models import (
     MatchTimelineEvent,
     News,
     NewsCategory,
+    Season,
 )
 from onboarding.models import UserClubPreference
 from profiles.models import Club
@@ -267,6 +268,62 @@ class CompetitionSerializer(serializers.ModelSerializer):
         ]
 
 
+class SeasonCreateSerializer(serializers.ModelSerializer):
+    """Admin create serializer for canonical seasons."""
+
+    sport = serializers.PrimaryKeyRelatedField(queryset=Sport.objects.filter(is_active=True))
+    competition = serializers.PrimaryKeyRelatedField(
+        queryset=Competition.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = Season
+        fields = [
+            "id",
+            "sport",
+            "competition",
+            "name",
+            "slug",
+            "starts_on",
+            "ends_on",
+            "is_active",
+            "is_verified",
+        ]
+        read_only_fields = ["id"]
+        extra_kwargs = {
+            # allow_blank=True + default="" lets DRF accept a missing or empty
+            # slug.  The UniqueTogetherValidator for unique_season_identity
+            # (sport + competition + slug) needs to see the *real* slug so it
+            # can actually detect duplicates — that is injected in
+            # to_internal_value() below before the validators run.
+            "slug": {"required": False, "allow_blank": True, "default": ""},
+            # Admin-authored seasons are verified on creation.
+            "is_verified": {"default": True},
+        }
+
+    def to_internal_value(self, data):
+        from django.utils.text import slugify
+
+        # Derive slug from name before UniqueTogetherValidator runs so the
+        # validator can correctly detect duplicates.  The model's save() does
+        # the same derivation, so this is always consistent.
+        mutable = data.copy() if hasattr(data, "copy") else dict(data)
+        if not mutable.get("slug") and mutable.get("name"):
+            mutable["slug"] = slugify(mutable["name"])
+        return super().to_internal_value(mutable)
+
+    def validate(self, attrs):
+        competition = attrs.get("competition")
+        sport = attrs.get("sport")
+        if competition and sport and competition.sport_id != sport.id:
+            raise serializers.ValidationError(
+                {"competition": "Competition sport must match the season sport."}
+            )
+        return attrs
+
+
 # =============================================================================
 # Fixtures & Results
 # =============================================================================
@@ -284,6 +341,7 @@ class FixtureListQuerySerializer(serializers.Serializer):
     )
     date_from = serializers.DateTimeField(required=False)
     date_to = serializers.DateTimeField(required=False)
+    live_score_featured = serializers.BooleanField(required=False)
     ordering = serializers.ChoiceField(
         choices=["starts_at", "-starts_at", "name", "-name"],
         required=False,
@@ -304,6 +362,10 @@ class FixtureSerializer(serializers.Serializer):
     starts_at = serializers.DateTimeField(required=False, allow_null=True)
     ends_at = serializers.DateTimeField(required=False, allow_null=True)
     venue = serializers.CharField(required=False, allow_blank=True)
+    match_type = serializers.CharField(required=False, allow_blank=True)
+    show_in_markets = serializers.BooleanField(required=False)
+    is_live_score_featured = serializers.BooleanField(required=False)
+    verification_status = serializers.SerializerMethodField()
     country_code = serializers.CharField(required=False, allow_blank=True)
     # source="*_id" — obj.sport/obj.competition are the related model
     # instances (this serializer is fed real SportingEvent rows, not
@@ -357,6 +419,14 @@ class FixtureSerializer(serializers.Serializer):
         match_centre = self._match_centre(obj)
         return match_centre.clock_display if match_centre else ""
 
+    def get_verification_status(self, obj: SportingEvent) -> str:
+        from discovery.models import FixtureResultVerification
+
+        try:
+            return obj.result_verification.status
+        except FixtureResultVerification.DoesNotExist:
+            return "NONE"
+
 
 class FixtureCreateSerializer(serializers.Serializer):
     """Sports Data Admin creating a fixture between two participants."""
@@ -370,6 +440,9 @@ class FixtureCreateSerializer(serializers.Serializer):
     starts_at = serializers.DateTimeField()
     ends_at = serializers.DateTimeField(required=False, allow_null=True)
     venue = serializers.CharField(required=False, allow_blank=True, default="")
+    match_type = serializers.CharField(required=False, allow_blank=True, default="")
+    show_in_markets = serializers.BooleanField(required=False, default=False)
+    is_live_score_featured = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs):
         errors = {}
@@ -431,6 +504,46 @@ class FixtureScoreSerializer(serializers.Serializer):
     clock_display = serializers.CharField(
         required=False, allow_blank=True, max_length=24, default=""
     )
+
+
+class FixtureResultVerificationSerializer(serializers.Serializer):
+    """Read shape for the Result Verification admin's 'Fixture Results'
+    queue — a completed fixture's score, submitted for QA review. Distinct
+    from MarketResultVerificationSerializer, which describes a market
+    outcome, not a raw score."""
+
+    id = serializers.UUIDField()
+    fixture_id = serializers.UUIDField(source="fixture.id")
+    fixture_name = serializers.CharField(source="fixture.name")
+    sport_name = serializers.CharField(source="fixture.sport.name")
+    competition_name = serializers.CharField(
+        source="fixture.competition.name", allow_null=True, default=None
+    )
+    starts_at = serializers.DateTimeField(source="fixture.starts_at")
+    home_score = serializers.SerializerMethodField()
+    away_score = serializers.SerializerMethodField()
+    status = serializers.CharField()
+    submitted_by_email = serializers.CharField(
+        source="submitted_by.email", allow_null=True, default=None
+    )
+    submitted_at = serializers.DateTimeField()
+    reviewed_by_email = serializers.CharField(
+        source="reviewed_by.email", allow_null=True, default=None
+    )
+    reviewed_at = serializers.DateTimeField(allow_null=True)
+    review_note = serializers.CharField(allow_blank=True)
+
+    def get_home_score(self, obj) -> int | None:
+        match_centre = getattr(obj.fixture, "match_centre", None)
+        return match_centre.home_score if match_centre else None
+
+    def get_away_score(self, obj) -> int | None:
+        match_centre = getattr(obj.fixture, "match_centre", None)
+        return match_centre.away_score if match_centre else None
+
+
+class FixtureResultVerificationDecisionSerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 # =============================================================================

@@ -236,6 +236,11 @@ class SportingEventListView(ListAPIView):
                 event_type=event_type,
             )
 
+        if filters.get("show_in_markets"):
+            queryset = queryset.filter(
+                show_in_markets=True,
+            )
+
         if starts_after := filters.get("starts_after"):
             queryset = queryset.filter(starts_at__gte=starts_after)
 

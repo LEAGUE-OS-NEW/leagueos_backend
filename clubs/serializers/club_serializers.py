@@ -8,6 +8,7 @@ from clubs.models import (
     ClubAuditLog,
     ClubMedia,
     ClubNews,
+    ClubPlayer,
     ClubProfileVersion,
     ClubWorkspace,
     MembershipPlan,
@@ -269,6 +270,24 @@ class StoreOrderItemSerializer(serializers.ModelSerializer):
             "total_price",
         ]
         read_only_fields = fields
+
+
+class ClubPlayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClubPlayer
+        fields = [
+            "id",
+            "club",
+            "name",
+            "position",
+            "nationality",
+            "status",
+            "contract_end",
+            "market_value",
+            "jersey_number",
+            "photo",
+        ]
+        read_only_fields = ["id", "club"]
 
 
 class StoreOrderSerializer(serializers.ModelSerializer):

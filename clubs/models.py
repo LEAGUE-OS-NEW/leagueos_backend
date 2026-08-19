@@ -805,6 +805,49 @@ class MerchandiseProduct(TimeStampedUUIDModel):
         return self.available_stock <= self.low_stock_threshold
 
 
+class ClubPlayer(TimeStampedUUIDModel):
+    """A club-administered squad player entry — distinct from the public
+    discovery app's PlayerProfile, this is the Club Admin's own roster
+    management record."""
+
+    class Status(models.TextChoices):
+        FIT = "FIT", "Fit"
+        INJURED = "INJURED", "Injured"
+        SUSPENDED = "SUSPENDED", "Suspended"
+
+    club = models.ForeignKey(
+        "profiles.Club",
+        on_delete=models.CASCADE,
+        related_name="squad_players",
+    )
+    name = models.CharField(max_length=200)
+    position = models.CharField(max_length=100, blank=True)
+    nationality = models.CharField(max_length=100, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.FIT,
+        db_index=True,
+    )
+    contract_end = models.DateField(null=True, blank=True)
+    market_value = models.CharField(max_length=100, blank=True)
+    jersey_number = models.PositiveSmallIntegerField(null=True, blank=True)
+    photo = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["jersey_number", "name"]
+        indexes = [
+            models.Index(fields=["club", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.club.name} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        self.name = self.name.strip()
+        super().save(*args, **kwargs)
+
+
 class StoreOrder(TimeStampedUUIDModel):
     """Merchandise order."""
 
@@ -1006,6 +1049,7 @@ class ClubAuditLog(TimeStampedUUIDModel):
         ("ROLE_REVOKED", "Role revoked"),
         ("PERMISSION_CHANGED", "Permission changed"),
         ("ANALYTICS_VIEWED", "Analytics viewed"),
+        ("MATCH_DATA_UPLOADED", "Match data uploaded"),
     ]
 
     club = models.ForeignKey(

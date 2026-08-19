@@ -1,18 +1,25 @@
 """
 Exact one-time staging market purge snapshot.
 
-Generated from the verified 40-market staging state on
+Generated from the verified 46-market staging state on
 2026-08-18.
+
+The original audited 40 rows remain unchanged;
+six subsequently created non-canonical staging markets
+were independently catalogue-audited and added to PURGE_IDS.
 
 Never replace these UUIDs with a dynamic
 "all markets except keepers" query.
 """
 
-SNAPSHOT_VERSION = "2026-08-18-final-four-market-purge-v1"
+SNAPSHOT_VERSION = "2026-08-18-final-four-market-purge-v2"
 
-SOURCE_TOTAL_MARKETS = 40
+SOURCE_TOTAL_MARKETS = 46
 
-SNAPSHOT_DIGEST = "0635c87e9dd5c36774d59ce49fc2af1c913b75c6e7417c5a3b2c3dc5adcba75c"
+# SHA-256 over version, source total, sorted keepers
+# and sorted purge UUIDs using the canonical payload
+# described by the snapshot-generation script.
+SNAPSHOT_DIGEST = "5cf21551d77a8e2edc76d3d1d04e581c8f74257c0cd7458875ae643e022ab175"
 
 KEEPER_IDS = (
     "77d428eb-4f2d-41ce-981e-018bc59173f8",
@@ -29,7 +36,11 @@ PURGE_IDS = (
     "208ddaa2-90bc-42c0-91f2-b50ff67d3ac9",
     "20e0b964-85bb-4cad-99d0-1163d8b9fcc5",
     "2321077a-3044-4dfe-8a37-d0a342f9e302",
+    "2c7333ba-0da2-4a28-b829-ea7299b60b19",
     "3703ee48-1ade-4d20-ae26-40610a5651c2",
+    "37472472-bf74-4e3c-bb72-34a8b4e2d426",
+    "3fc403c6-d28e-4370-b1c8-e1e772e6608a",
+    "47359490-416f-40df-9333-002f7e9acaf7",
     "5b506456-4bfe-4aee-91c6-2cfaef32de43",
     "5d9101ff-e143-422e-b4be-fef7c510f55a",
     "5e89d695-0d35-420c-a196-87b38de15044",
@@ -41,8 +52,10 @@ PURGE_IDS = (
     "83470a02-5c2f-4d45-8145-fe695d5b938b",
     "859c23fe-945b-4b9c-859e-43ed93f40107",
     "872e09c6-643b-47e3-8b13-7d96c910b9d2",
+    "8a9e35d6-211b-467c-9898-cc9a7541e49b",
     "8c6892dc-6761-407a-8129-f015a637101a",
     "8e51ff7e-e886-44b2-8907-a32ebe69c5f2",
+    "8e8b92ba-e12a-4cfb-b932-16c858e6b96d",
     "903721cd-44ea-4fad-8848-0c80a94a1d39",
     "9a53e2df-57ac-447b-96c4-69eb828c3043",
     "9af89b57-486d-4baa-b0e3-4ad57dcb7248",

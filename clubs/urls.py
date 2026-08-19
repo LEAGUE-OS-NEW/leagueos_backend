@@ -9,8 +9,12 @@ from clubs.views import (
     ClubAdminInviteView,
     ClubAuditLogViewSet,
     ClubLogoView,
+    ClubFixtureListView,
+    ClubMatchDataTemplateView,
+    ClubMatchDataUploadView,
     ClubMediaViewSet,
     ClubNewsViewSet,
+    ClubPlayerViewSet,
     ClubProfileVersionViewSet,
     ClubWorkspaceViewSet,
     MembershipPlanViewSet,
@@ -33,6 +37,7 @@ router.register(r"news", ClubNewsViewSet, basename="club-news")
 router.register(r"membership-plans", MembershipPlanViewSet, basename="membership-plan")
 router.register(r"ticket-products", TicketProductViewSet, basename="ticket-product")
 router.register(r"merchandise", MerchandiseProductViewSet, basename="merchandise-product")
+router.register(r"players", ClubPlayerViewSet, basename="club-player")
 router.register(r"categories", ProductCategoryViewSet, basename="product-category")
 router.register(r"orders", StoreOrderViewSet, basename="store-order")
 router.register(r"audit-logs", ClubAuditLogViewSet, basename="club-audit-log")
@@ -181,6 +186,18 @@ urlpatterns = [
         name="merchandise-detail",
     ),
     path(
+        "<uuid:club_pk>/players/",
+        ClubPlayerViewSet.as_view({"get": "list", "post": "create"}),
+        name="club-player-list",
+    ),
+    path(
+        "<uuid:club_pk>/players/<uuid:pk>/",
+        ClubPlayerViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
+        name="club-player-detail",
+    ),
+    path(
         "<uuid:club_pk>/categories/",
         ProductCategoryViewSet.as_view({"get": "list", "post": "create"}),
         name="product-category-list",
@@ -218,5 +235,21 @@ urlpatterns = [
             {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
         ),
         name="staff-invitation-detail",
+    ),
+    # ── Match Data Upload ─────────────────────────────────────────────────
+    path(
+        "<uuid:club_pk>/match-data/fixtures/",
+        ClubFixtureListView.as_view(),
+        name="club-match-data-fixtures",
+    ),
+    path(
+        "<uuid:club_pk>/match-data/upload/",
+        ClubMatchDataUploadView.as_view(),
+        name="club-match-data-upload",
+    ),
+    path(
+        "<uuid:club_pk>/match-data/template/",
+        ClubMatchDataTemplateView.as_view(),
+        name="club-match-data-template",
     ),
 ]
