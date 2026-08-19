@@ -3,9 +3,7 @@ from uuid import UUID
 
 try:
     from celery import shared_task
-    from celery.exceptions import MaxRetriesExceededError
 except ImportError:
-    MaxRetriesExceededError = Exception
 
     def shared_task(*args, **kwargs):
         bind = kwargs.get("bind", False)
@@ -55,37 +53,64 @@ from kyc.services.risk_engine import KYCRiskEngine
 logger = logging.getLogger(__name__)
 
 
+PROCESSING_FAILURE_REASON = "processing_failed_after_max_retries"
+
+
 def _mark_kyc_failed(attempt_id_str: str) -> None:
-    """Mark an attempt and its parent verification as FAILED after unrecoverable errors."""
+    """Make a processing failure retryable without overriding a final KYC decision."""
     try:
         attempt_id = UUID(attempt_id_str) if isinstance(attempt_id_str, str) else attempt_id_str
-        attempt = KYCVerificationAttempt.objects.select_related("kyc_verification").get(
-            id=attempt_id
-        )
-        verification = attempt.kyc_verification
 
-        now = timezone.now()
-        if attempt.status not in (
-            KYCVerificationAttempt.Status.COMPLETED,
-            KYCVerificationAttempt.Status.FAILED,
-            KYCVerificationAttempt.Status.CANCELLED,
-        ):
-            attempt.status = KYCVerificationAttempt.Status.FAILED
-            attempt.failure_reason = "processing_failed_after_max_retries"
-            attempt.completed_at = now
-            attempt.save(update_fields=["status", "failure_reason", "completed_at", "updated_at"])
+        with transaction.atomic():
+            attempt = KYCVerificationAttempt.objects.select_for_update().get(id=attempt_id)
+            verification = KYCVerification.objects.select_for_update().get(
+                id=attempt.kyc_verification_id
+            )
 
-        if verification.status not in (
-            KYCVerification.Status.VERIFIED,
-            KYCVerification.Status.REJECTED,
-            KYCVerification.Status.EXPIRED,
-        ):
-            verification.status = KYCVerification.Status.REJECTED
-            verification.rejection_reason = "Automated processing failed. Please contact support."
+            if verification.status in (
+                KYCVerification.Status.VERIFIED,
+                KYCVerification.Status.RETRY_REQUIRED,
+                KYCVerification.Status.REJECTED,
+                KYCVerification.Status.REVIEW,
+                KYCVerification.Status.EXPIRED,
+            ):
+                logger.warning(
+                    "Preserving terminal KYC verification %s (%s) after task failure "
+                    "for attempt %s.",
+                    verification.id,
+                    verification.status,
+                    attempt_id,
+                )
+                return
+
+            now = timezone.now()
+
+            if attempt.status not in (
+                KYCVerificationAttempt.Status.COMPLETED,
+                KYCVerificationAttempt.Status.FAILED,
+                KYCVerificationAttempt.Status.CANCELLED,
+            ):
+                attempt.status = KYCVerificationAttempt.Status.FAILED
+                attempt.failure_reason = PROCESSING_FAILURE_REASON
+                attempt.retry_reason = PROCESSING_FAILURE_REASON
+                attempt.completed_at = now
+                attempt.save(
+                    update_fields=[
+                        "status",
+                        "failure_reason",
+                        "retry_reason",
+                        "completed_at",
+                    ]
+                )
+
+            verification.status = KYCVerification.Status.RETRY_REQUIRED
+            verification.retry_reason = PROCESSING_FAILURE_REASON
+            verification.rejection_reason = ""
             verification.verification_completed_at = now
             verification.save(
                 update_fields=[
                     "status",
+                    "retry_reason",
                     "rejection_reason",
                     "verification_completed_at",
                     "updated_at",
@@ -93,15 +118,48 @@ def _mark_kyc_failed(attempt_id_str: str) -> None:
             )
 
         logger.error(
-            "Marked KYC attempt %s and verification %s as FAILED after unrecoverable error.",
+            "Marked KYC attempt %s as FAILED and verification %s as "
+            "RETRY_REQUIRED after unrecoverable processing failure.",
             attempt_id,
             verification.id,
         )
+
     except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed to mark KYC attempt %s as failed: %s", attempt_id_str, exc)
+        logger.exception(
+            "Failed to mark KYC attempt %s as failed: %s",
+            attempt_id_str,
+            exc,
+        )
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=60, on_failure=_mark_kyc_failed)
+def _handle_kyc_task_failure(
+    self,
+    exc,
+    task_id,
+    args,
+    kwargs,
+    einfo,
+) -> None:
+    """Map Celery's terminal failure callback back to its KYC attempt."""
+    attempt_id = args[0] if args else kwargs.get("attempt_id_str")
+
+    if not attempt_id:
+        logger.error(
+            "KYC task %s failed without an attempt id: %s",
+            task_id,
+            exc,
+        )
+        return
+
+    _mark_kyc_failed(str(attempt_id))
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    on_failure=_handle_kyc_task_failure,
+)
 def process_kyc_attempt(self, attempt_id_str: str):
     """Asynchronous pipeline task orchestrating all internal automated KYC checks."""
     try:
@@ -135,11 +193,24 @@ def process_kyc_attempt(self, attempt_id_str: str):
                 )
                 return
 
+            verification = attempt.kyc_verification
+
+            if verification.status not in (
+                KYCVerification.Status.PENDING,
+                KYCVerification.Status.PROCESSING,
+            ):
+                logger.warning(
+                    "Skipping KYC attempt %s: parent verification %s " "is already %s.",
+                    attempt_id,
+                    verification.id,
+                    verification.status,
+                )
+                return
+
             attempt.status = KYCVerificationAttempt.Status.PROCESSING
             attempt.started_at = timezone.now()
             attempt.save(update_fields=["status", "started_at"])
 
-            verification = attempt.kyc_verification
             verification.status = KYCVerification.Status.PROCESSING
             verification.verification_started_at = timezone.now()
             verification.save(update_fields=["status", "verification_started_at", "updated_at"])
@@ -184,9 +255,6 @@ def process_kyc_attempt(self, attempt_id_str: str):
     except OperationalError:
         logger.warning("KYC attempt %s row is locked. Retrying Celery task.", attempt_id_str)
         raise self.retry(countdown=5) from None
-    except MaxRetriesExceededError:
-        logger.error("KYC attempt %s failed after maximum retries.", attempt_id_str)
-        _mark_kyc_failed(attempt_id_str)
     except Exception as exc:
         logger.exception("Error processing KYC attempt %s: %s", attempt_id_str, exc)
         raise self.retry(exc=exc) from None
