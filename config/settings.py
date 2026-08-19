@@ -379,6 +379,18 @@ SPECTACULAR_SETTINGS = {
             ("BUY", "Buy"),
             ("SELL", "Sell"),
         ],
+        "PlatformMembershipPlanStatusEnum": [
+            ("DRAFT", "Draft"),
+            ("ACTIVE", "Active"),
+            ("PAUSED", "Paused"),
+            ("ARCHIVED", "Archived"),
+        ],
+        "PlatformMembershipSubscriptionStatusEnum": [
+            ("ACTIVE", "Active"),
+            ("CANCELLED", "Cancelled"),
+            ("EXPIRED", "Expired"),
+            ("PAST_DUE", "Past due"),
+        ],
     },
 }
 
