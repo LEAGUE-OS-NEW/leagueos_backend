@@ -23,19 +23,11 @@ from markets.services.staging_catalogue_audit_service import (
     build_staging_market_catalogue_audit,
 )
 from markets.services.staging_market_purge_service import (
-    CONFIRMATION_PHRASE,
-    StagingMarketPurgeError,
-    apply_staging_market_purge,
     build_purge_preflight,
-)
-from markets.services.staging_market_purge_snapshot import (
-    SNAPSHOT_DIGEST,
 )
 from system.serializers import (
     HealthCheckSerializer,
     MarketCatalogueAuditSerializer,
-    MarketPurgeExecutionRequestSerializer,
-    MarketPurgeExecutionResponseSerializer,
     MarketPurgePreflightSerializer,
     PesapalDiagnosticSerializer,
 )
@@ -592,105 +584,5 @@ def market_purge_preflight(request):
             resolution_actor=resolution_actor,
             refund_actor=refund_actor,
         ),
-        status=status.HTTP_200_OK,
-    )
-
-
-@extend_schema(
-    request=MarketPurgeExecutionRequestSerializer,
-    responses={
-        200: MarketPurgeExecutionResponseSerializer,
-    },
-    summary="Execute final staging market purge",
-    tags=["System"],
-)
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def market_purge_execute(request):
-    """
-    Temporary one-time staging-only purge endpoint.
-
-    The route is hidden unless review tools are enabled
-    and the caller is the exact synthetic Super Admin.
-    """
-    review_enabled = getattr(
-        settings,
-        "REVIEW_WORKFLOW_TOOLS_ENABLED",
-        False,
-    )
-
-    actor_email = str(request.user.email or "").lower()
-
-    if not (review_enabled and actor_email == "superadmin.local@leagueos.test"):
-        return Response(
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    serializer = MarketPurgeExecutionRequestSerializer(
-        data=request.data,
-    )
-    serializer.is_valid(
-        raise_exception=True,
-    )
-
-    confirmation = serializer.validated_data["confirmation"]
-    snapshot_digest = serializer.validated_data["snapshot_digest"]
-
-    if confirmation != CONFIRMATION_PHRASE:
-        return Response(
-            {"detail": ("Invalid purge confirmation phrase.")},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    if snapshot_digest != SNAPSHOT_DIGEST:
-        return Response(
-            {"detail": ("Snapshot digest does not match.")},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    user_model = get_user_model()
-
-    resolution_actor = user_model.objects.filter(
-        email__iexact=("results.local@leagueos.test"),
-    ).first()
-
-    refund_actor = user_model.objects.filter(
-        email__iexact=("superadmin.local@leagueos.test"),
-    ).first()
-
-    preflight = build_purge_preflight(
-        resolution_actor=resolution_actor,
-        refund_actor=refund_actor,
-    )
-
-    if not preflight.get(
-        "can_execute",
-        False,
-    ):
-        return Response(
-            {
-                "detail": ("Purge preflight is not green."),
-                "preflight": preflight,
-            },
-            status=status.HTTP_409_CONFLICT,
-        )
-
-    try:
-        result = apply_staging_market_purge(
-            resolution_actor=resolution_actor,
-            refund_actor=refund_actor,
-            confirmation=confirmation,
-            snapshot_digest=snapshot_digest,
-        )
-    except StagingMarketPurgeError as exc:
-        return Response(
-            {
-                "detail": str(exc),
-            },
-            status=status.HTTP_409_CONFLICT,
-        )
-
-    return Response(
-        result,
         status=status.HTTP_200_OK,
     )
