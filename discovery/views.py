@@ -356,6 +356,7 @@ class FixtureListView(ListAPIView):
             status=params.get("status"),
             date_from=params.get("date_from"),
             date_to=params.get("date_to"),
+            live_score_featured=params.get("live_score_featured"),
             ordering=params.get("ordering", "starts_at"),
         )
 

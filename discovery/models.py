@@ -457,6 +457,55 @@ class MatchCentre(TimeStampedUUIDModel):
         return f"Match centre for {self.fixture.name}"
 
 
+class FixtureResultVerification(TimeStampedUUIDModel):
+    """QA review of a completed fixture's final score — a lightweight,
+    independent check distinct from market outcome verification/settlement
+    (markets.MarketProvisionalResult and friends). Has no effect on market
+    resolution; it exists purely so a Result Verification Admin can confirm
+    or flag the score a Sports Data Admin entered."""
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        VERIFIED = "VERIFIED", "Verified"
+        REJECTED = "REJECTED", "Rejected"
+
+    fixture = models.OneToOneField(
+        SportingEvent,
+        on_delete=models.CASCADE,
+        related_name="result_verification",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="+",
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "-submitted_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Result verification for {self.fixture.name} ({self.status})"
+
+
 class MatchLineup(TimeStampedUUIDModel):
     """A player in a fixture lineup."""
 
