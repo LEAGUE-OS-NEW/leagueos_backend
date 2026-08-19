@@ -788,6 +788,8 @@ class MerchandiseProduct(TimeStampedUUIDModel):
         self.name = self.name.strip()
         if not self.slug:
             self.slug = slugify(self.name)
+        if self.price is not None and not isinstance(self.price, Decimal):
+            self.price = Decimal(str(self.price))
         if self.price is not None and self.price < Decimal("0.00"):
             raise ValidationError({"price": "Price cannot be negative."})
         if self.stock < 0 or self.reserved_stock < 0:

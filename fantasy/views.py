@@ -1,8 +1,8 @@
 from django.db import transaction
 from django.db.models import Count, Q, Sum
-from rest_framework import status, viewsets
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -1219,7 +1219,18 @@ class MatchStatisticViewSet(viewsets.ViewSet):
     @action(
         detail=False,
         methods=["get"],
-        url_path=r"review/(?P<fixture_id>[^/.]+)/(?P<participant_id>[^/.]+)",
+        url_path=(
+            r"review/(?P<fixture_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+            r"[0-9a-f]{4}-[0-9a-f]{12})/(?P<participant_id>[0-9a-f]{8}-"
+            r"[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+        ),
+    )
+    @extend_schema(
+        operation_id="fantasy_admin_match_statistics_review_detail",
+        parameters=[
+            OpenApiParameter("fixture_id", OpenApiTypes.UUID, OpenApiParameter.PATH),
+            OpenApiParameter("participant_id", OpenApiTypes.UUID, OpenApiParameter.PATH),
+        ],
     )
     def review_detail(self, request, fixture_id=None, participant_id=None):
         """

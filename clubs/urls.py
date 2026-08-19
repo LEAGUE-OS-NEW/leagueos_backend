@@ -21,6 +21,8 @@ from clubs.views import (
     MerchandiseProductViewSet,
     NewsSubmissionView,
     ProductCategoryViewSet,
+    PublicMerchandiseProductListView,
+    PublicStoreOrderCreateView,
     StaffInvitationAcceptView,
     StaffInvitationViewSet,
     StoreOrderViewSet,
@@ -44,6 +46,16 @@ router.register(r"staff-invitations", StaffInvitationViewSet, basename="staff-in
 app_name = "clubs"
 
 urlpatterns = [
+    path(
+        "store/products/",
+        PublicMerchandiseProductListView.as_view(),
+        name="public-merchandise-list",
+    ),
+    path(
+        "store/orders/",
+        PublicStoreOrderCreateView.as_view(),
+        name="public-store-order-create",
+    ),
     path(
         "staff-invitations/accept/",
         StaffInvitationAcceptView.as_view(),

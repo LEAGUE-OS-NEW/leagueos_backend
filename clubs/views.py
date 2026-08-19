@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from django.db.models import F
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from discovery.models import News
@@ -46,11 +47,13 @@ from clubs.serializers.club_serializers import (
     MembershipPlanSerializer,
     MerchandiseProductSerializer,
     ProductCategorySerializer,
+    StoreCheckoutSerializer,
     StaffInvitationAcceptSerializer,
     StaffInvitationSerializer,
     StoreOrderSerializer,
     TicketProductSerializer,
 )
+from clubs.services.store_service import store_service
 from profiles.models import Club
 
 
@@ -289,6 +292,90 @@ class MerchandiseProductViewSet(viewsets.ModelViewSet):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
         serializer.save(club=club, created_by=self.request.user)
+
+
+class PublicMerchandiseProductListView(generics.ListAPIView):
+    """Public catalog of active, in-stock club merchandise."""
+
+    serializer_class = MerchandiseProductSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        queryset = (
+            MerchandiseProduct.objects.filter(
+                status=MerchandiseProduct.Status.ACTIVE,
+                stock__gt=F("reserved_stock"),
+                club__is_active=True,
+            )
+            .select_related("club", "category")
+            .order_by("-is_featured", "-created_at", "name")
+        )
+
+        club = self.request.query_params.get("club")
+        category = self.request.query_params.get("category")
+        if club:
+            queryset = queryset.filter(club__slug=club)
+        if category:
+            queryset = queryset.filter(metadata__cat=category)
+
+        return queryset
+
+
+class PublicStoreOrderCreateView(APIView):
+    """Create a paid store order from fan checkout items."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = StoreCheckoutSerializer
+
+    def post(self, request):
+        serializer = StoreCheckoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        values = serializer.validated_data
+        product_ids = [item["product"] for item in values["items"]]
+        products = {
+            product.id: product
+            for product in MerchandiseProduct.objects.select_related("club").filter(
+                id__in=product_ids,
+                status=MerchandiseProduct.Status.ACTIVE,
+                club__is_active=True,
+            )
+        }
+
+        if len(products) != len(set(product_ids)):
+            return Response(
+                {"detail": "One or more products are unavailable."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        clubs = {product.club_id for product in products.values()}
+        if len(clubs) != 1:
+            return Response(
+                {"detail": "Submit one club's products per store order."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order_items = [
+            {
+                "product": products[item["product"]],
+                "quantity": item["quantity"],
+            }
+            for item in values["items"]
+        ]
+
+        try:
+            order = store_service.create_order(
+                request.user,
+                next(iter(products.values())).club,
+                order_items,
+                shipping_address=values.get("shipping_address") or {},
+                metadata=values.get("metadata") or {},
+                status=StoreOrder.OrderStatus.PAID,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(StoreOrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 
 @extend_schema_view(
