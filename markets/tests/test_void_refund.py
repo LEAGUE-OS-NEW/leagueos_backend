@@ -39,7 +39,7 @@ from markets.services.settlement_service import MarketSettlementService
 from markets.services.void_refund_service import MarketVoidRefundService
 from markets.tests.eligibility_test_support import make_market_eligible
 from sports.models import Competition, Sport, SportingEvent
-from wallets.models import LedgerEntry, Wallet
+from wallets.models import LedgerEntry, Wallet, WalletTransaction
 from wallets.services.wallet_service import WalletService
 
 
@@ -444,6 +444,32 @@ class MarketVoidRefundServiceTests(VoidRefundFixtureMixin, TestCase):
         self.assertFalse(records.filter(market_position=zero).exists())
         self.assertFalse(
             Wallet.objects.filter(user=other, currency="UGX").exclude(available_balance=0).exists()
+        )
+
+    def test_refund_creates_wallet_transaction_for_positive_positions_only(self):
+        market = self.void_market(self.approve_market(self.create_market()))
+        yes = market.outcomes.get(side=MarketOutcome.Side.YES)
+        no = market.outcomes.get(side=MarketOutcome.Side.NO)
+        zero_user = UserFactory()
+        refunded_position = self.position(market, outcome=yes, quantity="4", cost="2.4000")
+        zero_position = self.position(
+            market, user=zero_user, outcome=no, quantity="0", cost="0", reserved="0"
+        )
+
+        refund = MarketVoidRefundService.refund_void_market(market_id=market.id, actor=self.actor)
+        record = refund.position_refunds.get(market_position=refunded_position)
+
+        transaction = WalletTransaction.objects.get(wallet__user=refunded_position.user)
+        self.assertEqual(
+            transaction.transaction_type,
+            WalletTransaction.TransactionType.VOID_REFUND,
+        )
+        self.assertEqual(transaction.status, WalletTransaction.Status.COMPLETED)
+        self.assertEqual(transaction.amount, record.net_refund_amount)
+        self.assertIsNotNone(transaction.completed_at)
+
+        self.assertFalse(
+            WalletTransaction.objects.filter(wallet__user=zero_position.user).exists()
         )
 
     def test_replay_is_idempotent_and_preserves_original_actor_and_time(self):

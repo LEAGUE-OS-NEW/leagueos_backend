@@ -34,7 +34,7 @@ from markets.services.lifecycle_service import MarketLifecycleService
 from markets.services.resolution_service import MarketResolutionService
 from markets.services.settlement_service import MarketSettlementService
 from sports.models import Competition, Sport, SportingEvent
-from wallets.models import LedgerEntry, Wallet
+from wallets.models import LedgerEntry, Wallet, WalletTransaction
 from wallets.services.wallet_service import WalletService
 
 
@@ -482,6 +482,35 @@ class MarketSettlementServiceTests(SettlementFixtureMixin, TestCase):
             settlement.total_payout_amount,
             ledger_payout_total,
         )
+
+    def test_settlement_creates_wallet_transaction_for_winner_only(self):
+        market = self.resolve_market()
+        losing_outcome = market.outcomes.get(side=MarketOutcome.Side.NO)
+
+        winner = self.create_position(market=market, quantity="4.0000", cost="2.0000")
+        loser = self.create_position(
+            market=market,
+            outcome=losing_outcome,
+            quantity="3.0000",
+            cost="1.2000",
+        )
+
+        settlement = MarketSettlementService.settle_market(
+            market_id=market.id,
+            actor=self.actor,
+        )
+        winner_record = settlement.position_settlements.get(participant=winner.user)
+
+        winner_transaction = WalletTransaction.objects.get(wallet__user=winner.user)
+        self.assertEqual(
+            winner_transaction.transaction_type,
+            WalletTransaction.TransactionType.SETTLEMENT_PAYOUT,
+        )
+        self.assertEqual(winner_transaction.status, WalletTransaction.Status.COMPLETED)
+        self.assertEqual(winner_transaction.amount, winner_record.net_payout_amount)
+        self.assertIsNotNone(winner_transaction.completed_at)
+
+        self.assertFalse(WalletTransaction.objects.filter(wallet__user=loser.user).exists())
 
     def test_failure_restores_existing_wallet_and_ledger_history(
         self,
