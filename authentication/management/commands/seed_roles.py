@@ -393,6 +393,18 @@ SYSTEM_PERMISSIONS = [
         "description": "Manage sports data.",
     },
     {
+        "name": "view_news",
+        "resource": "news",
+        "action": "view",
+        "description": "View the news moderation queue and articles.",
+    },
+    {
+        "name": "manage_news",
+        "resource": "news",
+        "action": "manage",
+        "description": "Edit, approve, reject, and curate news articles.",
+    },
+    {
         "name": "admin.users.view",
         "resource": "admin",
         "action": "users.view",
@@ -491,6 +503,8 @@ ROLE_PERMISSIONS = {
         "update_sports",
         "delete_sports",
         "manage_sports",
+        "view_news",
+        "manage_news",
     ],
     "Market Operations & Approval Admin": [
         "admin.dashboard.view",

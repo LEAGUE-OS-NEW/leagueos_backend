@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You've Been Invited as Club Admin</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f0f2f5; font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #333333;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td align="center" style="padding: 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #2563eb; border-radius: 12px 12px 0 0; padding: 30px; text-align: center;">
+                            <h1 style="margin: 0; font-size: 28px; font-weight: bold; color: #ffffff; letter-spacing: 1px;">League OS</h1>
+                        </td>
+                    </tr>
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h2 style="margin: 0 0 20px 0; font-size: 24px; color: #1a1a1a;">You've Been Invited as Club Admin</h2>
+                            <p style="margin: 0 0 15px 0; font-size: 16px;">Hello {{ first_name }},</p>
+                            <p style="margin: 0 0 15px 0; font-size: 16px;">You've been invited to manage <strong>{{ club_name }}</strong> on League OS as Club Admin, using the login <strong>{{ login_email }}</strong>.</p>
+                            {% if setup_url %}
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center" style="border-radius: 8px;" bgcolor="#2563eb">
+                                        <a href="{{ setup_url }}" target="_blank" style="display: inline-block; padding: 14px 32px; font-size: 16px; font-weight: bold; color: #ffffff; text-decoration: none; border-radius: 8px;">Complete Account Setup</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin: 0 0 15px 0; font-size: 14px; color: #64748a;">Or copy and paste this link into your browser:</p>
+                            <p style="margin: 0 0 15px 0; font-size: 14px; color: #2563eb; word-break: break-all;">{{ setup_url }}</p>
+                            {% else %}
+                            <p style="margin: 0 0 15px 0; font-size: 14px; color: #64748a;">Use the following account setup token:</p>
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center" style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px 30px;">
+                                        <span style="display: inline-block; font-size: 16px; font-weight: bold; word-break: break-all; color: #2563eb; font-family: 'Courier New', monospace;">{{ setup_token }}</span>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
+                            <p style="margin: 0 0 15px 0; font-size: 14px; color: #64748a;">This invitation expires in {{ expiry_days }} days.</p>
+                            <p style="margin: 0 0 15px 0; font-size: 14px; color: #475569;">If you were not expecting this invitation, you can safely ignore this email.</p>
+                            <p style="margin: 0; font-size: 16px; color: #1e293b;">Kind regards,</p>
+                            <p style="margin: 0 0 20px 0; font-size: 16px; color: #1e293b;">The League OS Team</p>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8fafc; border-radius: 0 0 12px 12px; padding: 20px; text-align: center; font-size: 12px; color: #94a3b8;">
+                            <p style="margin: 0 0 5px 0;">League OS</p>
+                            <p style="margin: 0 0 5px 0;">Empowering Sports Through Technology</p>
+                            <p style="margin: 0 0 5px 0;">Support: <a href="mailto:{{ support_email }}" style="color: #2563eb; text-decoration: none;">{{ support_email }}</a></p>
+                            <p style="margin: 0;">Website: <a href="{{ website }}" style="color: #2563eb; text-decoration: none;">{{ website }}</a></p>
+                            <p style="margin: 10px 0 0 0;">&copy; {{ current_year }} League OS. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

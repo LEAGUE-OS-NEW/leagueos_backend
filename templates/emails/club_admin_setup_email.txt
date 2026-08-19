@@ -1,0 +1,25 @@
+Hello {{ first_name }},
+
+You've been invited to manage {{ club_name }} on League OS as Club Admin, using the login {{ login_email }}.
+{% if setup_url %}
+Complete your account setup using this link:
+{{ setup_url }}
+{% else %}
+Use the following account setup token:
+
+{{ setup_token }}
+{% endif %}
+This invitation expires in {{ expiry_days }} days.
+
+If you were not expecting this invitation, you can safely ignore this email.
+
+Kind regards,
+The League OS Team
+
+---
+League OS
+Empowering Sports Through Technology
+Support: {{ support_email }}
+Website: {{ website }}
+
+© {{ current_year }} League OS. All rights reserved.

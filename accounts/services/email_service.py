@@ -192,25 +192,36 @@ class EmailService:
 
         first_name = user.first_name or "there"
 
-        if setup_url:
+        context = {
+            "first_name": first_name,
+            "club_name": club_name,
+            "login_email": user.email,
+            "setup_url": setup_url,
+            "setup_token": setup_token,
+            "expiry_days": 7,
+            "support_email": getattr(settings, "SUPPORT_EMAIL", "support@leagueos.com"),
+            "website": getattr(settings, "WEBSITE_URL", "https://leagueos.com"),
+            "current_year": timezone.now().year,
+        }
+
+        try:
+            html_content = render_to_string("emails/club_admin_setup_email.html", context)
+        except Exception:
+            html_content = None
+
+        try:
+            text_content = render_to_string("emails/club_admin_setup_email.txt", context)
+        except Exception:
             text_content = (
                 f"Hello {first_name},\n\n"
                 f"You've been invited to manage {club_name} on League OS "
                 f"as Club Admin, using the login {user.email}.\n\n"
-                "Complete your account setup using this link:\n"
-                f"{setup_url}\n\n"
-                "This invitation expires in 7 days.\n\n"
-                "If you were not expecting this invitation, "
-                "you can ignore this email.\n"
-            )
-        else:
-            text_content = (
-                f"Hello {first_name},\n\n"
-                f"You've been invited to manage {club_name} on League OS "
-                f"as Club Admin, using the login {user.email}.\n\n"
-                "Use the following account setup token:\n\n"
-                f"{setup_token}\n\n"
-                "This invitation expires in 7 days.\n\n"
+                + (
+                    f"Complete your account setup using this link:\n{setup_url}\n\n"
+                    if setup_url
+                    else f"Use the following account setup token:\n\n{setup_token}\n\n"
+                )
+                + "This invitation expires in 7 days.\n\n"
                 "If you were not expecting this invitation, "
                 "you can ignore this email.\n"
             )
@@ -221,6 +232,9 @@ class EmailService:
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[deliver_to],
         )
+
+        if html_content:
+            email.attach_alternative(html_content, "text/html")
 
         email.send(
             fail_silently=False,
@@ -292,8 +306,11 @@ class EmailService:
         )
 
     @staticmethod
-    def send_admin_invitation_email(invitation) -> None:
-        """Emails the invite link for an authentication.AdminInvitation."""
+    def send_admin_invitation_email(invitation, deliver_to: str) -> None:
+        """Emails the invite link for an authentication.AdminInvitation to an
+        already-active user — deliver_to may differ from invitation.email
+        (the login identity) since the two are no longer assumed to be the
+        same inbox, same rationale as send_club_admin_setup_email."""
         subject = "You've Been Invited to League OS Administration"
 
         admin_invite_url = getattr(settings, "ADMIN_INVITE_URL", "").strip()
@@ -337,11 +354,79 @@ class EmailService:
             subject=subject,
             body=text_content,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[invitation.email],
+            to=[deliver_to],
         )
 
         if html_content:
             email.attach_alternative(html_content, "text/html")
 
         email.send(fail_silently=False)
-        logger.info("Admin invitation email sent to %s", invitation.email)
+        logger.info("Admin invitation email for %s sent to %s", invitation.email, deliver_to)
+
+    @staticmethod
+    def send_admin_invitation_setup_email(
+        user,
+        setup_token: str,
+        deliver_to: str,
+        role_names: list[str],
+    ) -> None:
+        """Same link-building logic as send_club_admin_setup_email, for a
+        brand-new platform-role admin identity (no club) that has no working
+        inbox yet at its LeagueOS login address."""
+        subject = "You've Been Invited to League OS Administration"
+
+        account_setup_url = getattr(settings, "ACCOUNT_SETUP_URL", "").strip()
+        setup_url = None
+        if account_setup_url:
+            separator = "&" if "?" in account_setup_url else "?"
+            setup_url = f"{account_setup_url}{separator}token={setup_token}"
+
+        first_name = user.first_name or "there"
+        role_label = ", ".join(role_names) if role_names else "Administrator"
+
+        context = {
+            "first_name": first_name,
+            "role_label": role_label,
+            "login_email": user.email,
+            "setup_url": setup_url,
+            "setup_token": setup_token,
+            "expiry_days": 7,
+            "support_email": getattr(settings, "SUPPORT_EMAIL", "support@leagueos.com"),
+            "website": getattr(settings, "WEBSITE_URL", "https://leagueos.com"),
+            "current_year": timezone.now().year,
+        }
+
+        try:
+            html_content = render_to_string("emails/admin_invitation_setup_email.html", context)
+        except Exception:
+            html_content = None
+
+        try:
+            text_content = render_to_string("emails/admin_invitation_setup_email.txt", context)
+        except Exception:
+            text_content = (
+                f"Hello {first_name},\n\n"
+                f"You've been invited to League OS administration as {role_label}, "
+                f"using the login {user.email}.\n\n"
+                + (
+                    f"Complete your account setup using this link:\n{setup_url}\n\n"
+                    if setup_url
+                    else f"Use the following account setup token:\n\n{setup_token}\n\n"
+                )
+                + "This invitation expires in 7 days.\n\n"
+                "If you were not expecting this invitation, "
+                "you can ignore this email.\n"
+            )
+
+        email = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[deliver_to],
+        )
+
+        if html_content:
+            email.attach_alternative(html_content, "text/html")
+
+        email.send(fail_silently=False)
+        logger.info("Admin invitation setup email for %s sent to %s", user.email, deliver_to)

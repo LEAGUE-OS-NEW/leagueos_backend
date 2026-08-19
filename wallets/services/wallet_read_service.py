@@ -1,6 +1,12 @@
 from django.core.exceptions import ValidationError
 
-from wallets.models import LedgerEntry, Receipt, Wallet, WalletTransaction
+from wallets.models import (
+    LedgerEntry,
+    Receipt,
+    Wallet,
+    WalletTransaction,
+    WithdrawalRequest,
+)
 
 
 class WalletReadService:
@@ -57,6 +63,51 @@ class WalletReadService:
             normalized = cls.normalize_currency(currency)
             queryset = queryset.filter(wallet__currency=normalized)
         return queryset.order_by("-created_at")
+
+    @classmethod
+    def list_withdrawals(cls, *, user, filters=None):
+        """List withdrawal requests scoped to the user."""
+        filters = filters or {}
+
+        queryset = WithdrawalRequest.objects.filter(
+            wallet__user=user,
+        ).select_related(
+            "wallet",
+            "transaction",
+            "approved_by",
+        )
+
+        status = filters.get("status")
+        if status:
+            queryset = queryset.filter(
+                status=status,
+            )
+
+        currency = filters.get("currency")
+        if currency:
+            normalized = cls.normalize_currency(
+                currency,
+            )
+            queryset = queryset.filter(
+                wallet__currency=normalized,
+            )
+
+        created_from = filters.get("created_from")
+        if created_from:
+            queryset = queryset.filter(
+                created_at__gte=created_from,
+            )
+
+        created_to = filters.get("created_to")
+        if created_to:
+            queryset = queryset.filter(
+                created_at__lte=created_to,
+            )
+
+        return queryset.order_by(
+            "-created_at",
+            "-id",
+        )
 
     @classmethod
     def get_transaction(cls, *, user, transaction_id):

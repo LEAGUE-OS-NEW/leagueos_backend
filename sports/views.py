@@ -15,6 +15,7 @@ from sports.serializers import (
     CompetitionCreateSerializer,
     CompetitionListQuerySerializer,
     CompetitionPublicSerializer,
+    ParticipantCreateSerializer,
     ParticipantListQuerySerializer,
     ParticipantPublicSerializer,
     SportCreateSerializer,
@@ -112,10 +113,13 @@ class CompetitionListView(_AdminManagedCreateMixin, ListCreateAPIView):
         )
 
 
-class ParticipantListView(ListAPIView):
-    permission_classes = [AllowAny]
-    serializer_class = ParticipantPublicSerializer
+class ParticipantListView(_AdminManagedCreateMixin, ListCreateAPIView):
     pagination_class = PublicCatalogPagination
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return ParticipantCreateSerializer
+        return ParticipantPublicSerializer
 
     @extend_schema(
         parameters=[
@@ -230,6 +234,11 @@ class SportingEventListView(ListAPIView):
         if event_type := filters.get("event_type"):
             queryset = queryset.filter(
                 event_type=event_type,
+            )
+
+        if filters.get("show_in_markets"):
+            queryset = queryset.filter(
+                show_in_markets=True,
             )
 
         if starts_after := filters.get("starts_after"):

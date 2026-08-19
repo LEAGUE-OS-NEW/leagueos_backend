@@ -77,7 +77,8 @@ class TestPrivilegeEscalationPrevention:
         response = api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "hacker@example.com",
+                "login_email": "hacker@example.com",
+                "notify_email": "notify-hacker@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -170,7 +171,8 @@ class TestAuditLogging:
         api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "audit@example.com",
+                "login_email": "audit@example.com",
+                "notify_email": "notify-audit@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },

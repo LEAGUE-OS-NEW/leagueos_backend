@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import status, viewsets
+from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from discovery.models import News
+from discovery.serializers import NewsModerationSerializer, NewsSubmissionSerializer
+from discovery.services.news_moderation_service import news_moderation_service
+from profiles.services.club_logo_service import club_logo_service
+from profiles.services.image_validation_service import ValidationError as ImageValidationError
 from clubs.models import (
     ClubAuditLog,
     ClubMedia,
@@ -29,6 +35,8 @@ from clubs.services.staff_service import StaffService
 from clubs.serializers.club_serializers import (
     ClubAdminInviteSerializer,
     ClubAuditLogSerializer,
+    ClubLogoResponseSerializer,
+    ClubLogoUploadSerializer,
     ClubMediaSerializer,
     ClubNewsSerializer,
     ClubProfileVersionSerializer,
@@ -312,6 +320,131 @@ class ClubAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         return ClubAuditLog.objects.filter(club_id=self.kwargs.get("club_pk")).order_by(
             "-created_at"
         )
+
+
+class NewsSubmissionView(generics.ListCreateAPIView):
+    """Club-side submission into the real discovery.News moderation pipeline
+    (distinct from ClubNewsViewSet's orphaned ClubNews model above — this is
+    what Sports Data & Statistics Admin / Super Admin actually review)."""
+
+    permission_classes = [IsClubStaff]
+
+    def get_queryset(self):
+        return (
+            News.objects.filter(club_id=self.kwargs.get("club_pk"))
+            .select_related("category", "sport", "competition")
+            .order_by("-created_at")
+        )
+
+    def get_serializer_class(self):
+        return (
+            NewsModerationSerializer if self.request.method == "GET" else NewsSubmissionSerializer
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = NewsSubmissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        club = Club.objects.get(id=self.kwargs["club_pk"])
+        news = news_moderation_service.submit_for_review(
+            club=club,
+            created_by=request.user,
+            **serializer.validated_data,
+        )
+
+        from clubs.services.audit_service import club_audit_service
+
+        club_audit_service.record(
+            "NEWS_SUBMITTED",
+            club,
+            request.user,
+            entity_type="news",
+            entity_id=news.id,
+            request=request,
+            metadata={"title": news.title},
+        )
+
+        return Response(NewsModerationSerializer(news).data, status=status.HTTP_201_CREATED)
+
+
+class ClubLogoView(APIView):
+    """Upload, replace, or delete a club's logo. IsClubAdmin already covers
+    both cases this needs: the club's own Club Admin (via workspace check),
+    and a Super Admin / admin.clubs.manage holder for any club — including
+    right after creating one, before any workspace exists."""
+
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsClubAdmin]
+    serializer_class = ClubLogoUploadSerializer
+
+    def _get_ip_address(self, request) -> str | None:
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        return request.META.get("REMOTE_ADDR")
+
+    @extend_schema(
+        summary="Upload or replace a club's logo",
+        request=ClubLogoUploadSerializer,
+        responses={200: ClubLogoResponseSerializer, 400: None, 403: None, 404: None},
+        tags=["Clubs"],
+    )
+    def post(self, request, club_pk=None):
+        club = Club.objects.filter(id=club_pk).first()
+        if not club:
+            return Response({"detail": "Club not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if "logo" not in request.data:
+            return Response(
+                {
+                    "success": False,
+                    "message": "No logo file provided.",
+                    "errors": {"logo": ["This field is required."]},
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        uploaded_file = request.data["logo"]
+
+        try:
+            result = club_logo_service.upload_or_replace_logo(
+                club=club,
+                file_data=uploaded_file.read(),
+                content_type=uploaded_file.content_type,
+                filename=uploaded_file.name,
+                actor=request.user,
+                ip_address=self._get_ip_address(request),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
+        except ImageValidationError as exc:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Image validation failed.",
+                    "errors": {"logo": [str(exc)]},
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({"success": True, **result}, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Delete a club's logo",
+        responses={200: None, 403: None, 404: None},
+        tags=["Clubs"],
+    )
+    def delete(self, request, club_pk=None):
+        club = Club.objects.filter(id=club_pk).first()
+        if not club:
+            return Response({"detail": "Club not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        club_logo_service.delete_logo(
+            club=club,
+            actor=request.user,
+            ip_address=self._get_ip_address(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
+        return Response({"success": True}, status=status.HTTP_200_OK)
 
 
 class StaffInvitationViewSet(viewsets.ModelViewSet):

@@ -21,16 +21,20 @@ class ClubService:
         return f"club:{club_id}"
 
     @classmethod
-    def get_public_clubs(cls, sport=None, country=None, search=None, ordering="name"):
+    def get_public_clubs(cls, sport=None, search=None, ordering="name", has_admin=None):
         """Return published, verified, active clubs."""
         qs = Club.objects.filter(is_active=True).select_related("sport", "competition")
 
         if sport:
             qs = qs.filter(sport_id=sport)
-        if country:
-            qs = qs.filter(country_code=country)
         if search:
             qs = qs.filter(Q(name__icontains=search) | Q(slug__icontains=search))
+        if has_admin:
+            qs = qs.filter(
+                workspaces__role="ADMIN",
+                workspaces__is_active=True,
+                workspaces__accepted_at__isnull=False,
+            ).distinct()
 
         return qs.order_by(ordering)
 
@@ -57,13 +61,22 @@ class ClubService:
         if profile and not (profile.is_published and profile.is_verified):
             profile = None
 
+        logo_url = None
+        if club.logo:
+            from profiles.services.storage_service import StorageService
+
+            logo_url = StorageService.get_public_url(club.logo.name)
+
         data = {
             "id": str(club.id),
             "name": club.name,
             "slug": club.slug,
             "sport": str(club.sport_id) if club.sport_id else None,
+            "sport_name": club.sport.name if club.sport_id else None,
             "competition": str(club.competition_id) if club.competition_id else None,
+            "competition_name": club.competition.name if club.competition_id else None,
             "founded": club.founded,
+            "logo": logo_url,
             "profile": (
                 {
                     "logo": profile.logo.url if profile and profile.logo else None,

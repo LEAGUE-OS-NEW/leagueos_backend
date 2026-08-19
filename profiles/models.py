@@ -73,6 +73,17 @@ class Gender(models.Model):
         return self.name
 
 
+def club_logo_upload_to(instance: "Club", filename: str) -> str:
+    """Generate upload path for club logo images.
+
+    Unused by ClubLogoService (which routes through StorageService and
+    sets `.name` directly, same as Profile.avatar/AvatarService) — kept
+    only as the field's fallback if `.save()` is ever called directly.
+    """
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "png"
+    return f"clubs/{instance.id}/logo/{uuid.uuid4()}.{ext}"
+
+
 class Club(models.Model):
     """Model representing a sports club.
 
@@ -99,6 +110,7 @@ class Club(models.Model):
         related_name="clubs",
     )
     founded = models.PositiveIntegerField(blank=True, null=True)
+    logo = models.ImageField(upload_to=club_logo_upload_to, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

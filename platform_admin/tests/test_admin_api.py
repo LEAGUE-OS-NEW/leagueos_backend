@@ -3,8 +3,8 @@ from django.core.management import call_command
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from accounts.models import AuditLog
-from authentication.models import Role, UserRole
+from accounts.models import AuditLog, User
+from authentication.models import Permission, Role, UserPermission, UserRole
 from authentication.services.role_service import RoleService
 
 from .factories import (
@@ -113,6 +113,78 @@ class TestAdminUserDetail:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
+    def test_deactivate_via_account_status(
+        self, api_client, super_admin_user, admin_user, seeded_roles
+    ):
+        RoleService.assign_role(super_admin_user, Role.objects.get(name="Super Admin"))
+        authenticate(api_client, super_admin_user)
+
+        response = api_client.patch(
+            f"/api/v1/admin/users/{admin_user.id}/",
+            {"account_status": "DEACTIVATED"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        admin_user.refresh_from_db()
+        assert admin_user.account_status == User.AccountStatus.DEACTIVATED
+        assert AuditLog.objects.filter(
+            action="ACCOUNT_DEACTIVATED", resource_id=admin_user.id
+        ).exists()
+
+    def test_reactivate_via_account_status(
+        self, api_client, super_admin_user, admin_user, seeded_roles
+    ):
+        RoleService.assign_role(super_admin_user, Role.objects.get(name="Super Admin"))
+        authenticate(api_client, super_admin_user)
+        admin_user.account_status = User.AccountStatus.DEACTIVATED
+        admin_user.save(update_fields=["account_status"])
+
+        response = api_client.patch(
+            f"/api/v1/admin/users/{admin_user.id}/",
+            {"account_status": "ACTIVE"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        admin_user.refresh_from_db()
+        assert admin_user.account_status == User.AccountStatus.ACTIVE
+        assert AuditLog.objects.filter(
+            action="ACCOUNT_REACTIVATED", resource_id=admin_user.id
+        ).exists()
+
+    def test_cannot_deactivate_self_via_account_status(self, api_client, super_admin_user):
+        authenticate(api_client, super_admin_user)
+
+        response = api_client.patch(
+            f"/api/v1/admin/users/{super_admin_user.id}/",
+            {"account_status": "DEACTIVATED"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        super_admin_user.refresh_from_db()
+        assert super_admin_user.account_status != User.AccountStatus.DEACTIVATED
+
+    def test_cannot_deactivate_superuser_via_account_status(
+        self, api_client, admin_user, super_admin_user, seeded_roles
+    ):
+        permission = Permission.objects.get(code="admin.users.manage")
+        UserPermission.objects.create(
+            user=admin_user, permission=permission, granted_by=super_admin_user
+        )
+        authenticate(api_client, admin_user)
+
+        response = api_client.patch(
+            f"/api/v1/admin/users/{super_admin_user.id}/",
+            {"account_status": "DEACTIVATED"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        super_admin_user.refresh_from_db()
+        assert super_admin_user.account_status != User.AccountStatus.DEACTIVATED
+
 
 class TestAdminUserRoles:
     def test_assign_role(self, api_client, super_admin_user, admin_user, seeded_roles):
@@ -199,7 +271,8 @@ class TestAdminInvitations:
         response = api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "newadmin@example.com",
+                "login_email": "newadmin@example.com",
+                "notify_email": "notify-newadmin@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -210,14 +283,20 @@ class TestAdminInvitations:
         assert response.data["email"] == "newadmin@example.com"
         assert AuditLog.objects.filter(action="ADMIN_INVITED").exists()
 
-    def test_duplicate_invitation_rejected(self, api_client, super_admin_user, seeded_roles):
+    def test_duplicate_invitation_to_active_user_rejected(
+        self, api_client, super_admin_user, seeded_roles
+    ):
+        from .factories import UserFactory
+
         authenticate(api_client, super_admin_user)
         role = Role.objects.get(name="Finance Admin")
+        existing_active_user = UserFactory()
 
         api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "dup@example.com",
+                "login_email": existing_active_user.email,
+                "notify_email": "notify-dup@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -227,7 +306,8 @@ class TestAdminInvitations:
         response = api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "dup@example.com",
+                "login_email": existing_active_user.email,
+                "notify_email": "notify-dup@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -243,7 +323,8 @@ class TestAdminInvitations:
         response = api_client.post(
             "/api/v1/admin/invitations/",
             {
-                "email": "newadmin@example.com",
+                "login_email": "newadmin@example.com",
+                "notify_email": "notify-newadmin@example.com",
                 "role_ids": [str(role.id)],
                 "expires_in_days": 7,
             },
@@ -251,6 +332,71 @@ class TestAdminInvitations:
         )
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_revoke_invitation(self, api_client, super_admin_user, seeded_roles):
+        authenticate(api_client, super_admin_user)
+        role = Role.objects.get(name="Finance Admin")
+
+        create_response = api_client.post(
+            "/api/v1/admin/invitations/",
+            {
+                "login_email": "revokeme@example.com",
+                "notify_email": "notify-revokeme@example.com",
+                "role_ids": [str(role.id)],
+                "expires_in_days": 7,
+            },
+            format="json",
+        )
+        invitation_id = create_response.data["id"]
+
+        response = api_client.post(f"/api/v1/admin/invitations/{invitation_id}/revoke/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["status"] == "REVOKED"
+
+    def test_accept_invitation_assigns_role_and_logs_in(
+        self, api_client, admin_user, super_admin_user, seeded_roles
+    ):
+        from authentication.models import AdminInvitation
+
+        authenticate(api_client, super_admin_user)
+        role = Role.objects.get(name="Finance Admin")
+
+        api_client.post(
+            "/api/v1/admin/invitations/",
+            {
+                "login_email": admin_user.email,
+                "notify_email": "notify-existing@example.com",
+                "role_ids": [str(role.id)],
+                "expires_in_days": 7,
+            },
+            format="json",
+        )
+        invitation = AdminInvitation.objects.get(email=admin_user.email)
+
+        api_client.credentials()
+        authenticate(api_client, admin_user)
+
+        response = api_client.post(
+            "/api/v1/admin/invitations/accept/",
+            {"token": invitation.token},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["status"] == "ACCEPTED"
+        assert UserRole.objects.filter(user=admin_user, role=role, is_active=True).exists()
+
+    def test_accept_invalid_invitation_token(self, api_client, admin_user, seeded_roles):
+        authenticate(api_client, admin_user)
+
+        response = api_client.post(
+            "/api/v1/admin/invitations/accept/",
+            {"token": "not-a-real-token"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 class TestAdminAudit:

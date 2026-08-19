@@ -5,9 +5,14 @@ from authentication.models import AdminInvitation, Permission, Role
 
 
 class AdminInvitationCreateSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    login_email = serializers.EmailField()
+    notify_email = serializers.EmailField()
     role_ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=False)
     expires_in_days = serializers.IntegerField(min_value=1, max_value=30, default=7)
+
+
+class AdminInvitationAcceptSerializer(serializers.Serializer):
+    token = serializers.CharField()
 
 
 class AdminInvitationReadSerializer(serializers.ModelSerializer):
@@ -107,6 +112,7 @@ class AdminUserRoleUpdateSerializer(serializers.Serializer):
         child=serializers.UUIDField(), allow_empty=True, required=False
     )
     is_active = serializers.BooleanField(required=False)
+    account_status = serializers.ChoiceField(choices=User.AccountStatus.choices, required=False)
 
 
 class AdminAuditLogSerializer(serializers.ModelSerializer):

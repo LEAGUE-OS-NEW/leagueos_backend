@@ -3,7 +3,11 @@ from decimal import Decimal
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from wallets.models import LedgerEntry, Wallet
+from wallets.models import (
+    LedgerEntry,
+    Wallet,
+    WithdrawalRequest,
+)
 
 
 class WalletReadSerializer(serializers.ModelSerializer):
@@ -100,6 +104,34 @@ class WithdrawalRequestSerializer(serializers.Serializer):
     idempotency_key = serializers.UUIDField(required=False)
 
 
+class WithdrawalRequestFilterSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=WithdrawalRequest.Status.choices,
+        required=False,
+    )
+    currency = serializers.CharField(
+        max_length=3,
+        required=False,
+    )
+    created_from = serializers.DateTimeField(
+        required=False,
+    )
+    created_to = serializers.DateTimeField(
+        required=False,
+    )
+
+    def validate(self, attrs):
+        created_from = attrs.get("created_from")
+        created_to = attrs.get("created_to")
+
+        if created_from and created_to and created_from > created_to:
+            raise serializers.ValidationError(
+                {"created_from": ("Must be earlier than or equal " "to created_to.")}
+            )
+
+        return attrs
+
+
 class WithdrawalRequestReadSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     amount = serializers.DecimalField(
@@ -115,6 +147,7 @@ class WithdrawalRequestReadSerializer(serializers.Serializer):
     approval_policy_version = serializers.CharField()
     approved_at = serializers.DateTimeField(allow_null=True)
     rejection_reason = serializers.CharField()
+    failure_reason = serializers.CharField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
     transaction_id = serializers.UUIDField(allow_null=True)

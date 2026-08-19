@@ -218,6 +218,8 @@ class AuditLog(models.Model):
         ("KYC_REVIEW_REQUIRED", "KYC review required"),
         ("KYC_DOCUMENT_ACCESSED", "KYC document accessed"),
         ("KYC_DATA_EXPORTED", "KYC data exported"),
+        ("NEWS_APPROVED", "News approved"),
+        ("NEWS_REJECTED", "News rejected"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

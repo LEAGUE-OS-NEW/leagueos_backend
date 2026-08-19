@@ -286,6 +286,9 @@ class News(TimeStampedUUIDModel):
     slug = models.SlugField(max_length=320, unique=True, blank=True)
     summary = models.TextField(blank=True)
     body = models.TextField()
+    image = models.TextField(blank=True)
+    author = models.CharField(max_length=180, blank=True)
+    avatar = models.TextField(blank=True)
     category = models.ForeignKey(
         NewsCategory,
         on_delete=models.PROTECT,
@@ -326,6 +329,7 @@ class News(TimeStampedUUIDModel):
         db_index=True,
     )
     is_featured = models.BooleanField(default=False, db_index=True)
+    is_trending = models.BooleanField(default=False, db_index=True)
     is_verified = models.BooleanField(default=False, db_index=True)
     published_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
@@ -337,12 +341,14 @@ class News(TimeStampedUUIDModel):
     )
     source_name = models.CharField(max_length=120, blank=True)
     source_reference = models.CharField(max_length=255, blank=True)
+    rejection_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ["-published_at", "-created_at"]
         indexes = [
             models.Index(fields=["status", "is_verified", "published_at"]),
             models.Index(fields=["is_featured", "status", "published_at"]),
+            models.Index(fields=["is_trending", "status", "published_at"]),
             models.Index(fields=["category", "status", "published_at"]),
             models.Index(fields=["club", "status", "published_at"]),
             models.Index(fields=["competition", "status", "published_at"]),
@@ -353,6 +359,9 @@ class News(TimeStampedUUIDModel):
 
     def save(self, *args, **kwargs):
         self.title = self.title.strip()
+        self.image = self.image.strip()
+        self.author = self.author.strip()
+        self.avatar = self.avatar.strip()
         self.source_name = self.source_name.strip()
         self.source_reference = self.source_reference.strip()
         if not self.slug:
@@ -403,6 +412,11 @@ class MatchCentre(TimeStampedUUIDModel):
     result = models.CharField(max_length=255, blank=True)
     home_score = models.PositiveSmallIntegerField(null=True, blank=True)
     away_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    clock_display = models.CharField(
+        max_length=24,
+        blank=True,
+        help_text='Free-text live clock, e.g. "75\'", "HT", "Q3 04:15" — set by admin.',
+    )
     attendance = models.PositiveIntegerField(null=True, blank=True)
     venue = models.ForeignKey(
         Venue,
@@ -441,6 +455,55 @@ class MatchCentre(TimeStampedUUIDModel):
 
     def __str__(self) -> str:
         return f"Match centre for {self.fixture.name}"
+
+
+class FixtureResultVerification(TimeStampedUUIDModel):
+    """QA review of a completed fixture's final score — a lightweight,
+    independent check distinct from market outcome verification/settlement
+    (markets.MarketProvisionalResult and friends). Has no effect on market
+    resolution; it exists purely so a Result Verification Admin can confirm
+    or flag the score a Sports Data Admin entered."""
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        VERIFIED = "VERIFIED", "Verified"
+        REJECTED = "REJECTED", "Rejected"
+
+    fixture = models.OneToOneField(
+        SportingEvent,
+        on_delete=models.CASCADE,
+        related_name="result_verification",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="+",
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "-submitted_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Result verification for {self.fixture.name} ({self.status})"
 
 
 class MatchLineup(TimeStampedUUIDModel):

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from django.db.models import Q
+from django.utils import timezone
 
 from discovery.models import AuditLog, News
 
@@ -29,6 +30,7 @@ class NewsService:
         qs = News.objects.filter(
             status=News.Status.PUBLISHED,
             is_verified=True,
+            published_at__lte=timezone.now(),
         ).select_related("category", "sport", "competition", "club")
 
         if category:
@@ -54,6 +56,7 @@ class NewsService:
                 id=news_id,
                 status=News.Status.PUBLISHED,
                 is_verified=True,
+                published_at__lte=timezone.now(),
             )
             .select_related("category", "sport", "competition", "club")
             .first()
