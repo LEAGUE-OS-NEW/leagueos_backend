@@ -1049,6 +1049,7 @@ class ClubAuditLog(TimeStampedUUIDModel):
         ("ROLE_REVOKED", "Role revoked"),
         ("PERMISSION_CHANGED", "Permission changed"),
         ("ANALYTICS_VIEWED", "Analytics viewed"),
+        ("MATCH_DATA_UPLOADED", "Match data uploaded"),
     ]
 
     club = models.ForeignKey(

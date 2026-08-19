@@ -547,3 +547,204 @@ class StaffInvitationAcceptView(APIView):
             return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(ClubWorkspaceSerializer(workspace).data, status=status.HTTP_200_OK)
+
+
+# =============================================================================
+# Match Data Upload (Club Admin CSV import)
+# =============================================================================
+
+
+class ClubFixtureListView(APIView):
+    """Return fixtures that involve the requesting Club Admin's club.
+
+    Used to populate the fixture-picker dropdown before uploading a CSV.
+
+    GET /api/v1/<club_pk>/match-data/fixtures/
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="List fixtures available for match data upload",
+        responses={200: {"type": "array", "items": {"type": "object"}}},
+    )
+    def get(self, request, club_pk=None):
+        club = _get_club_or_404(club_pk)
+
+        from discovery.models import ClubProfile
+        from sports.models import EventParticipant, Participant, SportingEvent
+
+        # Collect all participant IDs (ATHLETE + TEAM) linked to this club
+        athlete_ids = set(
+            Participant.objects.filter(player_profile__club=club).values_list("id", flat=True)
+        )
+
+        # Events where any of the club's athletes participate directly
+        fixture_ids_via_athletes = set(
+            EventParticipant.objects.filter(participant_id__in=athlete_ids).values_list(
+                "event_id", flat=True
+            )
+        )
+
+        # Events in the club's league (ClubProfile.league)
+        club_profile = ClubProfile.objects.filter(club=club).first()
+        league_id = club_profile.league_id if club_profile else None
+        fixture_ids_via_league: set = set()
+        if league_id:
+            fixture_ids_via_league = set(
+                SportingEvent.objects.filter(competition_id=league_id).values_list("id", flat=True)
+            )
+
+        all_fixture_ids = fixture_ids_via_athletes | fixture_ids_via_league
+
+        fixtures = (
+            SportingEvent.objects.filter(
+                id__in=all_fixture_ids,
+            )
+            .select_related("competition")
+            .prefetch_related("event_participants__participant")
+            .order_by("-starts_at")
+        )
+
+        data = []
+        for f in fixtures:
+            participants = list(f.event_participants.select_related("participant").all())
+            home_team = next(
+                (ep.participant.name for ep in participants if ep.role == "HOME"), None
+            )
+            away_team = next(
+                (ep.participant.name for ep in participants if ep.role == "AWAY"), None
+            )
+            data.append(
+                {
+                    "id": str(f.id),
+                    "name": f.name,
+                    "starts_at": f.starts_at,
+                    "status": f.status,
+                    "competition": f.competition.name if f.competition else None,
+                    "home_team": home_team,
+                    "away_team": away_team,
+                }
+            )
+
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class ClubMatchDataUploadView(APIView):
+    """Accept a CSV file and import match player statistics for a fixture.
+
+    The entire file is validated before any row is written.  On success,
+    ``SportsFeedService.complete_ingestion()`` is called inside the same
+    ``transaction.atomic()`` block, which schedules
+    ``score_affected_gameweeks.delay()`` via ``transaction.on_commit()``.
+    The Club Admin never needs to click Recalculate.
+
+    POST /api/v1/<club_pk>/match-data/upload/
+    Content-Type: multipart/form-data
+    Body: file=<csv>
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="Upload match player statistics CSV",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {"file": {"type": "string", "format": "binary"}},
+            }
+        },
+        responses={
+            202: {"description": "Import accepted; fantasy scoring scheduled."},
+            400: {"description": "Validation failure with row-level errors."},
+        },
+    )
+    def post(self, request, club_pk=None):
+        from clubs.serializers.match_data_serializers import MatchDataUploadSerializer
+        from clubs.services.match_data_service import import_csv_for_club
+
+        club = _get_club_or_404(club_pk)
+
+        serializer = MatchDataUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        result = import_csv_for_club(
+            file_obj=serializer.validated_data["file"],
+            club=club,
+            uploaded_by=request.user,
+        )
+
+        if not result.success:
+            payload = {
+                "success": False,
+                "message": result.message,
+                "records_received": result.records_received,
+                "row_errors": result.row_errors,
+            }
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload = {
+            "success": True,
+            "message": result.message,
+            "records_received": result.records_received,
+            "records_processed": result.records_processed,
+            "ingestion_id": result.ingestion_id,
+            "fixture_ids": result.fixture_ids,
+        }
+        return Response(payload, status=status.HTTP_202_ACCEPTED)
+
+
+class ClubMatchDataTemplateView(APIView):
+    """Return a downloadable CSV template for the Club Admin.
+
+    GET /api/v1/<club_pk>/match-data/template/
+
+    Optionally pass ?sport=<sport_slug_or_name> to get sport-specific
+    example stat_type values.
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="Download CSV template for match data upload",
+        responses={200: {"description": "CSV file download."}},
+    )
+    def get(self, request, club_pk=None):
+        from django.http import HttpResponse
+
+        from clubs.services.match_data_service import generate_csv_template
+        from sports.models import Sport
+
+        _get_club_or_404(club_pk)  # permission check: club must exist
+
+        sport_param = request.query_params.get("sport", "")
+        sport = None
+        if sport_param:
+            sport = (
+                Sport.objects.filter(slug__iexact=sport_param).first()
+                or Sport.objects.filter(name__iexact=sport_param).first()
+            )
+
+        csv_content = generate_csv_template(sport=sport)
+        response = HttpResponse(csv_content, content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="match_data_template.csv"'
+        return response
+
+
+# ---------------------------------------------------------------------------
+# Internal helper used by the three views above
+# ---------------------------------------------------------------------------
+
+
+def _get_club_or_404(club_pk):
+    """Return the Club instance or raise Http404."""
+    from django.http import Http404
+
+    try:
+        return Club.objects.get(id=club_pk)
+    except Club.DoesNotExist as err:
+        raise Http404(f"Club {club_pk} not found.") from err
