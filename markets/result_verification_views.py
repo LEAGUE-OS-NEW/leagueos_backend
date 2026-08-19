@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.generics import ListAPIView
@@ -26,7 +28,13 @@ class MarketResultVerificationQueueView(MarketAdminQuerysetMixin, ListAPIView):
     def get_queryset(self):
         return (
             self.get_admin_queryset()
-            .filter(status__in=[Market.Status.CLOSED, Market.Status.RESOLVED, Market.Status.VOIDED])
+            .filter(
+                Q(status__in=[Market.Status.CLOSED, Market.Status.RESOLVED, Market.Status.VOIDED])
+                | Q(
+                    status__in=[Market.Status.OPEN, Market.Status.SUSPENDED],
+                    closes_at__lte=timezone.now(),
+                )
+            )
             .select_related("provisional_result", "settlement", "void_refund")
             .prefetch_related(
                 "provisional_result__evidence_items",
