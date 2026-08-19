@@ -518,6 +518,8 @@ class NewsSerializer(serializers.ModelSerializer):
     """Public news serializer (published & verified only)."""
 
     category = serializers.UUIDField(source="category_id", read_only=True)
+    category_code = serializers.CharField(source="category.code", read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
     sport = serializers.UUIDField(source="sport_id", read_only=True, allow_null=True)
     competition = serializers.UUIDField(
         source="competition_id",
@@ -534,7 +536,12 @@ class NewsSerializer(serializers.ModelSerializer):
             "slug",
             "summary",
             "body",
+            "image",
+            "author",
+            "avatar",
             "category",
+            "category_code",
+            "category_name",
             "sport",
             "competition",
             "club",
@@ -564,7 +571,17 @@ class NewsSubmissionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = News
-        fields = ["title", "summary", "body", "category", "sport", "competition"]
+        fields = [
+            "title",
+            "summary",
+            "body",
+            "image",
+            "author",
+            "avatar",
+            "category",
+            "sport",
+            "competition",
+        ]
 
 
 class NewsComposeSerializer(serializers.ModelSerializer):
@@ -572,13 +589,25 @@ class NewsComposeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = News
-        fields = ["title", "summary", "body", "category", "sport", "competition"]
+        fields = [
+            "title",
+            "summary",
+            "body",
+            "image",
+            "author",
+            "avatar",
+            "category",
+            "sport",
+            "competition",
+        ]
 
 
 class NewsModerationSerializer(serializers.ModelSerializer):
     """Full detail for the review queue, published list, and Edit Story —
     exposes fields the public NewsSerializer intentionally omits."""
 
+    category_code = serializers.CharField(source="category.code", read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
     created_by = serializers.SerializerMethodField()
 
     class Meta:
@@ -589,7 +618,12 @@ class NewsModerationSerializer(serializers.ModelSerializer):
             "slug",
             "summary",
             "body",
+            "image",
+            "author",
+            "avatar",
             "category",
+            "category_code",
+            "category_name",
             "sport",
             "competition",
             "club",
@@ -633,7 +667,17 @@ class NewsModerationUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = News
-        fields = ["title", "summary", "body", "category", "sport", "competition"]
+        fields = [
+            "title",
+            "summary",
+            "body",
+            "image",
+            "author",
+            "avatar",
+            "category",
+            "sport",
+            "competition",
+        ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
 
