@@ -25,6 +25,7 @@ from .permissions import CanManageFantasy
 from .serializers import (
     CompetitionSerializer,
     CorrectionSerializer,
+    FantasyPlayerFullCreateSerializer,
     FantasyPlayerSerializer,
     GameweekSerializer,
     LeagueSerializer,
@@ -369,6 +370,7 @@ class PlayerViewSet(viewsets.ModelViewSet):
                 "retrieve",
                 # --- Local testing: admin endpoints temporarily open ---
                 "candidates",
+                "create_full",
                 "create",
                 "update",
                 "partial_update",
@@ -411,6 +413,31 @@ class PlayerViewSet(viewsets.ModelViewSet):
                 }
             )
         return Response(data)
+
+    @action(detail=False, methods=["post"], url_path="create-full")
+    def create_full(self, request):
+        """
+        Admin override: create a new Participant + PlayerProfile + FantasyPlayer
+        in a single atomic action.
+
+        Used when a club fails to submit a player who should be in the Fantasy
+        pool — the Super Admin manually adds the player with full details.
+
+        POST /api/v1/fantasy/players/create-full/
+        """
+        serializer = FantasyPlayerFullCreateSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        fantasy_player = serializer.save()
+        # Return the full FantasyPlayerSerializer shape so the frontend can
+        # immediately add the row to the player table.
+        out = FantasyPlayerSerializer(
+            fantasy_player,
+            context={"request": request},
+        )
+        return Response(out.data, status=201)
 
 
 class TeamViewSet(viewsets.ModelViewSet):

@@ -176,6 +176,12 @@ class FantasyPlayer(UUIDTimeStampedModel):
     )
     position = models.CharField(max_length=50)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    starting_points = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=0,
+        help_text="Admin-configured starting fantasy points for this player in this competition.",
+    )
     eligible = models.BooleanField(default=True)
     availability = models.CharField(
         max_length=16, choices=Availability.choices, default=Availability.AVAILABLE
@@ -209,6 +215,8 @@ class FantasyPlayer(UUIDTimeStampedModel):
             errors["player"] = "Player sport must match the Fantasy competition sport."
         if self.price is not None and self.price <= 0:
             errors["price"] = "Price must be greater than zero."
+        if self.starting_points is not None and self.starting_points < 0:
+            errors["starting_points"] = "Starting points cannot be negative."
         if (
             self.fantasy_competition_id
             and self.position
