@@ -906,9 +906,9 @@ class MatchStatisticViewSet(viewsets.ViewSet):
     """
 
     # --- Local testing: admin endpoint temporarily open ---
+    serializer_class = MatchPlayerStatisticCreateSerializer
     permission_classes = [AllowAny]
     fantasy_permission = "platform.fantasy.scoring.manage"
-    serializer_class = MatchPlayerStatisticCreateSerializer
 
     # ── helpers ────────────────────────────────────────────────────────────
 
@@ -1003,7 +1003,19 @@ class MatchStatisticViewSet(viewsets.ViewSet):
 
     # ── review list ────────────────────────────────────────────────────────
 
-    @extend_schema(operation_id="fantasy_admin_match_statistics_review_list")
+    @extend_schema(
+        operation_id="fantasy_admin_match_statistics_review_list",
+        parameters=[
+            OpenApiParameter(
+                "competition", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=True
+            ),
+            OpenApiParameter("gameweek", OpenApiTypes.UUID, OpenApiParameter.QUERY),
+            OpenApiParameter("fixture", OpenApiTypes.UUID, OpenApiParameter.QUERY),
+            OpenApiParameter("participant", OpenApiTypes.UUID, OpenApiParameter.QUERY),
+            OpenApiParameter("review_status", OpenApiTypes.STR, OpenApiParameter.QUERY),
+        ],
+        responses={200: OpenApiTypes.OBJECT},
+    )
     @action(detail=False, methods=["get"], url_path="review")
     def review_list(self, request):
         """
@@ -1188,7 +1200,22 @@ class MatchStatisticViewSet(viewsets.ViewSet):
         return Response(rows)
 
     # ── review detail ──────────────────────────────────────────────────────
-
+    @extend_schema(
+        operation_id="fantasy_admin_match_statistics_review_detail",
+        parameters=[
+            OpenApiParameter("fixture_id", OpenApiTypes.UUID, OpenApiParameter.PATH, required=True),
+            OpenApiParameter(
+                "participant_id",
+                OpenApiTypes.UUID,
+                OpenApiParameter.PATH,
+                required=True,
+            ),
+            OpenApiParameter(
+                "competition", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=True
+            ),
+        ],
+        responses={200: OpenApiTypes.OBJECT},
+    )
     @action(
         detail=False,
         methods=["get"],
