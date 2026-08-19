@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from accounts.models import AuditLog, User
 from authentication.models import AdminInvitation, Permission, Role
+from platform_admin.models import PlatformMembershipPlan, PlatformMembershipSubscription
 
 
 class AdminInvitationCreateSerializer(serializers.Serializer):
@@ -145,3 +146,71 @@ class AdminDashboardSummarySerializer(serializers.Serializer):
     support_cases = serializers.IntegerField(required=False)
     financial_reconciliation_status = serializers.IntegerField(required=False)
     sports_data_issues = serializers.IntegerField(required=False)
+
+
+class PlatformMembershipPlanSerializer(serializers.ModelSerializer):
+    subscriber_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = PlatformMembershipPlan
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "description",
+            "price",
+            "currency",
+            "billing_period",
+            "benefits",
+            "status",
+            "subscriber_count",
+            "published_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "slug", "subscriber_count", "published_at", "created_at", "updated_at"]
+
+    def validate_benefits(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Benefits must be a list.")
+        return [str(item).strip() for item in value if str(item).strip()]
+
+
+class PlatformMembershipSubscriptionSerializer(serializers.ModelSerializer):
+    fan_name = serializers.SerializerMethodField()
+    fan_email = serializers.EmailField(source="user.email", read_only=True)
+    plan_name = serializers.CharField(source="plan.name", read_only=True)
+    plan_description = serializers.CharField(source="plan.description", read_only=True)
+    plan_benefits = serializers.JSONField(source="plan.benefits", read_only=True)
+    billing_period = serializers.CharField(source="plan.billing_period", read_only=True)
+
+    class Meta:
+        model = PlatformMembershipSubscription
+        fields = [
+            "id",
+            "fan_name",
+            "fan_email",
+            "plan",
+            "plan_name",
+            "plan_description",
+            "plan_benefits",
+            "billing_period",
+            "status",
+            "subscribed_at",
+            "renews_at",
+            "amount_paid",
+            "currency",
+        ]
+        read_only_fields = fields
+
+    def get_fan_name(self, obj) -> str:
+        full_name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return full_name or obj.user.email
+
+
+class PlatformMembershipSubscribeSerializer(serializers.Serializer):
+    plan_id = serializers.UUIDField()
+
+
+class PlatformMembershipStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=PlatformMembershipPlan.Status.choices)

@@ -69,7 +69,11 @@ logger = logging.getLogger(__name__)
     default_retry_delay=30,
     name="fantasy.tasks.score_affected_gameweeks",
 )
-def score_affected_gameweeks(self, fixture_ids: Sequence[str]) -> dict:
+def score_affected_gameweeks(
+    self,
+    fixture_ids: Sequence[str] | None = None,
+    legacy_fixture_ids: Sequence[str] | None = None,
+) -> dict:
     """Score every non-finalised FantasyGameweek that contains the given fixtures.
 
     Parameters
@@ -89,6 +93,9 @@ def score_affected_gameweeks(self, fixture_ids: Sequence[str]) -> dict:
     # fully initialised when the module is first loaded by Celery's autodiscovery.
     from fantasy.models import FantasyGameweek
     from fantasy.services import score_gameweek
+
+    if legacy_fixture_ids is not None:
+        fixture_ids = legacy_fixture_ids
 
     if not fixture_ids:
         logger.info("score_affected_gameweeks: called with empty fixture_ids list — nothing to do.")

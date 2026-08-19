@@ -14,6 +14,7 @@ from authentication.services.permission_service import PermissionService
 from authentication.services.role_service import RoleService, SUPER_ADMIN_ROLE_NAME
 from authentication.services.session_service import SessionService
 from authentication.services.user_admin_service import UserAdminService
+from dashboard.services.dashboard_cache_service import DashboardCacheService
 from discovery.models import FixtureResultVerification, News
 from discovery.serializers import (
     FixtureCreateSerializer,
@@ -34,6 +35,7 @@ from discovery.serializers import (
 from discovery.services.fixture_admin_service import fixture_admin_service
 from discovery.services.news_moderation_service import news_moderation_service
 from sports.models import SportingEvent
+from platform_admin.models import PlatformMembershipPlan, PlatformMembershipSubscription
 from platform_admin.serializers import (
     AdminAuditLogSerializer,
     AdminDashboardSummarySerializer,
@@ -45,7 +47,31 @@ from platform_admin.serializers import (
     AdminRoleSerializer,
     AdminUserListSerializer,
     AdminUserRoleUpdateSerializer,
+    PlatformMembershipPlanSerializer,
+    PlatformMembershipStatusSerializer,
+    PlatformMembershipSubscribeSerializer,
+    PlatformMembershipSubscriptionSerializer,
 )
+
+
+def _can_manage_platform_memberships(user) -> bool:
+    return bool(
+        user
+        and user.is_authenticated
+        and (
+            user.is_superuser
+            or PermissionService.has_permission(user, "admin.memberships.manage")
+        )
+    )
+
+
+def _membership_renews_at(plan: PlatformMembershipPlan):
+    days_by_period = {
+        PlatformMembershipPlan.BillingPeriod.MONTHLY: 30,
+        PlatformMembershipPlan.BillingPeriod.QUARTERLY: 90,
+        PlatformMembershipPlan.BillingPeriod.ANNUAL: 365,
+    }
+    return timezone.now() + timezone.timedelta(days=days_by_period[plan.billing_period])
 
 
 class AdminPermissionListView(APIView):
@@ -791,6 +817,246 @@ class AdminDashboardSummaryView(APIView):
 
         serializer = self.serializer_class(data)
         return Response(serializer.data)
+
+
+class AdminPlatformMembershipPlanListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipPlanSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_plans_list",
+        responses={200: PlatformMembershipPlanSerializer(many=True), 403: None},
+    )
+    def get(self, request):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        plans = (
+            PlatformMembershipPlan.objects.annotate(
+                subscriber_count=Count(
+                    "subscriptions",
+                    filter=Q(subscriptions__status=PlatformMembershipSubscription.Status.ACTIVE),
+                )
+            )
+            .all()
+            .order_by("-created_at")
+        )
+        return Response(self.serializer_class(plans, many=True).data)
+
+    @extend_schema(
+        operation_id="admin_platform_membership_plan_create",
+        request=PlatformMembershipPlanSerializer,
+        responses={201: PlatformMembershipPlanSerializer, 400: None, 403: None},
+    )
+    def post(self, request):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        plan = serializer.save(created_by=request.user)
+        return Response(self.serializer_class(plan).data, status=201)
+
+
+class AdminPlatformMembershipPlanDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipPlanSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_plan_update",
+        request=PlatformMembershipPlanSerializer,
+        responses={200: PlatformMembershipPlanSerializer, 400: None, 403: None, 404: None},
+    )
+    def patch(self, request, plan_id):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        plan = PlatformMembershipPlan.objects.filter(id=plan_id).first()
+        if not plan:
+            return Response({"detail": "Membership plan not found."}, status=404)
+
+        serializer = self.serializer_class(plan, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminPlatformMembershipPlanStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipStatusSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_plan_status",
+        request=PlatformMembershipStatusSerializer,
+        responses={200: PlatformMembershipPlanSerializer, 400: None, 403: None, 404: None},
+    )
+    def patch(self, request, plan_id):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        plan = PlatformMembershipPlan.objects.filter(id=plan_id).first()
+        if not plan:
+            return Response({"detail": "Membership plan not found."}, status=404)
+
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        plan.status = serializer.validated_data["status"]
+        plan.save(update_fields=["status", "published_at", "updated_at"])
+        return Response(PlatformMembershipPlanSerializer(plan).data)
+
+
+class AdminPlatformMembershipSubscriberListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscriptionSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_subscribers_list",
+        responses={200: PlatformMembershipSubscriptionSerializer(many=True), 403: None},
+    )
+    def get(self, request):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to view platform memberships."},
+                status=403,
+            )
+
+        subscriptions = PlatformMembershipSubscription.objects.select_related(
+            "user", "plan"
+        ).order_by("-subscribed_at")
+        return Response(self.serializer_class(subscriptions, many=True).data)
+
+
+class AdminPlatformMembershipSubscriberCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscriptionSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_subscriber_cancel",
+        responses={200: PlatformMembershipSubscriptionSerializer, 403: None, 404: None},
+    )
+    def post(self, request, subscription_id):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        subscription = (
+            PlatformMembershipSubscription.objects.select_related("user", "plan")
+            .filter(id=subscription_id)
+            .first()
+        )
+        if not subscription:
+            return Response({"detail": "Subscription not found."}, status=404)
+
+        subscription.status = PlatformMembershipSubscription.Status.CANCELLED
+        subscription.cancelled_at = timezone.now()
+        subscription.save(update_fields=["status", "cancelled_at", "updated_at"])
+        DashboardCacheService.invalidate_dashboard(subscription.user)
+        return Response(self.serializer_class(subscription).data)
+
+
+class PublicPlatformMembershipPlanListView(APIView):
+    permission_classes = [permissions.AllowAny]
+    serializer_class = PlatformMembershipPlanSerializer
+
+    @extend_schema(
+        operation_id="platform_membership_plans_list",
+        responses={200: PlatformMembershipPlanSerializer(many=True)},
+    )
+    def get(self, request):
+        plans = PlatformMembershipPlan.objects.filter(
+            status=PlatformMembershipPlan.Status.ACTIVE
+        ).order_by("price", "name")
+        return Response(self.serializer_class(plans, many=True).data)
+
+
+class MyPlatformMembershipView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscriptionSerializer
+
+    @extend_schema(
+        operation_id="platform_membership_me",
+        responses={200: PlatformMembershipSubscriptionSerializer(many=True), 403: None},
+    )
+    def get(self, request):
+        subscriptions = PlatformMembershipSubscription.objects.select_related(
+            "user", "plan"
+        ).filter(user=request.user)
+        return Response(self.serializer_class(subscriptions, many=True).data)
+
+
+class PlatformMembershipSubscribeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscribeSerializer
+
+    @extend_schema(
+        operation_id="platform_membership_subscribe",
+        request=PlatformMembershipSubscribeSerializer,
+        responses={201: PlatformMembershipSubscriptionSerializer, 400: None, 404: None},
+    )
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        plan = PlatformMembershipPlan.objects.filter(
+            id=serializer.validated_data["plan_id"],
+            status=PlatformMembershipPlan.Status.ACTIVE,
+        ).first()
+        if not plan:
+            return Response({"detail": "Active membership plan not found."}, status=404)
+
+        PlatformMembershipSubscription.objects.filter(
+            user=request.user,
+            status=PlatformMembershipSubscription.Status.ACTIVE,
+        ).update(status=PlatformMembershipSubscription.Status.CANCELLED, cancelled_at=timezone.now())
+
+        subscription = PlatformMembershipSubscription.objects.create(
+            user=request.user,
+            plan=plan,
+            status=PlatformMembershipSubscription.Status.ACTIVE,
+            renews_at=_membership_renews_at(plan),
+            amount_paid=plan.price,
+            currency=plan.currency,
+        )
+        DashboardCacheService.invalidate_dashboard(request.user)
+        return Response(PlatformMembershipSubscriptionSerializer(subscription).data, status=201)
+
+
+class PlatformMembershipCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscriptionSerializer
+
+    @extend_schema(
+        operation_id="platform_membership_cancel",
+        responses={200: PlatformMembershipSubscriptionSerializer, 404: None},
+    )
+    def post(self, request, subscription_id):
+        subscription = (
+            PlatformMembershipSubscription.objects.select_related("user", "plan")
+            .filter(id=subscription_id, user=request.user)
+            .first()
+        )
+        if not subscription:
+            return Response({"detail": "Subscription not found."}, status=404)
+
+        subscription.status = PlatformMembershipSubscription.Status.CANCELLED
+        subscription.cancelled_at = timezone.now()
+        subscription.save(update_fields=["status", "cancelled_at", "updated_at"])
+        DashboardCacheService.invalidate_dashboard(request.user)
+        return Response(self.serializer_class(subscription).data)
 
 
 class AdminNewsComposeView(APIView):

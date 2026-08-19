@@ -15,6 +15,7 @@ from dashboard.aggregators import (
     FavouritesAggregator,
     FixturesAggregator,
     MarketsAggregator,
+    MembershipsAggregator,
     NotificationsAggregator,
     ProfileAggregator,
     StoreAggregator,
@@ -39,6 +40,7 @@ class DashboardAggregationService:
         FavouritesAggregator,
         FixturesAggregator,
         MarketsAggregator,
+        MembershipsAggregator,
         StoreAggregator,
         WalletAggregator,
     ]
