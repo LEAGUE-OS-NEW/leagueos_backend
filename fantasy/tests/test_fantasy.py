@@ -573,7 +573,8 @@ def test_player_candidates_are_athletes_of_matching_sport_only(domain):
 
     assert returned_ids == {str(candidate.id)}
     assert not returned_ids.intersection(existing_player_ids)
-    
+
+
 def test_league_members_are_ranked_and_do_not_expose_email(domain):
     fantasy, _, gameweek = domain
     owner = get_user_model().objects.create_user(
