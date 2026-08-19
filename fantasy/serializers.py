@@ -32,11 +32,13 @@ class CleanModelSerializer(serializers.ModelSerializer):
                 setattr(instance, field, value)
         try:
             instance.full_clean(
-                exclude=["fixtures"] if self.Meta.model is FantasyGameweek else None
+                exclude=[
+                    "fixtures"] if self.Meta.model is FantasyGameweek else None
             )
         except DjangoValidationError as exc:
             raise serializers.ValidationError(
-                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+                exc.message_dict if hasattr(
+                    exc, "message_dict") else exc.messages
             ) from exc
         return attrs
 
@@ -80,12 +82,14 @@ class FantasyPlayerSerializer(CleanModelSerializer):
         return round(selected * 100 / total, 2)
 
     def get_total_points(self, obj) -> float | None:
-        value = obj.gameweek_points.aggregate(value=Sum("total_points"))["value"]
+        value = obj.gameweek_points.aggregate(
+            value=Sum("total_points"))["value"]
         return float(value) if value is not None else None
 
     def get_current_gameweek_points(self, obj) -> float | None:
         gameweek = (
-            obj.fantasy_competition.gameweeks.exclude(status="DRAFT").order_by("number").last()
+            obj.fantasy_competition.gameweeks.exclude(
+                status="DRAFT").order_by("number").last()
         )
         if not gameweek:
             return None
@@ -119,10 +123,12 @@ class ScoringRuleSerializer(CleanModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         competition = attrs.get(
-            "fantasy_competition", getattr(self.instance, "fantasy_competition", None)
+            "fantasy_competition", getattr(
+                self.instance, "fantasy_competition", None)
         )
         statistic_type = (
-            attrs.get("statistic_type", getattr(self.instance, "statistic_type", ""))
+            attrs.get("statistic_type", getattr(
+                self.instance, "statistic_type", ""))
             .strip()
             .upper()
         )
@@ -158,7 +164,8 @@ class GameweekSerializer(CleanModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         competition = attrs.get(
-            "fantasy_competition", getattr(self.instance, "fantasy_competition", None)
+            "fantasy_competition", getattr(
+                self.instance, "fantasy_competition", None)
         )
         fixtures = attrs.get("fixtures", [])
         invalid = [
@@ -175,7 +182,8 @@ class GameweekSerializer(CleanModelSerializer):
 
 
 class CompetitionSerializer(CleanModelSerializer):
-    sport = serializers.CharField(source="competition.sport.slug", read_only=True)
+    sport = serializers.CharField(
+        source="competition.sport.slug", read_only=True)
     season_name = serializers.CharField(source="season.name", read_only=True)
     scoring_rules = ScoringRuleSerializer(many=True, read_only=True)
     current_gameweek = serializers.SerializerMethodField()
@@ -198,7 +206,8 @@ class CompetitionSerializer(CleanModelSerializer):
         return obj.gameweeks.count()
 
     def validate_tie_break_rules(self, value):
-        supported = {"total_points", "fewer_transfer_penalties", "earlier_registration"}
+        supported = {"total_points",
+                     "fewer_transfer_penalties", "earlier_registration"}
         if not isinstance(value, list) or any(rule not in supported for rule in value):
             raise serializers.ValidationError(
                 f"Supported tie breaks are: {', '.join(sorted(supported))}."
@@ -207,7 +216,8 @@ class CompetitionSerializer(CleanModelSerializer):
 
 
 class TeamSelectionSerializer(serializers.ModelSerializer):
-    fantasy_player_detail = FantasyPlayerSerializer(source="fantasy_player", read_only=True)
+    fantasy_player_detail = FantasyPlayerSerializer(
+        source="fantasy_player", read_only=True)
 
     class Meta:
         model = FantasyTeamPlayer
@@ -231,9 +241,11 @@ class TeamSerializer(serializers.ModelSerializer):
         selections = []
         for item in raw:
             try:
-                player = FantasyPlayer.objects.get(pk=item.get("fantasy_player"))
+                player = FantasyPlayer.objects.get(
+                    pk=item.get("fantasy_player"))
             except FantasyPlayer.DoesNotExist:
-                raise serializers.ValidationError("Unknown Fantasy player.") from None
+                raise serializers.ValidationError(
+                    "Unknown Fantasy player.") from None
             selections.append({**item, "fantasy_player": player})
         if (
             not competition.enabled
@@ -283,13 +295,17 @@ class LineupSerializer(serializers.Serializer):
 
 
 class TransferSerializer(serializers.Serializer):
-    gameweek = serializers.PrimaryKeyRelatedField(queryset=FantasyGameweek.objects.all())
-    player_out = serializers.PrimaryKeyRelatedField(queryset=FantasyPlayer.objects.all())
-    player_in = serializers.PrimaryKeyRelatedField(queryset=FantasyPlayer.objects.all())
+    gameweek = serializers.PrimaryKeyRelatedField(
+        queryset=FantasyGameweek.objects.all())
+    player_out = serializers.PrimaryKeyRelatedField(
+        queryset=FantasyPlayer.objects.all())
+    player_in = serializers.PrimaryKeyRelatedField(
+        queryset=FantasyPlayer.objects.all())
 
 
 class LeagueSerializer(serializers.ModelSerializer):
-    member_count = serializers.IntegerField(source="memberships.count", read_only=True)
+    member_count = serializers.IntegerField(
+        source="memberships.count", read_only=True)
 
     class Meta:
         model = FantasyLeague
@@ -307,9 +323,11 @@ class LeagueSerializer(serializers.ModelSerializer):
         return data
 
     def validate(self, attrs):
-        capacity = attrs.get("capacity", getattr(self.instance, "capacity", None))
+        capacity = attrs.get("capacity", getattr(
+            self.instance, "capacity", None))
         if capacity is not None and capacity < 2:
-            raise serializers.ValidationError({"capacity": "League capacity must be at least two."})
+            raise serializers.ValidationError(
+                {"capacity": "League capacity must be at least two."})
         return attrs
 
 
@@ -402,7 +420,8 @@ class CorrectionSerializer(serializers.ModelSerializer):
     player_name = serializers.CharField(
         source="player_points.fantasy_player.player.name", read_only=True
     )
-    gameweek = serializers.UUIDField(source="player_points.gameweek_id", read_only=True)
+    gameweek = serializers.UUIDField(
+        source="player_points.gameweek_id", read_only=True)
 
     class Meta:
         model = FantasyScoringCorrection
@@ -421,7 +440,8 @@ class CorrectionSerializer(serializers.ModelSerializer):
 
     def validate_reason(self, value):
         if not value.strip():
-            raise serializers.ValidationError("A correction reason is required.")
+            raise serializers.ValidationError(
+                "A correction reason is required.")
         return value.strip()
 
 
@@ -479,7 +499,8 @@ class FantasyPlayerFullCreateSerializer(serializers.Serializer):
         max_length=100,
         help_text="Canonical position label stored on PlayerProfile (e.g. 'GK', 'DEF').",
     )
-    shirt_number = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    shirt_number = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1)
     nationality = serializers.PrimaryKeyRelatedField(
         queryset=Country.objects.all(),
         required=False,
@@ -618,7 +639,15 @@ class FantasyPlayerFullCreateSerializer(serializers.Serializer):
             profile.shirt_number = validated_data["shirt_number"]
         if validated_data.get("nationality") is not None:
             profile.nationality = validated_data["nationality"]
-        profile.save(update_fields=["club", "position", "shirt_number", "nationality", "updated_at"])
+        profile.save(
+            update_fields=[
+                "club",
+                "position",
+                "shirt_number",
+                "nationality",
+                "updated_at",
+            ]
+        )
 
         # ── Duplicate FantasyPlayer detection ────────────────────────────
         existing_fp = FantasyPlayer.objects.filter(
@@ -642,6 +671,7 @@ class FantasyPlayerFullCreateSerializer(serializers.Serializer):
             price=validated_data["price"],
             starting_points=validated_data.get("starting_points", 0),
             eligible=validated_data.get("eligible", True),
-            availability=validated_data.get("availability", FantasyPlayer.Availability.AVAILABLE),
+            availability=validated_data.get(
+                "availability", FantasyPlayer.Availability.AVAILABLE),
         )
         return fantasy_player
