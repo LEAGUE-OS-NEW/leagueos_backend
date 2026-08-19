@@ -215,11 +215,11 @@ _SCORE_GW_PATH = "fantasy.services.score_gameweek"
 
 @pytest.mark.django_db
 class TestScoreAffectedGameweeks:
-    """Direct tests of the Celery task function (task_self=None bypasses retry)."""
+    """Direct tests of the Celery task function (.run() bypasses broker dispatch)."""
 
     def test_empty_fixture_ids_returns_zero_scored(self):
         """Empty list → task exits immediately without querying the DB."""
-        result = score_affected_gameweeks(None, [])
+        result = score_affected_gameweeks.run([])
         assert result["scored"] == 0
         assert result["skipped_finalized"] == 0
 
@@ -240,7 +240,7 @@ class TestScoreAffectedGameweeks:
             starts_at=now,
             status="COMPLETED",
         )
-        result = score_affected_gameweeks(None, [str(fixture.id)])
+        result = score_affected_gameweeks.run([str(fixture.id)])
         assert result["scored"] == 0
         assert result["no_gameweek"] == 1
 
@@ -250,7 +250,7 @@ class TestScoreAffectedGameweeks:
         _add_stat(domain)
 
         with patch(_SCORE_GW_PATH) as mock_sg:
-            result = score_affected_gameweeks(None, [str(domain["fixture"].id)])
+            result = score_affected_gameweeks.run([str(domain["fixture"].id)])
 
         mock_sg.assert_not_called()
         assert result["scored"] == 0
@@ -262,7 +262,7 @@ class TestScoreAffectedGameweeks:
         _add_stat(domain)
 
         with patch(_SCORE_GW_PATH) as mock_sg:
-            result = score_affected_gameweeks(None, [str(domain["fixture"].id)])
+            result = score_affected_gameweeks.run([str(domain["fixture"].id)])
 
         mock_sg.assert_called_once_with(domain["gameweek"])
         assert result["scored"] == 1
@@ -274,7 +274,7 @@ class TestScoreAffectedGameweeks:
         _add_stat(domain)
 
         with patch(_SCORE_GW_PATH) as mock_sg:
-            result = score_affected_gameweeks(None, [str(domain["fixture"].id)])
+            result = score_affected_gameweeks.run([str(domain["fixture"].id)])
 
         mock_sg.assert_called_once()
         assert result["scored"] == 1
@@ -287,7 +287,7 @@ class TestScoreAffectedGameweeks:
         domain2["gameweek"].fixtures.add(domain1["fixture"])
 
         with patch(_SCORE_GW_PATH) as mock_sg:
-            result = score_affected_gameweeks(None, [str(domain1["fixture"].id)])
+            result = score_affected_gameweeks.run([str(domain1["fixture"].id)])
 
         assert mock_sg.call_count == 2
         called_gws = {c.args[0].id for c in mock_sg.call_args_list}
@@ -302,7 +302,7 @@ class TestScoreAffectedGameweeks:
         domain_scr["gameweek"].fixtures.add(domain_fin["fixture"])
 
         with patch(_SCORE_GW_PATH) as mock_sg:
-            result = score_affected_gameweeks(None, [str(domain_fin["fixture"].id)])
+            result = score_affected_gameweeks.run([str(domain_fin["fixture"].id)])
 
         # domain_fin's own gameweek is FINALIZED → skip
         # domain_scr's gameweek contains the same fixture, is SCORING → score
@@ -320,12 +320,12 @@ class TestScoreAffectedGameweeks:
         gameweek = domain["gameweek"]
 
         # First execution
-        score_affected_gameweeks(None, [str(domain["fixture"].id)])
+        score_affected_gameweeks.run([str(domain["fixture"].id)])
         points_after_first = FantasyPlayerGameweekPoints.objects.filter(gameweek=gameweek).count()
         scores_after_first = FantasyTeamGameweekScore.objects.filter(gameweek=gameweek).count()
 
         # Second execution (simulated retry)
-        score_affected_gameweeks(None, [str(domain["fixture"].id)])
+        score_affected_gameweeks.run([str(domain["fixture"].id)])
         points_after_second = FantasyPlayerGameweekPoints.objects.filter(gameweek=gameweek).count()
         scores_after_second = FantasyTeamGameweekScore.objects.filter(gameweek=gameweek).count()
 
@@ -348,7 +348,7 @@ class TestScoreAffectedGameweeks:
 
         gameweek = domain["gameweek"]
 
-        result = score_affected_gameweeks(None, [str(domain["fixture"].id)])
+        result = score_affected_gameweeks.run([str(domain["fixture"].id)])
 
         assert result["scored"] == 1
 
@@ -381,7 +381,7 @@ class TestScoreAffectedGameweeks:
         fixture_ids = [str(domain["fixture"].id), str(fixture2.id)]
 
         with patch(_SCORE_GW_PATH) as mock_sg:
-            result = score_affected_gameweeks(None, fixture_ids)
+            result = score_affected_gameweeks.run(fixture_ids)
 
         mock_sg.assert_called_once()
         assert result["scored"] == 1

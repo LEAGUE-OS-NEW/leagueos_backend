@@ -29,7 +29,7 @@ import io
 import uuid
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.urls import reverse
@@ -832,21 +832,27 @@ def test_fixture_in_multiple_gameweeks_scores_each():
     def fake_score_gw(gw):
         scored_gw_ids.append(gw.id)
 
+    from fantasy.tasks import score_affected_gameweeks
+
+    mock_task = MagicMock()
+    mock_task.delay.side_effect = lambda ids: score_affected_gameweeks.run(ids)
+
     with patch("fantasy.services.score_gameweek", side_effect=fake_score_gw):
         with patch("django.db.transaction.on_commit", side_effect=lambda f: f()):
-            result = import_csv_for_club(
-                _make_csv(
-                    [
-                        {
-                            "fixture_id": str(fixture.id),
-                            "player_id": str(player.id),
-                            "stat_type": "GOALS",
-                            "value": "2",
-                        }
-                    ]
-                ),
-                club,
-            )
+            with patch("fantasy.tasks.score_affected_gameweeks", mock_task):
+                result = import_csv_for_club(
+                    _make_csv(
+                        [
+                            {
+                                "fixture_id": str(fixture.id),
+                                "player_id": str(player.id),
+                                "stat_type": "GOALS",
+                                "value": "2",
+                            }
+                        ]
+                    ),
+                    club,
+                )
 
     assert result.success is True
     assert gw1.id in scored_gw_ids

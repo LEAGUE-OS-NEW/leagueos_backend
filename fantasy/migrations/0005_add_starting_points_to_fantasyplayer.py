@@ -6,13 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('fantasy', '0004_fantasy_statistic_review'),
+        ("fantasy", "0004_fantasy_statistic_review"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='fantasyplayer',
-            name='starting_points',
-            field=models.DecimalField(decimal_places=2, default=0, help_text='Admin-configured starting fantasy points for this player in this competition.', max_digits=8),
+            model_name="fantasyplayer",
+            name="starting_points",
+            field=models.DecimalField(
+                decimal_places=2,
+                default=0,
+                help_text="Admin-configured starting fantasy points for this player in this competition.",
+                max_digits=8,
+            ),
         ),
     ]
