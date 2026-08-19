@@ -168,7 +168,14 @@ class PlatformMembershipPlanSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "slug", "subscriber_count", "published_at", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "slug",
+            "subscriber_count",
+            "published_at",
+            "created_at",
+            "updated_at",
+        ]
 
     def validate_benefits(self, value):
         if not isinstance(value, list):

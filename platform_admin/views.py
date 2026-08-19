@@ -1021,7 +1021,10 @@ class PlatformMembershipSubscribeView(APIView):
         PlatformMembershipSubscription.objects.filter(
             user=request.user,
             status=PlatformMembershipSubscription.Status.ACTIVE,
-        ).update(status=PlatformMembershipSubscription.Status.CANCELLED, cancelled_at=timezone.now())
+        ).update(
+            status=PlatformMembershipSubscription.Status.CANCELLED,
+            cancelled_at=timezone.now(),
+        )
 
         subscription = PlatformMembershipSubscription.objects.create(
             user=request.user,
