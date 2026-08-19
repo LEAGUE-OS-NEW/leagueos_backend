@@ -6,7 +6,6 @@ from platform_admin.models import PlatformMembershipSubscription
 
 from .factories import UserFactory
 
-
 pytestmark = pytest.mark.django_db
 
 
