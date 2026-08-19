@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from django.utils import timezone
 from profiles.models import Club, Country
-from sports.models import Competition, Participant, Sport, SportingEvent
+from sports.models import Participant, Sport, SportingEvent
 
 from .models import (
     FantasyCompetition,
