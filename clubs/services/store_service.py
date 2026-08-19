@@ -74,13 +74,24 @@ class StoreService:
         return product
 
     @staticmethod
-    def create_order(user, club, items_data):
+    def create_order(
+        user,
+        club,
+        items_data,
+        *,
+        shipping_address=None,
+        metadata=None,
+        status=None,
+    ):
         """Create a merchandise order."""
         with transaction.atomic():
             order = StoreOrder.objects.create(
                 user=user,
                 club=club,
                 total_amount=0,
+                shipping_address=shipping_address or {},
+                metadata=metadata or {},
+                status=status or StoreOrder.OrderStatus.PENDING,
             )
 
             total = Decimal("0.00")

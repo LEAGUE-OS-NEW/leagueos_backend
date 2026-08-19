@@ -6,6 +6,7 @@ from .fixtures_aggregator import FixturesAggregator
 from .markets_aggregator import MarketsAggregator
 from .notifications_aggregator import NotificationsAggregator
 from .profile_aggregator import ProfileAggregator
+from .store_aggregator import StoreAggregator
 from .wallet_aggregator import WalletAggregator
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "MarketsAggregator",
     "NotificationsAggregator",
     "ProfileAggregator",
+    "StoreAggregator",
     "WalletAggregator",
 ]
