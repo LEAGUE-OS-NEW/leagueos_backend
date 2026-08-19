@@ -14,9 +14,11 @@ from authentication.services.permission_service import PermissionService
 from authentication.services.role_service import RoleService, SUPER_ADMIN_ROLE_NAME
 from authentication.services.session_service import SessionService
 from authentication.services.user_admin_service import UserAdminService
-from discovery.models import News
+from discovery.models import FixtureResultVerification, News
 from discovery.serializers import (
     FixtureCreateSerializer,
+    FixtureResultVerificationDecisionSerializer,
+    FixtureResultVerificationSerializer,
     FixtureRescheduleSerializer,
     FixtureScoreSerializer,
     FixtureSerializer,
@@ -1217,4 +1219,122 @@ class AdminFixtureCompleteView(APIView):
             return Response({"detail": "Fixture not found."}, status=404)
 
         updated = fixture_admin_service.complete_fixture(fixture=fixture)
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminFixtureSubmitVerificationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_submit_verification",
+        responses={200: FixtureSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_sports"):
+            return Response(
+                {"detail": "You do not have permission to manage fixtures."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+        if fixture.status != SportingEvent.Status.COMPLETED:
+            return Response(
+                {"detail": "Only completed fixtures can be submitted for result verification."},
+                status=400,
+            )
+
+        fixture_admin_service.submit_result_verification(fixture=fixture, actor=request.user)
+        return Response(self.serializer_class(fixture).data)
+
+
+class FixtureResultVerificationQueueView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureResultVerificationSerializer
+
+    def get_queryset(self):
+        if not PermissionService.has_any_permission(
+            self.request.user, ("approve_market", "verify_results", "reject_result")
+        ):
+            return FixtureResultVerification.objects.none()
+        return (
+            FixtureResultVerification.objects.select_related(
+                "fixture", "fixture__sport", "fixture__competition", "fixture__match_centre",
+                "submitted_by", "reviewed_by",
+            )
+            .order_by("-submitted_at")
+        )
+
+    def list(self, request, *args, **kwargs):
+        if not PermissionService.has_any_permission(
+            request.user, ("approve_market", "verify_results", "reject_result")
+        ):
+            return Response(
+                {"detail": "You do not have permission to view fixture result verification."},
+                status=403,
+            )
+        return super().list(request, *args, **kwargs)
+
+
+class FixtureResultVerifyView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureResultVerificationSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_result_verify",
+        request=FixtureResultVerificationDecisionSerializer,
+        responses={200: FixtureResultVerificationSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, verification_id):
+        if not PermissionService.has_any_permission(
+            request.user, ("approve_market", "verify_results", "reject_result")
+        ):
+            return Response(
+                {"detail": "You do not have permission to verify fixture results."},
+                status=403,
+            )
+
+        verification = FixtureResultVerification.objects.filter(id=verification_id).first()
+        if not verification:
+            return Response({"detail": "Verification record not found."}, status=404)
+
+        serializer = FixtureResultVerificationDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = fixture_admin_service.verify_result(
+            verification=verification, actor=request.user, note=serializer.validated_data["note"]
+        )
+        return Response(self.serializer_class(updated).data)
+
+
+class FixtureResultRejectView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FixtureResultVerificationSerializer
+
+    @extend_schema(
+        operation_id="admin_fixture_result_reject",
+        request=FixtureResultVerificationDecisionSerializer,
+        responses={200: FixtureResultVerificationSerializer, 400: None, 403: None, 404: None},
+    )
+    def post(self, request, verification_id):
+        if not PermissionService.has_any_permission(
+            request.user, ("approve_market", "verify_results", "reject_result")
+        ):
+            return Response(
+                {"detail": "You do not have permission to verify fixture results."},
+                status=403,
+            )
+
+        verification = FixtureResultVerification.objects.filter(id=verification_id).first()
+        if not verification:
+            return Response({"detail": "Verification record not found."}, status=404)
+
+        serializer = FixtureResultVerificationDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        updated = fixture_admin_service.reject_result(
+            verification=verification, actor=request.user, note=serializer.validated_data["note"]
+        )
         return Response(self.serializer_class(updated).data)

@@ -27,12 +27,13 @@ class FixtureService:
         status=None,
         date_from=None,
         date_to=None,
+        live_score_featured=None,
         ordering="starts_at",
     ):
         """Return verified fixtures with optimized queries."""
         qs = (
             SportingEvent.objects.filter(is_verified=True, sport__is_active=True)
-            .select_related("sport", "competition", "competition__sport", "match_centre")
+            .select_related("sport", "competition", "competition__sport", "match_centre", "result_verification")
             .prefetch_related("event_participants__participant")
         )
 
@@ -48,6 +49,8 @@ class FixtureService:
             qs = qs.filter(starts_at__gte=date_from)
         if date_to:
             qs = qs.filter(starts_at__lte=date_to)
+        if live_score_featured:
+            qs = qs.filter(is_live_score_featured=True)
 
         return qs.distinct().order_by(ordering)
 

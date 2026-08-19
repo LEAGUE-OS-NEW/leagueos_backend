@@ -10,6 +10,7 @@ from platform_admin.views import (
     AdminFixtureRescheduleView,
     AdminFixtureScoreView,
     AdminFixtureStatusView,
+    AdminFixtureSubmitVerificationView,
     AdminInvitationAcceptView,
     AdminInvitationListView,
     AdminInvitationRevokeView,
@@ -32,6 +33,9 @@ from platform_admin.views import (
     AdminUserRoleAssignView,
     AdminUserRoleListView,
     AdminUserRoleRevokeView,
+    FixtureResultRejectView,
+    FixtureResultVerifyView,
+    FixtureResultVerificationQueueView,
 )
 
 app_name = "platform_admin"
@@ -102,5 +106,25 @@ urlpatterns = [
         "fixtures/<uuid:fixture_id>/complete/",
         AdminFixtureCompleteView.as_view(),
         name="fixture-complete",
+    ),
+    path(
+        "fixtures/<uuid:fixture_id>/submit-verification/",
+        AdminFixtureSubmitVerificationView.as_view(),
+        name="fixture-submit-verification",
+    ),
+    path(
+        "fixture-results/",
+        FixtureResultVerificationQueueView.as_view(),
+        name="fixture-result-verification-queue",
+    ),
+    path(
+        "fixture-results/<uuid:verification_id>/verify/",
+        FixtureResultVerifyView.as_view(),
+        name="fixture-result-verify",
+    ),
+    path(
+        "fixture-results/<uuid:verification_id>/reject/",
+        FixtureResultRejectView.as_view(),
+        name="fixture-result-reject",
     ),
 ]
