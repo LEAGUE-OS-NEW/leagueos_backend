@@ -20,6 +20,7 @@ from clubs.models import (
     ClubAuditLog,
     ClubMedia,
     ClubNews,
+    ClubPlayer,
     ClubProfileVersion,
     ClubWorkspace,
     MembershipPlan,
@@ -39,6 +40,7 @@ from clubs.serializers.club_serializers import (
     ClubLogoUploadSerializer,
     ClubMediaSerializer,
     ClubNewsSerializer,
+    ClubPlayerSerializer,
     ClubProfileVersionSerializer,
     ClubWorkspaceSerializer,
     MembershipPlanSerializer,
@@ -287,6 +289,21 @@ class MerchandiseProductViewSet(viewsets.ModelViewSet):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
         serializer.save(club=club, created_by=self.request.user)
+
+
+class ClubPlayerViewSet(viewsets.ModelViewSet):
+    serializer_class = ClubPlayerSerializer
+    permission_classes = [IsClubStaff]
+
+    def get_queryset(self):
+        return ClubPlayer.objects.filter(club_id=self.kwargs.get("club_pk")).order_by(
+            "jersey_number", "name"
+        )
+
+    def perform_create(self, serializer):
+        club_id = self.kwargs.get("club_pk")
+        club = Club.objects.get(id=club_id)
+        serializer.save(club=club)
 
 
 class ProductCategoryViewSet(viewsets.ModelViewSet):
