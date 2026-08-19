@@ -59,8 +59,7 @@ def _can_manage_platform_memberships(user) -> bool:
         user
         and user.is_authenticated
         and (
-            user.is_superuser
-            or PermissionService.has_permission(user, "admin.memberships.manage")
+            user.is_superuser or PermissionService.has_permission(user, "admin.memberships.manage")
         )
     )
 

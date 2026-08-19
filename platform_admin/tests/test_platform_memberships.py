@@ -62,9 +62,7 @@ def test_super_admin_membership_plans_feed_fan_subscriptions():
     assert subscribers_response.data[0]["plan_name"] == "LeagueOS Plus"
 
     subscription = PlatformMembershipSubscription.objects.get(id=subscribe_response.data["id"])
-    cancel_response = client.post(
-        f"/api/v1/admin/membership/subscribers/{subscription.id}/cancel/"
-    )
+    cancel_response = client.post(f"/api/v1/admin/membership/subscribers/{subscription.id}/cancel/")
     assert cancel_response.status_code == status.HTTP_200_OK
     subscription.refresh_from_db()
     assert subscription.status == PlatformMembershipSubscription.Status.CANCELLED

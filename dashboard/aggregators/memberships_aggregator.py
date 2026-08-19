@@ -31,9 +31,9 @@ class MembershipsAggregator(BaseAggregator):
                     "tier": subscription.plan.name,
                     "status": subscription.status,
                     "starts_at": subscription.subscribed_at.isoformat(),
-                    "expires_at": subscription.renews_at.isoformat()
-                    if subscription.renews_at
-                    else None,
+                    "expires_at": (
+                        subscription.renews_at.isoformat() if subscription.renews_at else None
+                    ),
                     "plan_id": str(subscription.plan_id),
                     "benefits": subscription.plan.benefits,
                     "billing_period": subscription.plan.billing_period,
