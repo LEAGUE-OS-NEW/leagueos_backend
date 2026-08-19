@@ -6,6 +6,7 @@ import time
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connections
 from django.db.utils import OperationalError
@@ -545,7 +546,7 @@ def market_catalogue_audit(request):
 def market_purge_preflight(request):
     """
     Read-only preflight for the exact audited
-    40-to-4 staging market purge.
+    46-to-4 staging market purge.
 
     This endpoint never changes market, wallet,
     payment, or ledger data.
@@ -568,9 +569,20 @@ def market_purge_preflight(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
+    user_model = get_user_model()
+
+    resolution_actor = user_model.objects.filter(
+        email__iexact=("results.local@leagueos.test"),
+    ).first()
+
+    refund_actor = user_model.objects.filter(
+        email__iexact=("superadmin.local@leagueos.test"),
+    ).first()
+
     return Response(
         build_purge_preflight(
-            actor=request.user,
+            resolution_actor=resolution_actor,
+            refund_actor=refund_actor,
         ),
         status=status.HTTP_200_OK,
     )

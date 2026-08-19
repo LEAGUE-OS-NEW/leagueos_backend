@@ -354,7 +354,8 @@ def _delete_market_graph(
 
 def build_purge_preflight(
     *,
-    actor=None,
+    resolution_actor=None,
+    refund_actor=None,
 ):
     keepers, purge = _snapshot_sets()
 
@@ -412,52 +413,67 @@ def build_purge_preflight(
         if (str(row["id"]) not in settled_set and row["status"] != Market.Status.VOIDED)
     )
 
-    actor_creator_conflict_ids = []
+    resolution_creator_conflict_ids = []
 
-    if actor is not None:
-        actor_creator_conflict_ids = sorted(
+    if resolution_actor is not None:
+        resolution_creator_conflict_ids = sorted(
             str(row["id"])
             for row in unsettled_rows
-            if (str(row["id"]) in void_required_ids and row["created_by_id"] == actor.id)
+            if (str(row["id"]) in void_required_ids and row["created_by_id"] == resolution_actor.id)
         )
 
-    actor_has_resolution_permission = None
-    actor_has_refund_permission = None
+    resolution_actor_has_permission = None
+    refund_actor_has_permission = None
 
-    if actor is not None:
-        actor_has_resolution_permission = PermissionService.has_any_permission(
-            actor,
+    if resolution_actor is not None:
+        resolution_actor_has_permission = PermissionService.has_any_permission(
+            resolution_actor,
             (MarketResolutionService.RESULT_VERIFICATION_PERMISSIONS),
         )
 
-        actor_has_refund_permission = PermissionService.has_permission(
-            actor,
+    if refund_actor is not None:
+        refund_actor_has_permission = PermissionService.has_permission(
+            refund_actor,
             (MarketVoidRefundService.APPROVE_PERMISSION),
         )
 
+    actors_are_distinct = bool(
+        resolution_actor is not None
+        and refund_actor is not None
+        and resolution_actor.id != refund_actor.id
+    )
+
     snapshot_matches = market_ids == expected_ids
 
-    actor_ready = (
-        actor is not None
-        and actor_has_resolution_permission
-        and actor_has_refund_permission
-        and not actor_creator_conflict_ids
+    actors_ready = (
+        resolution_actor is not None
+        and refund_actor is not None
+        and resolution_actor_has_permission
+        and refund_actor_has_permission
+        and actors_are_distinct
+        and not resolution_creator_conflict_ids
     )
 
     can_execute = (
         snapshot_matches
         and len(keepers & market_ids) == 4
         and len(purge & market_ids) == len(purge)
-        and actor_ready
+        and actors_ready
     )
 
     return {
         "snapshot_version": SNAPSHOT_VERSION,
         "snapshot_digest": SNAPSHOT_DIGEST,
-        "database_market_count": len(market_ids),
-        "snapshot_matches_database": market_ids == expected_ids,
-        "keeper_count": len(keepers & market_ids),
-        "purge_target_count": len(purge & market_ids),
+        "database_market_count": len(
+            market_ids,
+        ),
+        "snapshot_matches_database": snapshot_matches,
+        "keeper_count": len(
+            keepers & market_ids,
+        ),
+        "purge_target_count": len(
+            purge & market_ids,
+        ),
         "unexpected_market_ids": sorted(
             market_ids - expected_ids,
         ),
@@ -467,10 +483,14 @@ def build_purge_preflight(
         "unsettled_financial_market_ids": unsettled_ids,
         "settled_market_ids": sorted(settled_ids),
         "void_required_market_ids": void_required_ids,
-        "actor_email": (str(actor.email or "") if actor is not None else ""),
-        "actor_creator_conflict_ids": actor_creator_conflict_ids,
-        "actor_has_resolution_permission": actor_has_resolution_permission,
-        "actor_has_refund_permission": actor_has_refund_permission,
+        "resolution_actor_email": (
+            str(resolution_actor.email or "") if resolution_actor is not None else ""
+        ),
+        "refund_actor_email": (str(refund_actor.email or "") if refund_actor is not None else ""),
+        "resolution_actor_creator_conflict_ids": resolution_creator_conflict_ids,
+        "resolution_actor_has_permission": resolution_actor_has_permission,
+        "refund_actor_has_permission": refund_actor_has_permission,
+        "actors_are_distinct": actors_are_distinct,
         "can_execute": can_execute,
         "affected_ledger_entry_count": len(
             _affected_ledger_ids(

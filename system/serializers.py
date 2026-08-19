@@ -218,20 +218,25 @@ class MarketPurgePreflightSerializer(serializers.Serializer):
         child=serializers.UUIDField(),
     )
 
-    actor_email = serializers.EmailField(
+    resolution_actor_email = serializers.EmailField(
         allow_blank=True,
     )
-    actor_creator_conflict_ids = serializers.ListField(
+    refund_actor_email = serializers.EmailField(
+        allow_blank=True,
+    )
+
+    resolution_actor_creator_conflict_ids = serializers.ListField(
         child=serializers.UUIDField(),
     )
 
-    actor_has_resolution_permission = serializers.BooleanField(
+    resolution_actor_has_permission = serializers.BooleanField(
         allow_null=True,
     )
-    actor_has_refund_permission = serializers.BooleanField(
+    refund_actor_has_permission = serializers.BooleanField(
         allow_null=True,
     )
 
+    actors_are_distinct = serializers.BooleanField()
     can_execute = serializers.BooleanField()
 
     affected_ledger_entry_count = serializers.IntegerField()
