@@ -221,6 +221,7 @@ class SportingEventListQuerySerializer(serializers.Serializer):
         choices=SportingEvent.EventType.choices,
         required=False,
     )
+    show_in_markets = serializers.BooleanField(required=False)
     search = serializers.CharField(
         required=False,
         allow_blank=False,

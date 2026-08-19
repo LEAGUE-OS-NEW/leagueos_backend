@@ -41,7 +41,7 @@ from wallets.models import (
     WithdrawalRequest,
 )
 
-CONFIRMATION_PHRASE = "PURGE_36_STAGING_MARKETS_KEEP_4"
+CONFIRMATION_PHRASE = "PURGE_42_STAGING_MARKETS_KEEP_4"
 
 
 class StagingMarketPurgeError(ValueError):
@@ -71,14 +71,20 @@ def _snapshot_sets():
     if len(keepers) != 4:
         raise StagingMarketPurgeError("Snapshot must contain exactly four keepers.")
 
-    if len(purge) != 36:
-        raise StagingMarketPurgeError("Snapshot must contain exactly 36 purge targets.")
+    expected_purge_count = SOURCE_TOTAL_MARKETS - len(keepers)
+
+    if len(purge) != expected_purge_count:
+        raise StagingMarketPurgeError(
+            "Snapshot purge target count does " "not match SOURCE_TOTAL_MARKETS."
+        )
 
     if keepers & purge:
         raise StagingMarketPurgeError("Keeper and purge UUIDs overlap.")
 
     if len(keepers | purge) != SOURCE_TOTAL_MARKETS:
-        raise StagingMarketPurgeError("Snapshot does not contain exactly 40 markets.")
+        raise StagingMarketPurgeError(
+            "Snapshot market count does not " "match SOURCE_TOTAL_MARKETS."
+        )
 
     return keepers, purge
 
@@ -175,7 +181,8 @@ def _market_has_unsettled_financial_state(
 def _unwind_market_if_required(
     *,
     market_id,
-    actor,
+    resolution_actor,
+    refund_actor,
     report,
 ):
     market = Market.objects.select_for_update().get(id=market_id)
@@ -202,7 +209,7 @@ def _unwind_market_if_required(
     if market.status == Market.Status.VOIDED:
         refunded = MarketVoidRefundService.refund_void_market(
             market_id=market.id,
-            actor=actor,
+            actor=refund_actor,
         )
 
         report.refunded_market_ids.append(str(refunded.market_id))
@@ -217,7 +224,7 @@ def _unwind_market_if_required(
 
     voided = MarketResolutionService.void(
         market_id=market.id,
-        actor=actor,
+        actor=resolution_actor,
         notes=("Staging-only cleanup of obsolete " "synthetic market data."),
         evidence=("Verified 2026-08-18 staging purge " "snapshot."),
     )
@@ -226,7 +233,7 @@ def _unwind_market_if_required(
 
     refunded = MarketVoidRefundService.refund_void_market(
         market_id=voided.id,
-        actor=actor,
+        actor=refund_actor,
     )
 
     report.refunded_market_ids.append(str(refunded.market_id))
@@ -347,7 +354,8 @@ def _delete_market_graph(
 
 def build_purge_preflight(
     *,
-    actor=None,
+    resolution_actor=None,
+    refund_actor=None,
 ):
     keepers, purge = _snapshot_sets()
 
@@ -405,52 +413,67 @@ def build_purge_preflight(
         if (str(row["id"]) not in settled_set and row["status"] != Market.Status.VOIDED)
     )
 
-    actor_creator_conflict_ids = []
+    resolution_creator_conflict_ids = []
 
-    if actor is not None:
-        actor_creator_conflict_ids = sorted(
+    if resolution_actor is not None:
+        resolution_creator_conflict_ids = sorted(
             str(row["id"])
             for row in unsettled_rows
-            if (str(row["id"]) in void_required_ids and row["created_by_id"] == actor.id)
+            if (str(row["id"]) in void_required_ids and row["created_by_id"] == resolution_actor.id)
         )
 
-    actor_has_resolution_permission = None
-    actor_has_refund_permission = None
+    resolution_actor_has_permission = None
+    refund_actor_has_permission = None
 
-    if actor is not None:
-        actor_has_resolution_permission = PermissionService.has_any_permission(
-            actor,
+    if resolution_actor is not None:
+        resolution_actor_has_permission = PermissionService.has_any_permission(
+            resolution_actor,
             (MarketResolutionService.RESULT_VERIFICATION_PERMISSIONS),
         )
 
-        actor_has_refund_permission = PermissionService.has_permission(
-            actor,
+    if refund_actor is not None:
+        refund_actor_has_permission = PermissionService.has_permission(
+            refund_actor,
             (MarketVoidRefundService.APPROVE_PERMISSION),
         )
 
+    actors_are_distinct = bool(
+        resolution_actor is not None
+        and refund_actor is not None
+        and resolution_actor.id != refund_actor.id
+    )
+
     snapshot_matches = market_ids == expected_ids
 
-    actor_ready = (
-        actor is not None
-        and actor_has_resolution_permission
-        and actor_has_refund_permission
-        and not actor_creator_conflict_ids
+    actors_ready = (
+        resolution_actor is not None
+        and refund_actor is not None
+        and resolution_actor_has_permission
+        and refund_actor_has_permission
+        and actors_are_distinct
+        and not resolution_creator_conflict_ids
     )
 
     can_execute = (
         snapshot_matches
         and len(keepers & market_ids) == 4
-        and len(purge & market_ids) == 36
-        and actor_ready
+        and len(purge & market_ids) == len(purge)
+        and actors_ready
     )
 
     return {
         "snapshot_version": SNAPSHOT_VERSION,
         "snapshot_digest": SNAPSHOT_DIGEST,
-        "database_market_count": len(market_ids),
-        "snapshot_matches_database": market_ids == expected_ids,
-        "keeper_count": len(keepers & market_ids),
-        "purge_target_count": len(purge & market_ids),
+        "database_market_count": len(
+            market_ids,
+        ),
+        "snapshot_matches_database": snapshot_matches,
+        "keeper_count": len(
+            keepers & market_ids,
+        ),
+        "purge_target_count": len(
+            purge & market_ids,
+        ),
         "unexpected_market_ids": sorted(
             market_ids - expected_ids,
         ),
@@ -460,10 +483,14 @@ def build_purge_preflight(
         "unsettled_financial_market_ids": unsettled_ids,
         "settled_market_ids": sorted(settled_ids),
         "void_required_market_ids": void_required_ids,
-        "actor_email": (str(actor.email or "") if actor is not None else ""),
-        "actor_creator_conflict_ids": actor_creator_conflict_ids,
-        "actor_has_resolution_permission": actor_has_resolution_permission,
-        "actor_has_refund_permission": actor_has_refund_permission,
+        "resolution_actor_email": (
+            str(resolution_actor.email or "") if resolution_actor is not None else ""
+        ),
+        "refund_actor_email": (str(refund_actor.email or "") if refund_actor is not None else ""),
+        "resolution_actor_creator_conflict_ids": resolution_creator_conflict_ids,
+        "resolution_actor_has_permission": resolution_actor_has_permission,
+        "refund_actor_has_permission": refund_actor_has_permission,
+        "actors_are_distinct": actors_are_distinct,
         "can_execute": can_execute,
         "affected_ledger_entry_count": len(
             _affected_ledger_ids(
@@ -478,7 +505,8 @@ def build_purge_preflight(
 @transaction.atomic
 def apply_staging_market_purge(
     *,
-    actor,
+    resolution_actor,
+    refund_actor,
     confirmation,
     snapshot_digest,
 ):
@@ -519,7 +547,8 @@ def apply_staging_market_purge(
     for market_id in sorted(purge):
         _unwind_market_if_required(
             market_id=market_id,
-            actor=actor,
+            resolution_actor=resolution_actor,
+            refund_actor=refund_actor,
             report=report,
         )
 
@@ -615,7 +644,7 @@ def apply_staging_market_purge(
     return {
         "snapshot_version": SNAPSHOT_VERSION,
         "snapshot_digest": SNAPSHOT_DIGEST,
-        "deleted_market_count": 36,
+        "deleted_market_count": len(purge),
         "remaining_market_count": 4,
         "voided_market_count": len(
             report.voided_market_ids,

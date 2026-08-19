@@ -54,30 +54,48 @@ def test_preflight_hidden_from_other_synthetic_accounts():
 
 @pytest.mark.django_db
 @override_settings(REVIEW_WORKFLOW_TOOLS_ENABLED=True)
+@pytest.mark.parametrize(
+    "request_actor_email",
+    (
+        "results.local@leagueos.test",
+        "superadmin.local@leagueos.test",
+    ),
+)
 @patch("system.views.build_purge_preflight")
-def test_preflight_uses_exact_superadmin_actor(
+def test_preflight_uses_exact_dual_actor_pair(
     build_preflight,
+    request_actor_email,
 ):
-    user = make_user(
+    resolution_actor = make_user(
+        "results.local@leagueos.test",
+    )
+    refund_actor = make_user(
         "superadmin.local@leagueos.test",
     )
 
+    if request_actor_email == resolution_actor.email:
+        request_actor = resolution_actor
+    else:
+        request_actor = refund_actor
+
     build_preflight.return_value = {
-        "snapshot_version": "test-v1",
+        "snapshot_version": "test-v2",
         "snapshot_digest": "abc",
-        "database_market_count": 40,
+        "database_market_count": 46,
         "snapshot_matches_database": True,
         "keeper_count": 4,
-        "purge_target_count": 36,
+        "purge_target_count": 42,
         "unexpected_market_ids": [],
         "missing_snapshot_ids": [],
         "unsettled_financial_market_ids": [],
         "settled_market_ids": [],
         "void_required_market_ids": [],
-        "actor_email": user.email,
-        "actor_creator_conflict_ids": [],
-        "actor_has_resolution_permission": True,
-        "actor_has_refund_permission": True,
+        "resolution_actor_email": resolution_actor.email,
+        "refund_actor_email": refund_actor.email,
+        "resolution_actor_creator_conflict_ids": [],
+        "resolution_actor_has_permission": True,
+        "refund_actor_has_permission": True,
+        "actors_are_distinct": True,
         "can_execute": True,
         "affected_ledger_entry_count": 0,
         "payment_counts": {
@@ -89,11 +107,14 @@ def test_preflight_uses_exact_superadmin_actor(
         "ledger_entry_count": 0,
     }
 
-    response = authenticate(user).get(URL)
+    response = authenticate(
+        request_actor,
+    ).get(URL)
 
     assert response.status_code == 200
     assert response.json()["can_execute"] is True
 
     build_preflight.assert_called_once_with(
-        actor=user,
+        resolution_actor=resolution_actor,
+        refund_actor=refund_actor,
     )

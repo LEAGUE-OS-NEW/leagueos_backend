@@ -304,6 +304,18 @@ class SportingEvent(TimeStampedUUIDModel):
         max_length=255,
         blank=True,
     )
+    match_type = models.CharField(
+        max_length=40,
+        blank=True,
+    )
+    show_in_markets = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+    is_live_score_featured = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
     country_code = models.CharField(
         max_length=2,
         blank=True,
