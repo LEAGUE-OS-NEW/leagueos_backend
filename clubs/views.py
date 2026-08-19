@@ -291,6 +291,10 @@ class MerchandiseProductViewSet(viewsets.ModelViewSet):
         serializer.save(club=club, created_by=self.request.user)
 
 
+@extend_schema_view(
+    list=extend_schema(operation_id="api_v1_club_players_list"),
+    retrieve=extend_schema(operation_id="api_v1_club_players_retrieve"),
+)
 class ClubPlayerViewSet(viewsets.ModelViewSet):
     serializer_class = ClubPlayerSerializer
     permission_classes = [IsClubStaff]
