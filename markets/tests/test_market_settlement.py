@@ -33,6 +33,7 @@ from markets.services.catalog_service import MarketCatalogService
 from markets.services.lifecycle_service import MarketLifecycleService
 from markets.services.resolution_service import MarketResolutionService
 from markets.services.settlement_service import MarketSettlementService
+from notifications.models import Notification, NotificationCategory
 from sports.models import Competition, Sport, SportingEvent
 from wallets.models import LedgerEntry, Wallet, WalletTransaction
 from wallets.services.wallet_service import WalletService
@@ -63,6 +64,9 @@ class SettlementFixtureMixin:
         UserRoleFactory(user=self.actor, role=role)
         self.outsider = UserFactory()
         UserRoleFactory(user=self.outsider, role=operations_role)
+        NotificationCategory.objects.get_or_create(
+            code="MARKET_SETTLEMENTS", defaults={"name": "Market Settlements"}
+        )
         self.sport = Sport.objects.create(name="Football", code="FOOTBALL")
         self.category = MarketCategory.objects.create(name="Settlement")
         self.competition = Competition.objects.create(
@@ -511,6 +515,39 @@ class MarketSettlementServiceTests(SettlementFixtureMixin, TestCase):
         self.assertIsNotNone(winner_transaction.completed_at)
 
         self.assertFalse(WalletTransaction.objects.filter(wallet__user=loser.user).exists())
+
+    def test_settlement_sends_win_and_loss_notifications(self):
+        market = self.resolve_market()
+        losing_outcome = market.outcomes.get(side=MarketOutcome.Side.NO)
+
+        winner = self.create_position(market=market, quantity="4.0000", cost="2.0000")
+        loser = self.create_position(
+            market=market,
+            outcome=losing_outcome,
+            quantity="3.0000",
+            cost="1.2000",
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            settlement = MarketSettlementService.settle_market(
+                market_id=market.id,
+                actor=self.actor,
+            )
+        winner_record = settlement.position_settlements.get(participant=winner.user)
+
+        win_notification = Notification.objects.get(recipient=winner.user)
+        self.assertEqual(win_notification.event_type, "SETTLEMENT_WIN")
+        self.assertEqual(win_notification.category.code, "MARKET_SETTLEMENTS")
+        self.assertTrue(win_notification.mandatory)
+        self.assertEqual(win_notification.title, "You won!")
+        self.assertIn(str(winner_record.net_payout_amount), win_notification.message)
+
+        loss_notification = Notification.objects.get(recipient=loser.user)
+        self.assertEqual(loss_notification.event_type, "SETTLEMENT_LOSS")
+        self.assertEqual(loss_notification.category.code, "MARKET_SETTLEMENTS")
+        self.assertTrue(loss_notification.mandatory)
+        self.assertEqual(loss_notification.title, "Market settled")
+        self.assertIn("didn't win", loss_notification.message)
 
     def test_failure_restores_existing_wallet_and_ledger_history(
         self,

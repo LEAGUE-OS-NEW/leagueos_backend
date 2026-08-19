@@ -38,6 +38,7 @@ from markets.services.resolution_service import MarketResolutionService
 from markets.services.settlement_service import MarketSettlementService
 from markets.services.void_refund_service import MarketVoidRefundService
 from markets.tests.eligibility_test_support import make_market_eligible
+from notifications.models import Notification, NotificationCategory
 from sports.models import Competition, Sport, SportingEvent
 from wallets.models import LedgerEntry, Wallet, WalletTransaction
 from wallets.services.wallet_service import WalletService
@@ -68,6 +69,9 @@ class VoidRefundFixtureMixin:
             UserRoleFactory(user=user, role=approval_role)
         UserRoleFactory(user=self.creator, role=operations_role)
         UserRoleFactory(user=self.trader, role=participant_role)
+        NotificationCategory.objects.get_or_create(
+            code="MARKET_SETTLEMENTS", defaults={"name": "Market Settlements"}
+        )
         self.sport = Sport.objects.create(name="Football", code="FOOTBALL")
         self.category = MarketCategory.objects.create(name="Void refunds")
         self.competition = Competition.objects.create(
@@ -468,9 +472,23 @@ class MarketVoidRefundServiceTests(VoidRefundFixtureMixin, TestCase):
         self.assertEqual(transaction.amount, record.net_refund_amount)
         self.assertIsNotNone(transaction.completed_at)
 
-        self.assertFalse(
-            WalletTransaction.objects.filter(wallet__user=zero_position.user).exists()
-        )
+        self.assertFalse(WalletTransaction.objects.filter(wallet__user=zero_position.user).exists())
+
+    def test_refund_sends_void_notification(self):
+        market = self.void_market(self.approve_market(self.create_market()))
+        position = self.position(market, quantity="4", cost="2.4000")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            refund = MarketVoidRefundService.refund_void_market(
+                market_id=market.id, actor=self.actor
+            )
+        record = refund.position_refunds.get(market_position=position)
+
+        notification = Notification.objects.get(recipient=position.user)
+        self.assertEqual(notification.event_type, "VOID_REFUND")
+        self.assertEqual(notification.category.code, "MARKET_SETTLEMENTS")
+        self.assertTrue(notification.mandatory)
+        self.assertIn(str(record.net_refund_amount), notification.message)
 
     def test_replay_is_idempotent_and_preserves_original_actor_and_time(self):
         market = self.void_market(self.approve_market(self.create_market()))
