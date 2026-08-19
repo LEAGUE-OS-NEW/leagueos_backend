@@ -242,3 +242,24 @@ class MarketPurgePreflightSerializer(serializers.Serializer):
     affected_ledger_entry_count = serializers.IntegerField()
     payment_counts = MarketPurgePaymentCountsSerializer()
     ledger_entry_count = serializers.IntegerField()
+
+
+class MarketPurgeExecutionRequestSerializer(serializers.Serializer):
+    confirmation = serializers.CharField()
+    snapshot_digest = serializers.CharField()
+
+
+class MarketPurgeExecutionResponseSerializer(serializers.Serializer):
+    snapshot_version = serializers.CharField()
+    snapshot_digest = serializers.CharField()
+    deleted_market_count = serializers.IntegerField()
+    remaining_market_count = serializers.IntegerField()
+    voided_market_count = serializers.IntegerField()
+    refunded_market_count = serializers.IntegerField()
+    preserved_existing_ledger_count = serializers.IntegerField()
+    new_ledger_entry_count = serializers.IntegerField()
+    wallets_never_lost_value = serializers.BooleanField()
+    payment_rows_unchanged = serializers.BooleanField()
+    deleted_by_model = serializers.DictField(
+        child=serializers.IntegerField(),
+    )
