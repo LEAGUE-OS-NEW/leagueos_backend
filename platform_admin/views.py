@@ -1259,13 +1259,14 @@ class FixtureResultVerificationQueueView(generics.ListAPIView):
             self.request.user, ("approve_market", "verify_results", "reject_result")
         ):
             return FixtureResultVerification.objects.none()
-        return (
-            FixtureResultVerification.objects.select_related(
-                "fixture", "fixture__sport", "fixture__competition", "fixture__match_centre",
-                "submitted_by", "reviewed_by",
-            )
-            .order_by("-submitted_at")
-        )
+        return FixtureResultVerification.objects.select_related(
+            "fixture",
+            "fixture__sport",
+            "fixture__competition",
+            "fixture__match_centre",
+            "submitted_by",
+            "reviewed_by",
+        ).order_by("-submitted_at")
 
     def list(self, request, *args, **kwargs):
         if not PermissionService.has_any_permission(

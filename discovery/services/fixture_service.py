@@ -33,7 +33,9 @@ class FixtureService:
         """Return verified fixtures with optimized queries."""
         qs = (
             SportingEvent.objects.filter(is_verified=True, sport__is_active=True)
-            .select_related("sport", "competition", "competition__sport", "match_centre", "result_verification")
+            .select_related(
+                "sport", "competition", "competition__sport", "match_centre", "result_verification"
+            )
             .prefetch_related("event_participants__participant")
         )
 

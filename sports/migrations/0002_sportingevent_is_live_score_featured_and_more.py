@@ -6,23 +6,23 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sports', '0001_initial'),
+        ("sports", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='sportingevent',
-            name='is_live_score_featured',
+            model_name="sportingevent",
+            name="is_live_score_featured",
             field=models.BooleanField(db_index=True, default=False),
         ),
         migrations.AddField(
-            model_name='sportingevent',
-            name='match_type',
+            model_name="sportingevent",
+            name="match_type",
             field=models.CharField(blank=True, max_length=40),
         ),
         migrations.AddField(
-            model_name='sportingevent',
-            name='show_in_markets',
+            model_name="sportingevent",
+            name="show_in_markets",
             field=models.BooleanField(db_index=True, default=False),
         ),
     ]

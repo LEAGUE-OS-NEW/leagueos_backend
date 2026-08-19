@@ -150,7 +150,14 @@ class FixtureAdminService:
             record.reviewed_at = None
             record.review_note = ""
             record.save(
-                update_fields=["status", "submitted_by", "reviewed_by", "reviewed_at", "review_note", "updated_at"]
+                update_fields=[
+                    "status",
+                    "submitted_by",
+                    "reviewed_by",
+                    "reviewed_at",
+                    "review_note",
+                    "updated_at",
+                ]
             )
         return record
 
@@ -162,7 +169,9 @@ class FixtureAdminService:
         verification.reviewed_by = actor
         verification.reviewed_at = timezone.now()
         verification.review_note = note
-        verification.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_note", "updated_at"])
+        verification.save(
+            update_fields=["status", "reviewed_by", "reviewed_at", "review_note", "updated_at"]
+        )
         return verification
 
     @staticmethod
@@ -173,7 +182,9 @@ class FixtureAdminService:
         verification.reviewed_by = actor
         verification.reviewed_at = timezone.now()
         verification.review_note = note
-        verification.save(update_fields=["status", "reviewed_by", "reviewed_at", "review_note", "updated_at"])
+        verification.save(
+            update_fields=["status", "reviewed_by", "reviewed_at", "review_note", "updated_at"]
+        )
         return verification
 
 

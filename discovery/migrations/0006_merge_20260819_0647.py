@@ -6,9 +6,8 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('discovery', '0005_fixtureresultverification'),
-        ('discovery', '0005_news_presentation_fields'),
+        ("discovery", "0005_fixtureresultverification"),
+        ("discovery", "0005_news_presentation_fields"),
     ]
 
-    operations = [
-    ]
+    operations = []
