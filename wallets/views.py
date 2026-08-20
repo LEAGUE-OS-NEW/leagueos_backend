@@ -23,6 +23,8 @@ from wallets.serializers import (
     LedgerEntryFilterSerializer,
     LedgerEntryReadSerializer,
     WalletReadSerializer,
+    WalletSpendReadSerializer,
+    WalletSpendSerializer,
     WithdrawalRequestFilterSerializer,
     WithdrawalRequestReadSerializer,
     WithdrawalRequestSerializer,
@@ -237,6 +239,51 @@ class DepositIntentDetailView(APIView):
             data["provider_status"] = pesapal.provider_status
 
         return Response(data)
+
+
+class WalletSpendView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = WalletSpendSerializer
+
+    @extend_schema(
+        request=WalletSpendSerializer,
+        responses={
+            201: WalletSpendReadSerializer,
+            400: OpenApiResponse(description="Invalid request data."),
+            401: OpenApiResponse(description="Authentication credentials are required."),
+        },
+        tags=["Wallets"],
+    )
+    def post(self, request):
+        serializer = WalletSpendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+
+        try:
+            wallet_transaction = WalletService.spend_available_balance(
+                user=request.user,
+                amount=values["amount"],
+                currency=values["currency"],
+                description=values.get("description", ""),
+                idempotency_key=values.get("idempotency_key"),
+            )
+        except DjangoValidationError as error:
+            raise_currency_validation(error)
+
+        wallet_transaction.wallet.refresh_from_db()
+
+        return Response(
+            WalletSpendReadSerializer(
+                {
+                    "transaction_id": wallet_transaction.id,
+                    "amount": wallet_transaction.amount,
+                    "currency": wallet_transaction.currency,
+                    "available_balance": wallet_transaction.wallet.available_balance,
+                    "reference": wallet_transaction.reference,
+                }
+            ).data,
+            status=201,
+        )
 
 
 class DepositCallbackView(APIView):

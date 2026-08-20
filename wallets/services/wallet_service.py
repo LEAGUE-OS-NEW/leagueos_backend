@@ -788,6 +788,99 @@ class WalletService:
 
         return withdrawal
 
+    @classmethod
+    @transaction.atomic
+    def spend_available_balance(
+        cls,
+        *,
+        user,
+        amount,
+        currency: str,
+        description: str = "",
+        idempotency_key=None,
+    ) -> WalletTransaction:
+        """Debit available wallet funds for an immediate fan purchase."""
+
+        if not getattr(user, "is_active", False):
+            raise ValidationError({"user": "An active account is required."})
+
+        currency = cls._normalize_currency(currency)
+        decimal_amount = cls._normalize_amount(amount)
+        normalized_description = str(description or "").strip()
+
+        try:
+            spend_key = UUID(str(idempotency_key)) if idempotency_key is not None else uuid4()
+        except (
+            TypeError,
+            ValueError,
+            AttributeError,
+        ) as error:
+            raise ValidationError({"idempotency_key": "A valid UUID is required."}) from error
+
+        transaction_reference = f"SPEND-{spend_key.hex}"
+
+        wallet = (
+            Wallet.objects.select_for_update()
+            .filter(
+                user=user,
+                currency=currency,
+            )
+            .first()
+        )
+
+        if wallet is None:
+            raise ValidationError({"currency": "No wallet exists for the specified currency."})
+
+        if wallet.status != Wallet.Status.ACTIVE:
+            raise ValidationError({"wallet": "This wallet is not active."})
+
+        existing_transaction = (
+            WalletTransaction.objects.select_related("wallet")
+            .filter(reference=transaction_reference)
+            .first()
+        )
+
+        if existing_transaction is not None:
+            matches = all(
+                (
+                    existing_transaction.wallet.user_id == user.pk,
+                    existing_transaction.wallet.currency == currency,
+                    existing_transaction.amount == decimal_amount,
+                    existing_transaction.transaction_type
+                    == WalletTransaction.TransactionType.ADJUSTMENT,
+                )
+            )
+
+            if not matches:
+                raise ValidationError({"idempotency_key": IDEMPOTENCY_ERROR})
+
+            return existing_transaction
+
+        wallet_transaction = WalletTransaction.objects.create(
+            wallet=wallet,
+            reference=transaction_reference,
+            transaction_type=WalletTransaction.TransactionType.ADJUSTMENT,
+            amount=decimal_amount,
+            currency=currency,
+            status=WalletTransaction.Status.COMPLETED,
+            description=normalized_description or "Wallet purchase",
+            completed_at=timezone.now(),
+        )
+
+        cls.debit_available(
+            user=user,
+            currency=currency,
+            amount=decimal_amount,
+            idempotency_reference=uuid5(
+                spend_key,
+                "wallet-spend-debit",
+            ),
+            transaction=wallet_transaction,
+            counterparty_account=LedgerEntry.AccountType.REVENUE,
+        )
+
+        return wallet_transaction
+
     @staticmethod
     def _require_withdrawal_actor(actor):
         if actor is None or not getattr(
