@@ -139,6 +139,8 @@ class MarketPublicSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     trading_snapshot = serializers.SerializerMethodField()
+    is_settled = serializers.SerializerMethodField()
+    is_refunded = serializers.SerializerMethodField()
 
     class Meta:
         model = Market
@@ -174,7 +176,17 @@ class MarketPublicSerializer(serializers.ModelSerializer):
             "opening_liquidity_available",
             "opening_reference",
             "opening_liquidity",
+            "is_settled",
+            "is_refunded",
         ]
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_is_settled(self, obj):
+        return hasattr(obj, "settlement")
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_is_refunded(self, obj):
+        return hasattr(obj, "void_refund")
 
     @extend_schema_field(serializers.DictField())
     def get_opening_liquidity(self, obj):

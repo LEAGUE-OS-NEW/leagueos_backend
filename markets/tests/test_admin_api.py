@@ -296,6 +296,13 @@ class MarketAdminAPITests(APITestCase):
             response.data["status_transitions"][0]["actor_email"],
             self.operations_user.email,
         )
+        # Inherited from MarketPublicSerializer — proves the general admin
+        # read serializer carries settlement/refund visibility too, not just
+        # the dedicated result-verification serializer.
+        self.assertIn("is_settled", response.data)
+        self.assertIn("is_refunded", response.data)
+        self.assertFalse(response.data["is_settled"])
+        self.assertFalse(response.data["is_refunded"])
 
     def test_operations_admin_can_create_draft_market(self):
         self.authenticate(self.operations_user)
