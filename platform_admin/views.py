@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -52,6 +53,7 @@ from platform_admin.serializers import (
     PlatformMembershipSubscribeSerializer,
     PlatformMembershipSubscriptionSerializer,
 )
+from wallets.services.wallet_service import WalletService
 
 
 def _can_manage_platform_memberships(user) -> bool:
@@ -1017,22 +1019,41 @@ class PlatformMembershipSubscribeView(APIView):
         if not plan:
             return Response({"detail": "Active membership plan not found."}, status=404)
 
-        PlatformMembershipSubscription.objects.filter(
-            user=request.user,
-            status=PlatformMembershipSubscription.Status.ACTIVE,
-        ).update(
-            status=PlatformMembershipSubscription.Status.CANCELLED,
-            cancelled_at=timezone.now(),
-        )
+        try:
+            with transaction.atomic():
+                wallet_transaction = WalletService.spend_available_balance(
+                    user=request.user,
+                    amount=plan.price,
+                    currency=plan.currency,
+                    description=f"Membership purchase - {plan.name}",
+                    idempotency_key=serializer.validated_data.get("idempotency_key"),
+                )
 
-        subscription = PlatformMembershipSubscription.objects.create(
-            user=request.user,
-            plan=plan,
-            status=PlatformMembershipSubscription.Status.ACTIVE,
-            renews_at=_membership_renews_at(plan),
-            amount_paid=plan.price,
-            currency=plan.currency,
-        )
+                PlatformMembershipSubscription.objects.filter(
+                    user=request.user,
+                    status=PlatformMembershipSubscription.Status.ACTIVE,
+                ).update(
+                    status=PlatformMembershipSubscription.Status.CANCELLED,
+                    cancelled_at=timezone.now(),
+                )
+
+                subscription = PlatformMembershipSubscription.objects.create(
+                    user=request.user,
+                    plan=plan,
+                    status=PlatformMembershipSubscription.Status.ACTIVE,
+                    renews_at=_membership_renews_at(plan),
+                    amount_paid=plan.price,
+                    currency=plan.currency,
+                    metadata={
+                        "wallet_transaction_id": str(wallet_transaction.id),
+                        "wallet_reference": wallet_transaction.reference,
+                    },
+                )
+        except DjangoValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                return Response(exc.message_dict, status=400)
+            return Response({"detail": " ".join(exc.messages)}, status=400)
+
         DashboardCacheService.invalidate_dashboard(request.user)
         return Response(PlatformMembershipSubscriptionSerializer(subscription).data, status=201)
 

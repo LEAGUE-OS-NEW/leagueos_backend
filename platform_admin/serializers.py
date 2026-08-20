@@ -217,6 +217,7 @@ class PlatformMembershipSubscriptionSerializer(serializers.ModelSerializer):
 
 class PlatformMembershipSubscribeSerializer(serializers.Serializer):
     plan_id = serializers.UUIDField()
+    idempotency_key = serializers.UUIDField(required=False)
 
 
 class PlatformMembershipStatusSerializer(serializers.Serializer):

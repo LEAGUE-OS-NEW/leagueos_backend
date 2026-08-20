@@ -104,6 +104,29 @@ class WithdrawalRequestSerializer(serializers.Serializer):
     idempotency_key = serializers.UUIDField(required=False)
 
 
+class WalletSpendSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        max_digits=16,
+        decimal_places=4,
+        min_value=Decimal("0.01"),
+    )
+    currency = serializers.CharField(max_length=3)
+    description = serializers.CharField(
+        allow_blank=True,
+        required=False,
+        max_length=500,
+    )
+    idempotency_key = serializers.UUIDField(required=False)
+
+
+class WalletSpendReadSerializer(serializers.Serializer):
+    transaction_id = serializers.UUIDField()
+    amount = serializers.DecimalField(max_digits=16, decimal_places=4)
+    currency = serializers.CharField()
+    available_balance = serializers.DecimalField(max_digits=16, decimal_places=4)
+    reference = serializers.CharField()
+
+
 class WithdrawalRequestFilterSerializer(serializers.Serializer):
     status = serializers.ChoiceField(
         choices=WithdrawalRequest.Status.choices,
