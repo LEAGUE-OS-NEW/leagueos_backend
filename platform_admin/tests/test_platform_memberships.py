@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from platform_admin.models import PlatformMembershipSubscription
+from wallets.tests.factories import WalletFactory
 
 from .factories import UserFactory
 
@@ -12,6 +15,7 @@ pytestmark = pytest.mark.django_db
 def test_super_admin_membership_plans_feed_fan_subscriptions():
     super_admin = UserFactory(is_superuser=True)
     fan = UserFactory(email="fan@example.com", username="fan")
+    wallet = WalletFactory(user=fan, currency="UGX", available_balance="20000.0000")
     client = APIClient()
 
     client.force_authenticate(user=super_admin)
@@ -61,6 +65,9 @@ def test_super_admin_membership_plans_feed_fan_subscriptions():
     assert subscribers_response.data[0]["plan_name"] == "LeagueOS Plus"
 
     subscription = PlatformMembershipSubscription.objects.get(id=subscribe_response.data["id"])
+    wallet.refresh_from_db()
+    assert wallet.available_balance == Decimal("5000.0000")
+
     cancel_response = client.post(f"/api/v1/admin/membership/subscribers/{subscription.id}/cancel/")
     assert cancel_response.status_code == status.HTTP_200_OK
     subscription.refresh_from_db()
