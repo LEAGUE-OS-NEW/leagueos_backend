@@ -60,6 +60,7 @@ from markets.lifecycle_views import (
     MarketOpenView,
     MarketRejectView,
     MarketReopenView,
+    MarketRevertToDraftView,
     MarketSubmitView,
     MarketSuspendView,
 )
@@ -507,6 +508,11 @@ urlpatterns = [
         ("market-admin/markets/" "<uuid:market_id>/open/"),
         MarketOpenView.as_view(),
         name="admin-market-open",
+    ),
+    path(
+        ("market-admin/markets/" "<uuid:market_id>/revert-to-draft/"),
+        MarketRevertToDraftView.as_view(),
+        name="admin-market-revert-to-draft",
     ),
     path(
         ("market-admin/markets/" "<uuid:market_id>/suspend/"),

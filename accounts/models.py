@@ -48,6 +48,7 @@ class User(AbstractUser):
         default=AccountStatus.ACTIVE,
         db_index=True,
     )
+    deletion_requested_at = models.DateTimeField(null=True, blank=True)
     failed_attempts = models.IntegerField(default=0)
     last_failed_attempt = models.DateTimeField(null=True, blank=True)
     locked_until = models.DateTimeField(null=True, blank=True)
@@ -200,6 +201,8 @@ class AuditLog(models.Model):
         ("ACCOUNT_SUSPENDED", "Account suspended"),
         ("ACCOUNT_DEACTIVATED", "Account deactivated"),
         ("ACCOUNT_REACTIVATED", "Account reactivated"),
+        ("ACCOUNT_DELETION_REQUESTED", "Account deletion requested"),
+        ("ACCOUNT_DELETION_CANCELLED", "Account deletion cancelled"),
         ("PASSWORD_CHANGED", "Password changed"),
         ("PASSWORD_SETUP_COMPLETED", "Password setup completed"),
         ("WORKSPACE_ASSIGNED", "Workspace assigned"),

@@ -13,11 +13,16 @@ class HasMarketAdminAccess(BasePermission):
 
     def has_permission(self, request, view) -> bool:
         if request.method in SAFE_METHODS:
+            # Result-verification actors need read access to a market's
+            # detail (e.g. to resolve outcome ids) without holding full
+            # market-admin write access — see HasResultVerificationPermission.
             return PermissionService.has_any_permission(
                 request.user,
                 (
                     "manage_market",
                     "approve_market",
+                    "verify_results",
+                    "reject_result",
                 ),
             )
 

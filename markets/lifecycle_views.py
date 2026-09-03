@@ -134,6 +134,14 @@ class MarketOpenView(MarketLifecycleActionView):
     service_method_name = "open"
 
 
+class MarketRevertToDraftView(MarketLifecycleActionView):
+    permission_classes = [
+        IsAuthenticated,
+        HasApproveMarketPermission,
+    ]
+    service_method_name = "revert_to_draft"
+
+
 class MarketSuspendView(MarketLifecycleActionView):
     permission_classes = [
         IsAuthenticated,
