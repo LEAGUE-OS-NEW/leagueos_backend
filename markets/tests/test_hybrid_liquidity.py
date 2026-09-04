@@ -408,10 +408,11 @@ class HybridLiquidityTests(TestCase):
         self.assertEqual(set(references), financial_before["references"])
         self.assertEqual(len(references), len(set(references)))
 
-    def test_demo_refresh_covers_untraded_competition_and_participant_horizons(self):
+    def test_demo_refresh_ignores_noncanonical_long_horizon_markets(self):
         self.competition.source_name = "LEAGUE_OS_DEMO"
         self.competition.source_reference = "demo-long-competition"
         self.competition.save()
+
         participant = Participant.objects.create(
             sport=self.sport,
             name="Vipers SC",
@@ -419,120 +420,229 @@ class HybridLiquidityTests(TestCase):
             source_reference="demo-long-participant",
             is_verified=True,
         )
+
         competition_market = MarketCatalogService.create_market(
             sport=self.sport,
             category=self.category,
             scope_type=MarketScope.COMPETITION,
             competition=self.competition,
-            question="Will Vipers SC win the Uganda Premier League?",
+            question=("Will Vipers SC win the " "Uganda Premier League?"),
             description="Long horizon.",
             rules="Official table.",
             resolution_source="Official result",
             resolution_criteria="Champion.",
             status=Market.Status.DRAFT,
-            opens_at=self.now - timedelta(days=1),
-            closes_at=self.now - timedelta(hours=1),
+            opens_at=(self.now - timedelta(days=1)),
+            closes_at=(self.now - timedelta(hours=1)),
             created_by=self.operator,
         )
+
         participant_market = MarketCatalogService.create_market(
             sport=self.sport,
             category=self.category,
             scope_type=MarketScope.PARTICIPANT,
             participant=participant,
-            question="Will KOBS Rugby Club score 3 or more tries in their next league match?",
+            question=(
+                "Will KOBS Rugby Club score " "3 or more tries in their " "next league match?"
+            ),
             description="Long horizon.",
             rules="Official result.",
             resolution_source="Official result",
             resolution_criteria="Try count.",
             status=Market.Status.DRAFT,
-            opens_at=self.now - timedelta(days=1),
-            closes_at=self.now - timedelta(hours=1),
+            opens_at=(self.now - timedelta(days=1)),
+            closes_at=(self.now - timedelta(hours=1)),
             created_by=self.operator,
         )
-        before_events = SportingEvent.objects.count()
-        args = ("--confirm", "--market-admin-email", self.operator.email)
-        call_command("refresh_market_demo_staging", *args, stdout=StringIO())
-        for market, scope in (
-            (competition_market, MarketScope.COMPETITION),
-            (participant_market, MarketScope.PARTICIPANT),
-        ):
-            market.refresh_from_db()
-            self.assertEqual(market.scope_type, scope)
-            self.assertIsNone(market.sporting_event_id)
-            self.assertGreater(market.closes_at, self.now)
-            self.assertEqual(market.settles_by, market.closes_at + timedelta(hours=48))
-            self.assertEqual(market.face_value_ugx, 10000)
-            self.assertEqual(market.liquidity_configuration.initial_liquidity_ugx, 500000)
-        self.assertEqual(SportingEvent.objects.count(), before_events)
 
-    def test_demo_refresh_preserves_traded_long_horizon_and_reuses_replacement(self):
+        markets = (
+            competition_market,
+            participant_market,
+        )
+
+        original = {
+            market.id: (
+                market.opens_at,
+                market.closes_at,
+                market.settles_by,
+                market.face_value_ugx,
+            )
+            for market in markets
+        }
+
+        before_market_count = Market.objects.count()
+        before_events = SportingEvent.objects.count()
+
+        args = (
+            "--confirm",
+            "--market-admin-email",
+            self.operator.email,
+        )
+
+        call_command(
+            "refresh_market_demo_staging",
+            *args,
+            stdout=StringIO(),
+        )
+        call_command(
+            "refresh_market_demo_staging",
+            *args,
+            stdout=StringIO(),
+        )
+
+        for market in markets:
+            market.refresh_from_db()
+
+            self.assertEqual(
+                (
+                    market.opens_at,
+                    market.closes_at,
+                    market.settles_by,
+                    market.face_value_ugx,
+                ),
+                original[market.id],
+            )
+
+            self.assertFalse(
+                hasattr(
+                    market,
+                    "liquidity_configuration",
+                )
+            )
+
+        self.assertEqual(
+            Market.objects.count(),
+            before_market_count,
+        )
+
+        self.assertEqual(
+            SportingEvent.objects.count(),
+            before_events,
+        )
+
+    def test_demo_refresh_does_not_recreate_traded_noncanonical_long_horizon_markets(
+        self,
+    ):
         self.competition.source_name = "LEAGUE_OS_DEMO"
         self.competition.source_reference = "demo-historical-competition"
         self.competition.save()
+
         participant = Participant.objects.create(
             sport=self.sport,
             name="Historical KOBS Rugby Club",
             source_name="LEAGUE_OS_DEMO",
-            source_reference="demo-historical-participant",
+            source_reference=("demo-historical-participant"),
             is_verified=True,
         )
+
         historical_competition = MarketCatalogService.create_market(
             sport=self.sport,
             category=self.category,
             scope_type=MarketScope.COMPETITION,
             competition=self.competition,
-            question="Will Vipers SC win the Uganda Premier League?",
-            description="Historical long horizon.",
+            question=("Will Vipers SC win the " "Uganda Premier League?"),
+            description=("Historical long horizon."),
             rules="Official table.",
             resolution_source="Official result",
             resolution_criteria="Champion.",
             status=Market.Status.DRAFT,
-            opens_at=self.now - timedelta(days=20),
-            closes_at=self.now - timedelta(days=10),
+            opens_at=(self.now - timedelta(days=20)),
+            closes_at=(self.now - timedelta(days=10)),
             created_by=self.operator,
         )
+
         historical_participant = MarketCatalogService.create_market(
             sport=self.sport,
             category=self.category,
             scope_type=MarketScope.PARTICIPANT,
             participant=participant,
-            question="Will KOBS Rugby Club score 3 or more tries in their next league match?",
-            description="Historical participant horizon.",
+            question=(
+                "Will KOBS Rugby Club score " "3 or more tries in their " "next league match?"
+            ),
+            description=("Historical participant " "horizon."),
             rules="Official result.",
             resolution_source="Official result",
             resolution_criteria="Try count.",
             status=Market.Status.DRAFT,
-            opens_at=self.now - timedelta(days=20),
-            closes_at=self.now - timedelta(days=10),
+            opens_at=(self.now - timedelta(days=20)),
+            closes_at=(self.now - timedelta(days=10)),
             created_by=self.operator,
         )
-        historical_markets = (historical_competition, historical_participant)
+
+        historical_markets = (
+            historical_competition,
+            historical_participant,
+        )
+
         for historical in historical_markets:
             MarketPosition.objects.create(
                 user=self.provider_user,
                 market=historical,
-                outcome=historical.outcomes.get(side="YES"),
+                outcome=(
+                    historical.outcomes.get(
+                        side="YES",
+                    )
+                ),
                 quantity=Decimal("1"),
-                average_entry_price=Decimal("0.5"),
+                average_entry_price=(Decimal("0.5")),
                 total_cost=Decimal("0.5"),
             )
+
         original_closes = {market.id: market.closes_at for market in historical_markets}
+
+        before_market_count = Market.objects.count()
         before_events = SportingEvent.objects.count()
-        args = ("--confirm", "--market-admin-email", self.operator.email)
-        call_command("refresh_market_demo_staging", *args, stdout=StringIO())
-        call_command("refresh_market_demo_staging", *args, stdout=StringIO())
+
+        args = (
+            "--confirm",
+            "--market-admin-email",
+            self.operator.email,
+        )
+
+        call_command(
+            "refresh_market_demo_staging",
+            *args,
+            stdout=StringIO(),
+        )
+        call_command(
+            "refresh_market_demo_staging",
+            *args,
+            stdout=StringIO(),
+        )
+
         for historical in historical_markets:
             historical.refresh_from_db()
-            self.assertEqual(historical.closes_at, original_closes[historical.id])
+
+            self.assertEqual(
+                historical.closes_at,
+                original_closes[historical.id],
+            )
+
             replacements = Market.objects.filter(
                 question=historical.question,
-                scope_type=historical.scope_type,
-                competition=historical.competition,
-                participant=historical.participant,
+                scope_type=(historical.scope_type),
+                competition=(historical.competition),
+                participant=(historical.participant),
                 sporting_event__isnull=True,
-                closes_at__gt=self.now,
+            ).exclude(
+                pk=historical.pk,
             )
-            self.assertEqual(replacements.count(), 1)
-            self.assertIsNone(replacements.get().sporting_event_id)
-            self.assertEqual(MarketPosition.objects.get(market=historical).quantity, 1)
-        self.assertEqual(SportingEvent.objects.count(), before_events)
+
+            self.assertFalse(replacements.exists())
+
+            self.assertEqual(
+                MarketPosition.objects.get(
+                    market=historical,
+                ).quantity,
+                Decimal("1"),
+            )
+
+        self.assertEqual(
+            Market.objects.count(),
+            before_market_count,
+        )
+
+        self.assertEqual(
+            SportingEvent.objects.count(),
+            before_events,
+        )

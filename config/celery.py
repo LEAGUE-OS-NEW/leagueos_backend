@@ -47,6 +47,13 @@ def discover_markets_tasks():
         sender.add_periodic_task(300, close_due_markets_task.s(), name="markets-close-due")
 
 
+def discover_fantasy_tasks():
+    """Register Fantasy Celery tasks so the worker can execute them."""
+    if app is None:
+        return
+    app.autodiscover_tasks(["fantasy"])
+
+
 def _retention_cleanup_task():
     from kyc.services.retention_service import KYCRetentionService
 

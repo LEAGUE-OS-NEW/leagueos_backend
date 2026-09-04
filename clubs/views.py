@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from django.core.exceptions import ValidationError
+from django.db.models import F
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from discovery.models import News
@@ -21,6 +22,7 @@ from clubs.models import (
     ClubAuditLog,
     ClubMedia,
     ClubNews,
+    ClubPlayer,
     ClubProfileVersion,
     ClubWorkspace,
     MembershipPlan,
@@ -41,18 +43,21 @@ from clubs.serializers.club_serializers import (
     ClubLogoUploadSerializer,
     ClubMediaSerializer,
     ClubNewsSerializer,
+    ClubPlayerSerializer,
     ClubProfileVersionSerializer,
     ClubWorkspaceSerializer,
     FanTicketOrderSerializer,
     MembershipPlanSerializer,
     MerchandiseProductSerializer,
     ProductCategorySerializer,
+    StoreCheckoutSerializer,
     StaffInvitationAcceptSerializer,
     StaffInvitationSerializer,
     StoreOrderSerializer,
     TicketOrderSerializer,
     TicketProductSerializer,
 )
+from clubs.services.store_service import store_service
 from profiles.models import Club
 
 
@@ -379,6 +384,109 @@ class MerchandiseProductViewSet(viewsets.ModelViewSet):
         serializer.save(club=club, created_by=self.request.user)
 
 
+class PublicMerchandiseProductListView(generics.ListAPIView):
+    """Public catalog of active, in-stock club merchandise."""
+
+    serializer_class = MerchandiseProductSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        queryset = (
+            MerchandiseProduct.objects.filter(
+                status=MerchandiseProduct.Status.ACTIVE,
+                stock__gt=F("reserved_stock"),
+                club__is_active=True,
+            )
+            .select_related("club", "category")
+            .order_by("-is_featured", "-created_at", "name")
+        )
+
+        club = self.request.query_params.get("club")
+        category = self.request.query_params.get("category")
+        if club:
+            queryset = queryset.filter(club__slug=club)
+        if category:
+            queryset = queryset.filter(metadata__cat=category)
+
+        return queryset
+
+
+class PublicStoreOrderCreateView(APIView):
+    """Create a paid store order from fan checkout items."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = StoreCheckoutSerializer
+
+    def post(self, request):
+        serializer = StoreCheckoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        values = serializer.validated_data
+        product_ids = [item["product"] for item in values["items"]]
+        products = {
+            product.id: product
+            for product in MerchandiseProduct.objects.select_related("club").filter(
+                id__in=product_ids,
+                status=MerchandiseProduct.Status.ACTIVE,
+                club__is_active=True,
+            )
+        }
+
+        if len(products) != len(set(product_ids)):
+            return Response(
+                {"detail": "One or more products are unavailable."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        clubs = {product.club_id for product in products.values()}
+        if len(clubs) != 1:
+            return Response(
+                {"detail": "Submit one club's products per store order."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order_items = [
+            {
+                "product": products[item["product"]],
+                "quantity": item["quantity"],
+            }
+            for item in values["items"]
+        ]
+
+        try:
+            order = store_service.create_order(
+                request.user,
+                next(iter(products.values())).club,
+                order_items,
+                shipping_address=values.get("shipping_address") or {},
+                metadata=values.get("metadata") or {},
+                status=StoreOrder.OrderStatus.PAID,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(StoreOrderSerializer(order).data, status=status.HTTP_201_CREATED)
+
+
+@extend_schema_view(
+    list=extend_schema(operation_id="api_v1_club_players_list"),
+    retrieve=extend_schema(operation_id="api_v1_club_players_retrieve"),
+)
+class ClubPlayerViewSet(viewsets.ModelViewSet):
+    serializer_class = ClubPlayerSerializer
+    permission_classes = [IsClubStaff]
+
+    def get_queryset(self):
+        return ClubPlayer.objects.filter(club_id=self.kwargs.get("club_pk")).order_by(
+            "jersey_number", "name"
+        )
+
+    def perform_create(self, serializer):
+        club_id = self.kwargs.get("club_pk")
+        club = Club.objects.get(id=club_id)
+        serializer.save(club=club)
+
+
 class ProductCategoryViewSet(viewsets.ModelViewSet):
     serializer_class = ProductCategorySerializer
     permission_classes = [IsClubStaff]
@@ -616,3 +724,204 @@ class StaffInvitationAcceptView(APIView):
             return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(ClubWorkspaceSerializer(workspace).data, status=status.HTTP_200_OK)
+
+
+# =============================================================================
+# Match Data Upload (Club Admin CSV import)
+# =============================================================================
+
+
+class ClubFixtureListView(APIView):
+    """Return fixtures that involve the requesting Club Admin's club.
+
+    Used to populate the fixture-picker dropdown before uploading a CSV.
+
+    GET /api/v1/<club_pk>/match-data/fixtures/
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="List fixtures available for match data upload",
+        responses={200: {"type": "array", "items": {"type": "object"}}},
+    )
+    def get(self, request, club_pk=None):
+        club = _get_club_or_404(club_pk)
+
+        from discovery.models import ClubProfile
+        from sports.models import EventParticipant, Participant, SportingEvent
+
+        # Collect all participant IDs (ATHLETE + TEAM) linked to this club
+        athlete_ids = set(
+            Participant.objects.filter(player_profile__club=club).values_list("id", flat=True)
+        )
+
+        # Events where any of the club's athletes participate directly
+        fixture_ids_via_athletes = set(
+            EventParticipant.objects.filter(participant_id__in=athlete_ids).values_list(
+                "event_id", flat=True
+            )
+        )
+
+        # Events in the club's league (ClubProfile.league)
+        club_profile = ClubProfile.objects.filter(club=club).first()
+        league_id = club_profile.league_id if club_profile else None
+        fixture_ids_via_league: set = set()
+        if league_id:
+            fixture_ids_via_league = set(
+                SportingEvent.objects.filter(competition_id=league_id).values_list("id", flat=True)
+            )
+
+        all_fixture_ids = fixture_ids_via_athletes | fixture_ids_via_league
+
+        fixtures = (
+            SportingEvent.objects.filter(
+                id__in=all_fixture_ids,
+            )
+            .select_related("competition")
+            .prefetch_related("event_participants__participant")
+            .order_by("-starts_at")
+        )
+
+        data = []
+        for f in fixtures:
+            participants = list(f.event_participants.select_related("participant").all())
+            home_team = next(
+                (ep.participant.name for ep in participants if ep.role == "HOME"), None
+            )
+            away_team = next(
+                (ep.participant.name for ep in participants if ep.role == "AWAY"), None
+            )
+            data.append(
+                {
+                    "id": str(f.id),
+                    "name": f.name,
+                    "starts_at": f.starts_at,
+                    "status": f.status,
+                    "competition": f.competition.name if f.competition else None,
+                    "home_team": home_team,
+                    "away_team": away_team,
+                }
+            )
+
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class ClubMatchDataUploadView(APIView):
+    """Accept a CSV file and import match player statistics for a fixture.
+
+    The entire file is validated before any row is written.  On success,
+    ``SportsFeedService.complete_ingestion()`` is called inside the same
+    ``transaction.atomic()`` block, which schedules
+    ``score_affected_gameweeks.delay()`` via ``transaction.on_commit()``.
+    The Club Admin never needs to click Recalculate.
+
+    POST /api/v1/<club_pk>/match-data/upload/
+    Content-Type: multipart/form-data
+    Body: file=<csv>
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="Upload match player statistics CSV",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {"file": {"type": "string", "format": "binary"}},
+            }
+        },
+        responses={
+            202: {"description": "Import accepted; fantasy scoring scheduled."},
+            400: {"description": "Validation failure with row-level errors."},
+        },
+    )
+    def post(self, request, club_pk=None):
+        from clubs.serializers.match_data_serializers import MatchDataUploadSerializer
+        from clubs.services.match_data_service import import_csv_for_club
+
+        club = _get_club_or_404(club_pk)
+
+        serializer = MatchDataUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        result = import_csv_for_club(
+            file_obj=serializer.validated_data["file"],
+            club=club,
+            uploaded_by=request.user,
+        )
+
+        if not result.success:
+            payload = {
+                "success": False,
+                "message": result.message,
+                "records_received": result.records_received,
+                "row_errors": result.row_errors,
+            }
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload = {
+            "success": True,
+            "message": result.message,
+            "records_received": result.records_received,
+            "records_processed": result.records_processed,
+            "ingestion_id": result.ingestion_id,
+            "fixture_ids": result.fixture_ids,
+        }
+        return Response(payload, status=status.HTTP_202_ACCEPTED)
+
+
+class ClubMatchDataTemplateView(APIView):
+    """Return a downloadable CSV template for the Club Admin.
+
+    GET /api/v1/<club_pk>/match-data/template/
+
+    Optionally pass ?sport=<sport_slug_or_name> to get sport-specific
+    example stat_type values.
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="Download CSV template for match data upload",
+        responses={200: {"description": "CSV file download."}},
+    )
+    def get(self, request, club_pk=None):
+        from django.http import HttpResponse
+
+        from clubs.services.match_data_service import generate_csv_template
+        from sports.models import Sport
+
+        _get_club_or_404(club_pk)  # permission check: club must exist
+
+        sport_param = request.query_params.get("sport", "")
+        sport = None
+        if sport_param:
+            sport = (
+                Sport.objects.filter(slug__iexact=sport_param).first()
+                or Sport.objects.filter(name__iexact=sport_param).first()
+            )
+
+        csv_content = generate_csv_template(sport=sport)
+        response = HttpResponse(csv_content, content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="match_data_template.csv"'
+        return response
+
+
+# ---------------------------------------------------------------------------
+# Internal helper used by the three views above
+# ---------------------------------------------------------------------------
+
+
+def _get_club_or_404(club_pk):
+    """Return the Club instance or raise Http404."""
+    from django.http import Http404
+
+    try:
+        return Club.objects.get(id=club_pk)
+    except Club.DoesNotExist as err:
+        raise Http404(f"Club {club_pk} not found.") from err

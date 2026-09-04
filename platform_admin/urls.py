@@ -10,6 +10,7 @@ from platform_admin.views import (
     AdminFixtureRescheduleView,
     AdminFixtureScoreView,
     AdminFixtureStatusView,
+    AdminFixtureSubmitVerificationView,
     AdminInvitationAcceptView,
     AdminInvitationListView,
     AdminInvitationRevokeView,
@@ -24,6 +25,11 @@ from platform_admin.views import (
     AdminNewsRejectView,
     AdminNewsSetFeaturedView,
     AdminNewsSetTrendingView,
+    AdminPlatformMembershipPlanDetailView,
+    AdminPlatformMembershipPlanListCreateView,
+    AdminPlatformMembershipPlanStatusView,
+    AdminPlatformMembershipSubscriberCancelView,
+    AdminPlatformMembershipSubscriberListView,
     AdminPermissionListView,
     AdminRoleDetailView,
     AdminRoleListView,
@@ -32,6 +38,9 @@ from platform_admin.views import (
     AdminUserRoleAssignView,
     AdminUserRoleListView,
     AdminUserRoleRevokeView,
+    FixtureResultRejectView,
+    FixtureResultVerifyView,
+    FixtureResultVerificationQueueView,
 )
 
 app_name = "platform_admin"
@@ -65,6 +74,31 @@ urlpatterns = [
     path("invitations/accept/", AdminInvitationAcceptView.as_view(), name="invitation-accept"),
     path("audit/", AdminAuditLogListView.as_view(), name="audit-list"),
     path("dashboard/", AdminDashboardSummaryView.as_view(), name="dashboard-summary"),
+    path(
+        "membership/plans/",
+        AdminPlatformMembershipPlanListCreateView.as_view(),
+        name="membership-plan-list-create",
+    ),
+    path(
+        "membership/plans/<uuid:plan_id>/",
+        AdminPlatformMembershipPlanDetailView.as_view(),
+        name="membership-plan-detail",
+    ),
+    path(
+        "membership/plans/<uuid:plan_id>/status/",
+        AdminPlatformMembershipPlanStatusView.as_view(),
+        name="membership-plan-status",
+    ),
+    path(
+        "membership/subscribers/",
+        AdminPlatformMembershipSubscriberListView.as_view(),
+        name="membership-subscriber-list",
+    ),
+    path(
+        "membership/subscribers/<uuid:subscription_id>/cancel/",
+        AdminPlatformMembershipSubscriberCancelView.as_view(),
+        name="membership-subscriber-cancel",
+    ),
     path("clubs/", ClubListView.as_view(), name="club-list"),
     path("news/", AdminNewsComposeView.as_view(), name="news-compose"),
     path("news/queue/", AdminNewsQueueListView.as_view(), name="news-queue"),
@@ -102,5 +136,25 @@ urlpatterns = [
         "fixtures/<uuid:fixture_id>/complete/",
         AdminFixtureCompleteView.as_view(),
         name="fixture-complete",
+    ),
+    path(
+        "fixtures/<uuid:fixture_id>/submit-verification/",
+        AdminFixtureSubmitVerificationView.as_view(),
+        name="fixture-submit-verification",
+    ),
+    path(
+        "fixture-results/",
+        FixtureResultVerificationQueueView.as_view(),
+        name="fixture-result-verification-queue",
+    ),
+    path(
+        "fixture-results/<uuid:verification_id>/verify/",
+        FixtureResultVerifyView.as_view(),
+        name="fixture-result-verify",
+    ),
+    path(
+        "fixture-results/<uuid:verification_id>/reject/",
+        FixtureResultRejectView.as_view(),
+        name="fixture-result-reject",
     ),
 ]

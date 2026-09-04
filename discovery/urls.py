@@ -21,6 +21,7 @@ from discovery.views import (
     SearchAutocompleteView,
     SearchSuggestionsView,
     SearchView,
+    SeasonCreateView,
 )
 
 app_name = "discovery"
@@ -63,6 +64,12 @@ urlpatterns = [
         "competitions/",
         CompetitionListView.as_view(),
         name="competition-list",
+    ),
+    # Seasons
+    path(
+        "seasons/",
+        SeasonCreateView.as_view(),
+        name="season-create",
     ),
     # Fixtures & Results
     path("fixtures/", FixtureListView.as_view(), name="fixture-list"),

@@ -6,6 +6,7 @@ import time
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connections
 from django.db.utils import OperationalError
@@ -18,8 +19,16 @@ from rest_framework.decorators import (
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from markets.services.staging_catalogue_audit_service import (
+    build_staging_market_catalogue_audit,
+)
+from markets.services.staging_market_purge_service import (
+    build_purge_preflight,
+)
 from system.serializers import (
     HealthCheckSerializer,
+    MarketCatalogueAuditSerializer,
+    MarketPurgePreflightSerializer,
     PesapalDiagnosticSerializer,
 )
 from wallets.services.pesapal_config import get_pesapal_config
@@ -491,4 +500,89 @@ def pesapal_diagnostic(request):
     return Response(
         payload,
         status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+@extend_schema(
+    request=None,
+    responses=MarketCatalogueAuditSerializer,
+    summary="Staging market catalogue audit",
+    tags=["System"],
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def market_catalogue_audit(request):
+    """
+    Read-only staging catalogue audit.
+
+    The endpoint never changes market state or catalogue visibility.
+    """
+    review_enabled = getattr(
+        settings,
+        "REVIEW_WORKFLOW_TOOLS_ENABLED",
+        False,
+    )
+    synthetic_actor = str(request.user.email or "").lower().endswith("@leagueos.test")
+
+    if not (review_enabled and synthetic_actor):
+        return Response(
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    return Response(
+        build_staging_market_catalogue_audit(),
+        status=status.HTTP_200_OK,
+    )
+
+
+@extend_schema(
+    request=None,
+    responses=MarketPurgePreflightSerializer,
+    summary="Final staging market purge preflight",
+    tags=["System"],
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def market_purge_preflight(request):
+    """
+    Read-only preflight for the exact audited
+    46-to-4 staging market purge.
+
+    This endpoint never changes market, wallet,
+    payment, or ledger data.
+    """
+    review_enabled = getattr(
+        settings,
+        "REVIEW_WORKFLOW_TOOLS_ENABLED",
+        False,
+    )
+
+    actor_email = str(request.user.email or "").lower()
+
+    permitted_actor = actor_email in {
+        "superadmin.local@leagueos.test",
+        "results.local@leagueos.test",
+    }
+
+    if not (review_enabled and permitted_actor):
+        return Response(
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    user_model = get_user_model()
+
+    resolution_actor = user_model.objects.filter(
+        email__iexact=("results.local@leagueos.test"),
+    ).first()
+
+    refund_actor = user_model.objects.filter(
+        email__iexact=("superadmin.local@leagueos.test"),
+    ).first()
+
+    return Response(
+        build_purge_preflight(
+            resolution_actor=resolution_actor,
+            refund_actor=refund_actor,
+        ),
+        status=status.HTTP_200_OK,
     )

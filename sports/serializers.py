@@ -115,11 +115,27 @@ class CompetitionCreateSerializer(serializers.ModelSerializer):
         fields = ["id", "sport", "name", "slug", "country_code", "is_active", "is_verified"]
         read_only_fields = ["id"]
         extra_kwargs = {
-            "slug": {"required": False},
+            # allow_blank=True + default="" lets DRF accept a missing or empty
+            # slug.  The UniqueTogetherValidator for unique_competition_identity
+            # (sport + country_code + slug) needs to see the *real* slug so it
+            # can actually detect duplicates — that is injected in
+            # to_internal_value() below before the validators run.
+            "slug": {"required": False, "allow_blank": True, "default": ""},
             # Admin-authored competitions are verified on creation — unlike the
             # scraped/seeded pipeline, there's no separate review step here.
             "is_verified": {"default": True},
         }
+
+    def to_internal_value(self, data):
+        from django.utils.text import slugify
+
+        # Derive slug from name before UniqueTogetherValidator runs so the
+        # validator can correctly detect duplicates.  The model's save() does
+        # the same derivation, so this is always consistent.
+        mutable = data.copy() if hasattr(data, "copy") else dict(data)
+        if not mutable.get("slug") and mutable.get("name"):
+            mutable["slug"] = slugify(mutable["name"])
+        return super().to_internal_value(mutable)
 
 
 class CompetitionListQuerySerializer(serializers.Serializer):
@@ -205,6 +221,7 @@ class SportingEventListQuerySerializer(serializers.Serializer):
         choices=SportingEvent.EventType.choices,
         required=False,
     )
+    show_in_markets = serializers.BooleanField(required=False)
     search = serializers.CharField(
         required=False,
         allow_blank=False,

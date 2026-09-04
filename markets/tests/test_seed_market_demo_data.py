@@ -82,11 +82,28 @@ class SeedMarketDemoDataTests(TestCase):
             7,
         )
 
+        open_markets = Market.objects.filter(
+            status=Market.Status.OPEN,
+        )
+
         self.assertEqual(
-            Market.objects.filter(
-                status=Market.Status.OPEN,
-            ).count(),
-            16,
+            open_markets.count(),
+            4,
+        )
+
+        self.assertEqual(
+            set(
+                open_markets.values_list(
+                    "question",
+                    flat=True,
+                )
+            ),
+            {
+                "Will Vipers SC beat KCCA FC?",
+                "Will Vipers SC vs KCCA FC have over 2.5 goals?",
+                "Will KOBS Rugby Club beat Platinum Credit Heathens?",
+                "Will City Oilers beat Namuwongo Blazers?",
+            },
         )
 
         self.assertIn(

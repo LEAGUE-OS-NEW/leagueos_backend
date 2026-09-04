@@ -716,6 +716,10 @@ class Market(TimeStampedUUIDModel):
         default=False,
         db_index=True,
     )
+    is_catalog_visible = models.BooleanField(
+        default=True,
+        db_index=True,
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

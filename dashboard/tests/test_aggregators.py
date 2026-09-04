@@ -8,6 +8,7 @@ from dashboard.aggregators.fixtures_aggregator import FixturesAggregator
 from dashboard.aggregators.markets_aggregator import MarketsAggregator
 from dashboard.aggregators.notifications_aggregator import NotificationsAggregator
 from dashboard.aggregators.profile_aggregator import ProfileAggregator
+from dashboard.aggregators.store_aggregator import StoreAggregator
 from dashboard.aggregators.wallet_aggregator import WalletAggregator
 
 
@@ -121,6 +122,37 @@ def test_wallet_aggregator_returns_data(user):
     assert "data" in result
     assert "balance" in result["data"]
     assert "currency" in result["data"]
+
+
+def test_store_aggregator_returns_active_merchandise(user, db):
+    """Test store aggregator returns public merchandise picks."""
+    from clubs.models import MerchandiseProduct
+    from profiles.models import Club
+
+    club = Club.objects.create(name="Store Club", slug="store-club")
+    MerchandiseProduct.objects.create(
+        club=club,
+        name="Home Jersey",
+        description="Match shirt",
+        price="75000.00",
+        stock=10,
+        status=MerchandiseProduct.Status.ACTIVE,
+    )
+    MerchandiseProduct.objects.create(
+        club=club,
+        name="Draft Scarf",
+        description="Hidden",
+        price="25000.00",
+        stock=10,
+        status=MerchandiseProduct.Status.DRAFT,
+    )
+
+    aggregator = StoreAggregator()
+    result = aggregator.aggregate(user)
+
+    assert result["status"] == "success"
+    assert result["data"]["picks"][0]["name"] == "Home Jersey"
+    assert len(result["data"]["picks"]) == 1
 
 
 def test_aggregator_handles_exceptions(user):

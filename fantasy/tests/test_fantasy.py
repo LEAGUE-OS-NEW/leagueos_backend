@@ -524,19 +524,55 @@ def test_approved_statistic_catalogue_works_before_first_match(domain):
 
 def test_player_candidates_are_athletes_of_matching_sport_only(domain):
     fantasy, players, _ = domain
-    Participant.objects.create(
-        sport=fantasy.competition.sport, kind=Participant.Kind.TEAM, name="Not an athlete"
+
+    # Existing Fantasy players should not appear again.
+    existing_player_ids = {str(player.player_id) for player in players}
+
+    # Athlete from the correct sport, but not yet in this Fantasy pool.
+    candidate = Participant.objects.create(
+        sport=fantasy.competition.sport,
+        kind=Participant.Kind.ATHLETE,
+        name="Available Player",
     )
+    PlayerProfile.objects.create(
+        participant=candidate,
+        club=Club.objects.first(),
+        position="Forward",
+    )
+
+    # Non-athlete from the correct sport.
+    Participant.objects.create(
+        sport=fantasy.competition.sport,
+        kind=Participant.Kind.TEAM,
+        name="Not an athlete",
+    )
+
+    # Athlete from another sport.
     other_sport = Sport.objects.create(name="Other", code="OT")
-    Participant.objects.create(sport=other_sport, kind=Participant.Kind.ATHLETE, name="Wrong sport")
+    Participant.objects.create(
+        sport=other_sport,
+        kind=Participant.Kind.ATHLETE,
+        name="Wrong sport",
+    )
+
     admin = get_user_model().objects.create_superuser(
-        username="candidate_admin", email="candidate@example.com"
+        username="candidate_admin",
+        email="candidate@example.com",
     )
     client = APIClient()
     client.force_authenticate(admin)
-    response = client.get("/api/v1/fantasy/players/candidates/", {"competition": str(fantasy.id)})
+
+    response = client.get(
+        "/api/v1/fantasy/players/candidates/",
+        {"competition": str(fantasy.id)},
+    )
+
     assert response.status_code == 200
-    assert {row["id"] for row in response.data} == {str(player.player_id) for player in players}
+
+    returned_ids = {row["id"] for row in response.data}
+
+    assert returned_ids == {str(candidate.id)}
+    assert not returned_ids.intersection(existing_player_ids)
 
 
 def test_league_members_are_ranked_and_do_not_expose_email(domain):

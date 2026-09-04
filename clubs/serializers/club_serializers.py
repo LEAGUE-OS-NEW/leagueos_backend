@@ -10,6 +10,7 @@ from clubs.models import (
     ClubAuditLog,
     ClubMedia,
     ClubNews,
+    ClubPlayer,
     ClubProfileVersion,
     ClubWorkspace,
     MembershipPlan,
@@ -17,6 +18,7 @@ from clubs.models import (
     ProductCategory,
     StaffInvitation,
     StoreOrder,
+    StoreOrderItem,
     TicketOrder,
     TicketProduct,
 )
@@ -296,12 +298,16 @@ class FanTicketOrderSerializer(serializers.ModelSerializer):
 class MerchandiseProductSerializer(serializers.ModelSerializer):
     available_stock = serializers.IntegerField(read_only=True)
     is_low_stock = serializers.BooleanField(read_only=True)
+    club_slug = serializers.CharField(source="club.slug", read_only=True)
+    club_name = serializers.CharField(source="club.name", read_only=True)
 
     class Meta:
         model = MerchandiseProduct
         fields = [
             "id",
             "club",
+            "club_slug",
+            "club_name",
             "category",
             "name",
             "slug",
@@ -334,7 +340,45 @@ class MerchandiseProductSerializer(serializers.ModelSerializer):
         ]
 
 
+class StoreOrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_sku = serializers.CharField(source="product.sku", read_only=True)
+
+    class Meta:
+        model = StoreOrderItem
+        fields = [
+            "id",
+            "product",
+            "product_name",
+            "product_sku",
+            "quantity",
+            "unit_price",
+            "total_price",
+        ]
+        read_only_fields = fields
+
+
+class ClubPlayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClubPlayer
+        fields = [
+            "id",
+            "club",
+            "name",
+            "position",
+            "nationality",
+            "status",
+            "contract_end",
+            "market_value",
+            "jersey_number",
+            "photo",
+        ]
+        read_only_fields = ["id", "club"]
+
+
 class StoreOrderSerializer(serializers.ModelSerializer):
+    items = StoreOrderItemSerializer(many=True, read_only=True)
+
     class Meta:
         model = StoreOrder
         fields = [
@@ -346,10 +390,23 @@ class StoreOrderSerializer(serializers.ModelSerializer):
             "currency",
             "shipping_address",
             "metadata",
+            "items",
             "fulfilled_at",
             "cancelled_at",
         ]
         read_only_fields = ["id", "total_amount", "fulfilled_at", "cancelled_at"]
+
+
+class StoreCheckoutItemSerializer(serializers.Serializer):
+    product = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+    size = serializers.CharField(required=False, allow_blank=True)
+
+
+class StoreCheckoutSerializer(serializers.Serializer):
+    items = StoreCheckoutItemSerializer(many=True, allow_empty=False)
+    shipping_address = serializers.JSONField(required=False)
+    metadata = serializers.JSONField(required=False)
 
 
 class ClubAuditLogSerializer(serializers.ModelSerializer):

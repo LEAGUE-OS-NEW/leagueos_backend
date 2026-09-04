@@ -40,21 +40,11 @@ TREASURY_BUFFER = Decimal("100000")
 YES_PROBABILITIES = {
     "Will Vipers SC beat KCCA FC?": 58,
     "Will Vipers SC vs KCCA FC have over 2.5 goals?": 52,
-    "Will both SC Villa and Express FC score?": 49,
-    "Will BUL FC cover a -1 goal handicap against URA FC?": 44,
     "Will KOBS Rugby Club beat Platinum Credit Heathens?": 55,
-    "Will KOBS vs Heathens have over 42.5 total points?": 51,
-    "Will Black Pirates win by 1 to 7 points?": 38,
-    "Will Rhinos vs Mongers include a yellow card?": 47,
     "Will City Oilers beat Namuwongo Blazers?": 64,
-    "Will City Oilers vs Blazers exceed 155.5 total points?": 53,
-    "Will UCU Canons cover a -4.5 point spread?": 48,
-    "Will JT Jaguars score 80 or more points?": 46,
-    "Will Vipers SC win the Uganda Premier League?": 36,
-    "Will KOBS Rugby Club win the Nile Special Rugby Premiership?": 34,
-    "Will City Oilers win the National Basketball League?": 57,
-    "Will KOBS Rugby Club score 3 or more tries in their next league match?": 54,
 }
+
+KEEP_QUESTIONS = frozenset(YES_PROBABILITIES)
 
 
 class Command(BaseCommand):
@@ -88,7 +78,20 @@ class Command(BaseCommand):
         planned = []
         for index, event in enumerate(events):
             start = now + timedelta(days=options["days_ahead"], hours=(index * 24) % (14 * 24))
-            markets = list(event.markets.select_related("category", "sport").all())
+            markets = list(
+                event.markets.filter(
+                    question__in=KEEP_QUESTIONS,
+                )
+                .select_related(
+                    "category",
+                    "sport",
+                )
+                .all()
+            )
+
+            if not markets:
+                continue
+
             historical = event.starts_at <= now and any(self._has_history(m) for m in markets)
             decision = "PRESERVE_HISTORICAL" if historical else "RESCHEDULE_IN_PLACE"
             self.stdout.write(f"{decision} EVENT {event.source_reference}")
@@ -119,30 +122,6 @@ class Command(BaseCommand):
                     )
                 else:
                     self._reschedule(event, markets, start, now, actor, options)
-
-        long_horizon = list(
-            Market.objects.filter(
-                Q(scope_type="COMPETITION", competition__source_name=DEMO_SOURCE)
-                | Q(scope_type="PARTICIPANT", participant__source_name=DEMO_SOURCE),
-                sporting_event__isnull=True,
-            )
-            .select_related("sport", "category", "template", "competition", "participant")
-            .order_by("created_at", "id")
-        )
-        for index, market in enumerate(long_horizon):
-            start = now + timedelta(days=options["days_ahead"] + index)
-            historical = market.closes_at is not None and market.closes_at <= now
-            historical = historical and self._has_history(market)
-            self.stdout.write(
-                f"{'PRESERVE_HISTORICAL' if historical else 'RESCHEDULE_IN_PLACE'} "
-                f"{market.scope_type} MARKET {market.id}"
-            )
-            planned.append(market)
-            if options["confirm"]:
-                if historical:
-                    self._replace_long_horizon(market, start, now, actor, options)
-                else:
-                    self._reschedule_long_horizon(market, start, now, actor, options)
 
         configured_market_ids = {
             market.id
@@ -310,53 +289,6 @@ class Command(BaseCommand):
                 no_label=market.outcomes.get(side="NO").label,
             )
             self._configure_market(fresh, actor, options)
-
-    def _reschedule_long_horizon(self, market, close_at, now, actor, options):
-        market.opens_at = min(market.opens_at or now, now)
-        market.closes_at = close_at
-        market.settles_by = close_at + timedelta(hours=48)
-        market.face_value_ugx = 10000
-        market.full_clean()
-        market.save(
-            update_fields=["opens_at", "closes_at", "settles_by", "face_value_ugx", "updated_at"]
-        )
-        self._configure_market(market, actor, options)
-
-    def _replace_long_horizon(self, market, close_at, now, actor, options):
-        target = {"competition": market.competition, "participant": market.participant}
-        lookup = {
-            "question": market.question,
-            "scope_type": market.scope_type,
-            "sporting_event__isnull": True,
-            "competition": market.competition,
-            "participant": market.participant,
-            "closes_at__gt": now,
-        }
-        fresh = Market.objects.filter(**lookup).exclude(pk=market.pk).order_by("created_at").first()
-        if fresh is None:
-            fresh = MarketCatalogService.create_market(
-                sport=market.sport,
-                category=market.category,
-                template=market.template,
-                scope_type=market.scope_type,
-                sporting_event=None,
-                competition=target["competition"],
-                participant=target["participant"],
-                question=market.question,
-                description=market.description,
-                rules=market.rules,
-                resolution_source=market.resolution_source,
-                resolution_criteria=market.resolution_criteria,
-                face_value_ugx=10000,
-                status=Market.Status.DRAFT,
-                opens_at=now,
-                closes_at=close_at,
-                settles_by=close_at + timedelta(hours=48),
-                created_by=actor or market.created_by,
-                yes_label=market.outcomes.get(side="YES").label,
-                no_label=market.outcomes.get(side="NO").label,
-            )
-        self._configure_market(fresh, actor, options)
 
     @staticmethod
     def _configure_market(market, actor, options):
