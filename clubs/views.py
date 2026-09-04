@@ -330,6 +330,7 @@ class TicketProductViewSet(viewsets.ModelViewSet):
 
 class TicketOrderScanView(APIView):
     permission_classes = [IsClubStaff]
+    serializer_class = TicketOrderSerializer
 
     def post(self, request, club_pk=None):
         code = str(request.data.get("code") or "").strip()
