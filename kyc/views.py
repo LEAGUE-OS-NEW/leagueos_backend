@@ -10,6 +10,8 @@ from rest_framework.views import APIView
 
 from accounts.models import AuditLog
 from accounts.serializers import build_response
+from authentication.models import Role
+from authentication.services.role_service import RoleService
 from profiles.models import Profile
 from kyc.models import KYCVerification, KYCVerificationAttempt, KYCConfiguration
 from kyc.serializers import (
@@ -24,6 +26,18 @@ from markets.permissions import HasManageCompliancePermission
 
 logger = logging.getLogger(__name__)
 signer = TimestampSigner()
+
+
+def grant_verified_market_user_role(user, assigned_by=None):
+    """Promote a freshly-KYC-verified fan so they can actually trade.
+
+    KYC verification alone doesn't grant `participate_market` — that lives on
+    the "Verified Market User" role, which nothing else assigns in
+    production. Tolerant of the role not being seeded yet (dev/test envs).
+    """
+    role = Role.objects.filter(name="Verified Market User").first()
+    if role:
+        RoleService.assign_role(user=user, role=role, assigned_by=assigned_by)
 
 
 class KYCEmptyRequestSerializer(serializers.Serializer):
@@ -211,6 +225,7 @@ class FanKYCDevelopmentBypassView(APIView):
             user = request.user
             user.is_verified = True
             user.save(update_fields=["is_verified", "updated_at"])
+            grant_verified_market_user_role(user, assigned_by=request.user)
             log_kyc_audit(
                 user=request.user,
                 action="KYC_VERIFIED",
@@ -492,6 +507,7 @@ class AdminKYCReviewActionView(APIView):
                 if not user.is_verified:
                     user.is_verified = True
                     user.save(update_fields=["is_verified", "updated_at"])
+                grant_verified_market_user_role(user, assigned_by=request.user)
             elif decision == KYCVerification.Status.REJECTED:
                 verification.rejection_reason = (
                     f"Manual admin rejection: {notes}" if notes else "Manual admin rejection"

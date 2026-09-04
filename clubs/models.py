@@ -667,6 +667,15 @@ class TicketOrder(TimeStampedUUIDModel):
     )
     fulfilled_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    code = models.CharField(max_length=32, unique=True, editable=False, blank=True)
+    checked_in_at = models.DateTimeField(null=True, blank=True)
+    checked_in_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="checked_in_ticket_orders",
+    )
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -678,6 +687,11 @@ class TicketOrder(TimeStampedUUIDModel):
 
     def __str__(self) -> str:
         return f"Order {self.id} - {self.product}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = f"TK-{uuid.uuid4().hex[:10].upper()}"
+        super().save(*args, **kwargs)
 
 
 # =============================================================================
@@ -1043,6 +1057,10 @@ class ClubAuditLog(TimeStampedUUIDModel):
         ("NEWS_SUBMITTED", "News submitted for review"),
         ("MEMBERSHIP_CREATED", "Membership created"),
         ("TICKET_CREATED", "Ticket created"),
+        ("TICKET_PUBLISHED", "Ticket published"),
+        ("TICKET_ORDER_CREATED", "Ticket order created"),
+        ("TICKET_ORDER_PAID", "Ticket order paid"),
+        ("TICKET_SCANNED", "Ticket scanned"),
         ("PRODUCT_CREATED", "Product created"),
         ("INVENTORY_UPDATED", "Inventory updated"),
         ("STAFF_INVITED", "Staff invited"),

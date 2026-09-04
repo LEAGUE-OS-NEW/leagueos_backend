@@ -27,6 +27,8 @@ from markets.services.lifecycle_service import (
 from markets.services.resolution_service import (
     MarketResolutionService,
 )
+from markets.services.settlement_service import MarketSettlementService
+from markets.services.void_refund_service import MarketVoidRefundService
 from sports.models import (
     Competition,
     Participant,
@@ -456,3 +458,84 @@ class PublicResolvedMarketAPITests(APITestCase):
             "resolution_notes",
             response.data,
         )
+
+    def test_resolved_market_shows_is_settled_only_after_settlement(self):
+        detail_url = reverse(
+            "markets:market-detail",
+            kwargs={"market_id": self.resolved_market.id},
+        )
+
+        before = self.client.get(detail_url)
+        self.assertFalse(before.data["is_settled"])
+        self.assertFalse(before.data["is_refunded"])
+
+        MarketSettlementService.settle_market(
+            market_id=self.resolved_market.id,
+            actor=self.approver_user,
+        )
+
+        after = self.client.get(detail_url)
+        self.assertTrue(after.data["is_settled"])
+        self.assertFalse(after.data["is_refunded"])
+
+    def test_voided_market_shows_is_refunded_only_after_refund(self):
+        event = SportingEvent.objects.create(
+            sport=self.resolved_market.sport,
+            competition=self.resolved_market.competition,
+            event_type=SportingEvent.EventType.MATCH,
+            name="KCCA FC vs Vipers SC (void fixture)",
+            starts_at=self.now + timedelta(days=3),
+            status=SportingEvent.Status.SCHEDULED,
+            is_verified=True,
+            verified_at=self.now,
+        )
+        market = MarketCatalogService.create_market(
+            sport=self.resolved_market.sport,
+            category=self.resolved_market.category,
+            scope_type=MarketScope.EVENT,
+            sporting_event=event,
+            question="Will the fixture be postponed?",
+            description="Void/refund visibility fixture.",
+            rules="Void if the fixture is called off.",
+            resolution_source="Official competition result",
+            resolution_criteria="Use the verified final score.",
+            status=Market.Status.DRAFT,
+            opens_at=self.now - timedelta(hours=1),
+            closes_at=self.now + timedelta(hours=1),
+            created_by=self.operations_user,
+            yes_label="Postponed",
+            no_label="Not postponed",
+        )
+        market = MarketLifecycleService.submit(
+            market_id=market.id, actor=self.operations_user, notes="Ready."
+        )
+        market = MarketLifecycleService.approve(
+            market_id=market.id, actor=self.approver_user, notes="Approved."
+        )
+        market = MarketLifecycleService.open(
+            market_id=market.id, actor=self.approver_user, notes="Opened."
+        )
+        voided_market = MarketResolutionService.void(
+            market_id=market.id,
+            actor=self.approver_user,
+            notes="Fixture cancelled by the league.",
+            evidence="League statement confirming cancellation.",
+        )
+
+        detail_url = reverse(
+            "markets:market-detail",
+            kwargs={"market_id": voided_market.id},
+        )
+
+        before = self.client.get(detail_url)
+        self.assertFalse(before.data["is_refunded"])
+        self.assertFalse(before.data["is_settled"])
+
+        MarketVoidRefundService.refund_void_market(
+            market_id=voided_market.id,
+            actor=self.approver_user,
+        )
+
+        after = self.client.get(detail_url)
+        self.assertTrue(after.data["is_refunded"])
+        self.assertFalse(after.data["is_settled"])

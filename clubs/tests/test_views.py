@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -168,6 +170,63 @@ class TestTicketProductViewSet:
         response = api_client.post(url, data, format="json")
         assert response.status_code == 201
         assert TicketProduct.objects.count() == 1
+
+    def test_publish_ticket(self, api_client, user, club, admin_workspace):
+        product = TicketProduct.objects.create(
+            club=club, name="Final", price=Decimal("10000.00"), created_by=user
+        )
+        api_client.force_authenticate(user=user)
+        url = reverse("clubs:ticket-product-publish", kwargs={"club_pk": club.id, "pk": product.id})
+        response = api_client.post(url)
+        assert response.status_code == 200
+        assert response.data["status"] == "ACTIVE"
+
+    def test_purchase_and_scan_flow(self, api_client, user, club, admin_workspace):
+        from uuid import uuid4
+
+        from wallets.services.wallet_service import WalletService
+
+        product = TicketProduct.objects.create(
+            club=club,
+            name="Final",
+            price=Decimal("10000.00"),
+            status=TicketProduct.Status.ACTIVE,
+            created_by=user,
+        )
+        buyer = User.objects.create_user(
+            username="buyer", email="buyer@example.com", password="testpass123"
+        )
+        WalletService.credit(
+            user=buyer,
+            currency="UGX",
+            amount=Decimal("10000.00"),
+            idempotency_reference=uuid4(),
+        )
+
+        api_client.force_authenticate(user=buyer)
+        purchase_url = reverse(
+            "clubs:ticket-product-purchase", kwargs={"club_pk": club.id, "pk": product.id}
+        )
+        purchase_response = api_client.post(purchase_url, {"quantity": 1}, format="json")
+        assert purchase_response.status_code == 201
+        assert purchase_response.data["status"] == "PAID"
+        code = purchase_response.data["code"]
+
+        api_client.force_authenticate(user=user)
+        orders_url = reverse(
+            "clubs:ticket-product-orders", kwargs={"club_pk": club.id, "pk": product.id}
+        )
+        orders_response = api_client.get(orders_url)
+        assert orders_response.status_code == 200
+        assert len(orders_response.data) == 1
+
+        scan_url = reverse("clubs:ticket-order-scan", kwargs={"club_pk": club.id})
+        scan_response = api_client.post(scan_url, {"code": code}, format="json")
+        assert scan_response.status_code == 200
+        assert scan_response.data["status"] == "FULFILLED"
+
+        second_scan = api_client.post(scan_url, {"code": code}, format="json")
+        assert second_scan.status_code == 400
 
 
 class TestMerchandiseProductViewSet:

@@ -3,6 +3,7 @@ from uuid import UUID, uuid5
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from authentication.services.permission_service import PermissionService
@@ -27,6 +28,7 @@ from markets.services.provisional_result_service import (
 from markets.services.result_dispute_service import (
     MarketResultDisputeService,
 )
+from wallets.models import WalletTransaction
 from wallets.services.wallet_service import WalletService
 
 
@@ -123,18 +125,30 @@ class MarketVoidRefundService:
             net_refund = cost_basis - refund_fee
             ledger_entry = None
             if net_refund > Decimal("0.0000"):
+                refund_reference = cls.position_refund_idempotency_reference(
+                    market_id=market.id,
+                    position_id=position.id,
+                    participant_id=position.user_id,
+                    cost_basis=cost_basis,
+                    currency=cls.MARKET_CURRENCY,
+                )
+                wallet_transaction = WalletTransaction.objects.create(
+                    wallet=WalletService.get_or_create_wallet(position.user, cls.MARKET_CURRENCY),
+                    reference=str(refund_reference),
+                    transaction_type=WalletTransaction.TransactionType.VOID_REFUND,
+                    amount=net_refund,
+                    currency=cls.MARKET_CURRENCY,
+                    status=WalletTransaction.Status.COMPLETED,
+                    completed_at=timezone.now(),
+                    description=f"Void refund — {market.question}",
+                )
                 ledger_entry = WalletService.credit(
                     user=position.user,
                     currency=cls.MARKET_CURRENCY,
                     amount=net_refund,
-                    idempotency_reference=cls.position_refund_idempotency_reference(
-                        market_id=market.id,
-                        position_id=position.id,
-                        participant_id=position.user_id,
-                        cost_basis=cost_basis,
-                        currency=cls.MARKET_CURRENCY,
-                    ),
+                    idempotency_reference=refund_reference,
                     market=market,
+                    transaction=wallet_transaction,
                 )
             if cost_basis > Decimal("0.0000"):
                 MarketFeeService.record_fee(

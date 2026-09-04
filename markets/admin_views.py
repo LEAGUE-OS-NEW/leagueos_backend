@@ -48,6 +48,8 @@ class MarketAdminQuerysetMixin:
             "winning_outcome",
             "liquidity_configuration__provider",
             "collateral_pool",
+            "settlement",
+            "void_refund",
         ).prefetch_related(
             "outcomes",
             Prefetch(

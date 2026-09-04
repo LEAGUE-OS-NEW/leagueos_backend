@@ -184,17 +184,64 @@ class MarketLifecycleService:
                 {"outcomes": ("The market requires one YES " "and one NO outcome.")}
             )
 
-        opened = cls._apply_transition(
+        # Validate opening liquidity (treasury provider, price sanity, etc.)
+        # BEFORE flipping status to OPEN, so a failure here never touches the
+        # market's status — it stays cleanly at APPROVED instead of round-
+        # tripping through OPEN inside the same rolled-back transaction.
+        from markets.services.liquidity_service import MarketLiquidityService
+
+        MarketLiquidityService.activate_opening_liquidity(market=market, actor=actor)
+
+        return cls._apply_transition(
             market=market,
             actor=actor,
             action=MarketStatusTransition.Action.OPEN,
             to_status=Market.Status.OPEN,
             notes=clean_notes,
         )
-        from markets.services.liquidity_service import MarketLiquidityService
 
-        MarketLiquidityService.activate_opening_liquidity(market=opened, actor=actor)
-        return opened
+    @classmethod
+    @transaction.atomic
+    def revert_to_draft(
+        cls,
+        *,
+        market_id,
+        actor,
+        notes: str,
+    ) -> Market:
+        """Recovery path for a market stuck at APPROVED after a failed open()
+        (e.g. missing treasury provider) — moves it back to DRAFT so it's
+        editable and resubmittable via the normal submit/approve/open flow.
+        """
+        cls._require_permission(
+            actor,
+            cls.APPROVE_PERMISSION,
+        )
+
+        market = cls._get_locked_market(market_id)
+
+        cls._require_status(
+            market,
+            {
+                Market.Status.APPROVED,
+            },
+            action="revert_to_draft",
+        )
+
+        clean_notes = cls._clean_notes(notes)
+
+        return cls._apply_transition(
+            market=market,
+            actor=actor,
+            action=MarketStatusTransition.Action.REVERT_TO_DRAFT,
+            to_status=Market.Status.DRAFT,
+            notes=clean_notes,
+            market_updates={
+                "approved_by": None,
+                "approved_at": None,
+                "approval_notes": clean_notes,
+            },
+        )
 
     @classmethod
     @transaction.atomic

@@ -3011,6 +3011,7 @@ class MarketStatusTransition(TimeStampedUUIDModel):
         SUBMIT = "SUBMIT", "Submit for approval"
         APPROVE = "APPROVE", "Approve"
         REJECT = "REJECT", "Reject"
+        REVERT_TO_DRAFT = "REVERT_TO_DRAFT", "Revert to draft"
         OPEN = "OPEN", "Open"
         SUSPEND = "SUSPEND", "Suspend"
         REOPEN = "REOPEN", "Reopen"

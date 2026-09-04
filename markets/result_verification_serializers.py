@@ -24,7 +24,11 @@ class MarketResultVerificationSerializer(MarketAdminReadSerializer):
     can_publish_provisional = serializers.SerializerMethodField()
     can_resolve = serializers.SerializerMethodField()
     can_settle = serializers.SerializerMethodField()
+    can_close = serializers.SerializerMethodField()
+    can_void = serializers.SerializerMethodField()
+    can_refund = serializers.SerializerMethodField()
     settlement = serializers.SerializerMethodField()
+    void_refund = serializers.SerializerMethodField()
 
     class Meta(MarketAdminReadSerializer.Meta):
         fields = [
@@ -35,7 +39,11 @@ class MarketResultVerificationSerializer(MarketAdminReadSerializer):
             "can_publish_provisional",
             "can_resolve",
             "can_settle",
+            "can_close",
+            "can_void",
+            "can_refund",
             "settlement",
+            "void_refund",
         ]
 
     def _facts(self, obj):
@@ -51,6 +59,11 @@ class MarketResultVerificationSerializer(MarketAdminReadSerializer):
             return "REFUNDED" if hasattr(obj, "void_refund") else "VOIDED"
         if obj.status == obj.Status.RESOLVED:
             return "SETTLED" if hasattr(obj, "settlement") else "READY_TO_SETTLE"
+        if (
+            obj.status in (obj.Status.OPEN, obj.Status.SUSPENDED)
+            and obj.closes_at <= timezone.now()
+        ):
+            return "READY_TO_CLOSE"
 
         provisional, disputes, final_decision = self._facts(obj)
         if provisional is None:
@@ -115,4 +128,35 @@ class MarketResultVerificationSerializer(MarketAdminReadSerializer):
             "reference": str(settlement.id),
             "status": "SETTLED",
             "executed_at": settlement.executed_at,
+        }
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_close(self, obj):
+        return self.get_workflow_state(obj) == "READY_TO_CLOSE"
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_void(self, obj):
+        # Mirrors MarketResolutionService.VOIDABLE_STATUSES exactly — a market
+        # can be voided any time before it's actually resolved (event
+        # cancelled, no dispute ever needed to have been raised).
+        return obj.status in (
+            obj.Status.APPROVED,
+            obj.Status.OPEN,
+            obj.Status.SUSPENDED,
+            obj.Status.CLOSED,
+        )
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_can_refund(self, obj):
+        return self.get_workflow_state(obj) == "VOIDED"
+
+    @extend_schema_field(serializers.DictField(allow_null=True))
+    def get_void_refund(self, obj):
+        refund = obj.void_refund if hasattr(obj, "void_refund") else None
+        if refund is None:
+            return None
+        return {
+            "reference": str(refund.id),
+            "status": "REFUNDED",
+            "executed_at": refund.executed_at,
         }

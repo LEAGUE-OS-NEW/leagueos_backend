@@ -37,6 +37,8 @@ def preference_market_relations(queryset):
         "market__participant__sport",
         "market__winning_outcome",
         "market__liquidity_configuration__provider",
+        "market__settlement",
+        "market__void_refund",
     ).prefetch_related(
         "market__outcomes",
         "market__sporting_event__event_participants__participant",

@@ -282,7 +282,7 @@ class MarketResolutionService:
             ]
         )
 
-        MarketStatusTransition.objects.create(
+        transition = MarketStatusTransition.objects.create(
             market=market,
             action=action,
             from_status=from_status,
@@ -292,5 +292,26 @@ class MarketResolutionService:
             notes=notes,
             metadata=metadata,
         )
+
+        from notifications.services.operational_alert_service import OperationalAlertService
+
+        if to_status == Market.Status.RESOLVED:
+            OperationalAlertService.create(
+                permissions=("approve_market", "verify_results", "reject_result"),
+                event_type="MARKET_AWAITING_SETTLEMENT",
+                title="Market awaiting settlement",
+                message="A market has resolved and is ready to be settled.",
+                source_key=f"market-transition:{transition.id}:settlement",
+                data={"market_id": str(market.id), "transition_id": str(transition.id)},
+            )
+        if to_status == Market.Status.VOIDED:
+            OperationalAlertService.create(
+                permissions=("approve_market",),
+                event_type="MARKET_AWAITING_REFUND",
+                title="Market awaiting refund",
+                message="A market has been voided and is ready to be refunded.",
+                source_key=f"market-transition:{transition.id}:refund",
+                data={"market_id": str(market.id), "transition_id": str(transition.id)},
+            )
 
         return market

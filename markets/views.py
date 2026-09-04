@@ -40,6 +40,8 @@ def public_market_queryset(user=None):
             "participant__sport",
             "winning_outcome",
             "liquidity_configuration__provider",
+            "settlement",
+            "void_refund",
         )
         .prefetch_related(
             "outcomes",
