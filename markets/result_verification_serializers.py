@@ -17,6 +17,19 @@ class MarketResultAccelerationResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
+class MarketResultExposureOutcomeSerializer(serializers.Serializer):
+    outcome_id = serializers.UUIDField()
+    side = serializers.CharField()
+    label = serializers.CharField()
+    position_count = serializers.IntegerField()
+    total_quantity = serializers.DecimalField(max_digits=18, decimal_places=4)
+    total_stake = serializers.DecimalField(max_digits=18, decimal_places=4)
+
+
+class MarketResultExposureResponseSerializer(serializers.Serializer):
+    outcomes = MarketResultExposureOutcomeSerializer(many=True)
+
+
 class MarketResultVerificationSerializer(MarketAdminReadSerializer):
     workflow_state = serializers.SerializerMethodField()
     provisional_result = serializers.SerializerMethodField()
