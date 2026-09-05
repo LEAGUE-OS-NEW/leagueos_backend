@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -11,11 +11,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from markets.admin_views import MarketAdminQuerysetMixin
-from markets.models import Market, MarketProvisionalResult, MarketResultDevelopmentAcceleration
+from markets.models import (
+    Market,
+    MarketPosition,
+    MarketProvisionalResult,
+    MarketResultDevelopmentAcceleration,
+)
 from markets.permissions import HasResultVerificationPermission
 from markets.result_verification_serializers import (
     MarketResultAccelerationRequestSerializer,
     MarketResultAccelerationResponseSerializer,
+    MarketResultExposureResponseSerializer,
     MarketResultVerificationSerializer,
 )
 
@@ -44,6 +50,46 @@ class MarketResultVerificationQueueView(MarketAdminQuerysetMixin, ListAPIView):
             )
             .order_by("closes_at", "created_at")
         )
+
+
+class MarketResultExposureView(APIView):
+    """Per-outcome position count and stake for a market still awaiting a
+    result decision, so an admin can see who's on each side before picking
+    the winning outcome. Only reflects live, unsettled exposure — positions
+    are zeroed on settlement, so this is meaningless (and excluded) once a
+    market has actually been settled."""
+
+    permission_classes = [IsAuthenticated, HasResultVerificationPermission]
+
+    @extend_schema(responses={200: MarketResultExposureResponseSerializer})
+    def get(self, request, market_id):
+        get_object_or_404(Market, id=market_id)
+
+        rows = (
+            MarketPosition.objects.filter(market_id=market_id, quantity__gt=0)
+            .values("outcome_id", "outcome__side", "outcome__label")
+            .annotate(
+                position_count=Count("id"),
+                total_quantity=Sum("quantity"),
+                total_stake=Sum("total_cost"),
+            )
+            .order_by("outcome__side")
+        )
+
+        outcomes = [
+            {
+                "outcome_id": row["outcome_id"],
+                "side": row["outcome__side"],
+                "label": row["outcome__label"],
+                "position_count": row["position_count"],
+                "total_quantity": row["total_quantity"],
+                "total_stake": row["total_stake"],
+            }
+            for row in rows
+        ]
+
+        serializer = MarketResultExposureResponseSerializer({"outcomes": outcomes})
+        return Response(serializer.data)
 
 
 class MarketResultDevelopmentAcceleratorView(APIView):
