@@ -177,7 +177,7 @@ def test_auto_verify_high_risk_passing_checks():
 
 
 @pytest.mark.django_db
-def test_auto_verify_uncertain_face_match():
+def test_uncertain_face_match_requires_review():
     user = User.objects.create_user(
         username="uncertain_user", email="uncertain@example.com", password="Pass123!Password"
     )
@@ -212,12 +212,12 @@ def test_auto_verify_uncertain_face_match():
     )
 
     decision = KYCDecisionService.run_decision_engine(attempt)
-    assert decision.status == KYCVerification.Status.VERIFIED
-    assert user.is_verified is True
+    assert decision.status == KYCVerification.Status.REVIEW
+    assert user.is_verified is False
 
 
 @pytest.mark.django_db
-def test_auto_verify_fallback_no_review():
+def test_incomplete_checks_fallback_to_review():
     user = User.objects.create_user(
         username="fallback_user", email="fallback@example.com", password="Pass123!Password"
     )
@@ -232,5 +232,5 @@ def test_auto_verify_fallback_no_review():
     )
 
     decision = KYCDecisionService.run_decision_engine(attempt)
-    assert decision.status == KYCVerification.Status.VERIFIED
-    assert user.is_verified is True
+    assert decision.status == KYCVerification.Status.REVIEW
+    assert user.is_verified is False

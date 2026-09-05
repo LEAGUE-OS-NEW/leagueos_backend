@@ -12,6 +12,8 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -780,12 +782,18 @@ class MerchandiseProduct(TimeStampedUUIDModel):
             models.Index(fields=["status", "is_featured"]),
             models.Index(fields=["sku", "status"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("sku"), "club", condition=~Q(sku=""), name="unique_club_normalized_sku"
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.club.name} - {self.name}"
 
     def save(self, *args, **kwargs):
         self.name = self.name.strip()
+        self.sku = self.sku.strip().upper()
         if not self.slug:
             self.slug = slugify(self.name)
         if self.price is not None and not isinstance(self.price, Decimal):
@@ -857,6 +865,9 @@ class StoreOrder(TimeStampedUUIDModel):
         PENDING = "PENDING", "Pending"
         PAID = "PAID", "Paid"
         PROCESSING = "PROCESSING", "Processing"
+        READY_FOR_COLLECTION = "READY_FOR_COLLECTION", "Ready for collection"
+        SHIPPED = "SHIPPED", "Shipped"
+        DELIVERED = "DELIVERED", "Delivered"
         FULFILLED = "FULFILLED", "Fulfilled"
         CANCELLED = "CANCELLED", "Cancelled"
         REFUNDED = "REFUNDED", "Refunded"
@@ -881,6 +892,23 @@ class StoreOrder(TimeStampedUUIDModel):
     currency = models.CharField(max_length=3, default="UGX")
     shipping_address = models.JSONField(default=dict, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
+    checkout_idempotency_key = models.UUIDField(null=True, blank=True, db_index=True)
+    checkout_group = models.UUIDField(null=True, blank=True, db_index=True)
+    payment_transaction = models.ForeignKey(
+        "wallets.WalletTransaction",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="store_orders",
+    )
+    refund_transaction = models.ForeignKey(
+        "wallets.WalletTransaction",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="refunded_store_orders",
+    )
+    delivery_reference = models.CharField(max_length=255, blank=True)
     fulfilled_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
 
@@ -889,6 +917,13 @@ class StoreOrder(TimeStampedUUIDModel):
         indexes = [
             models.Index(fields=["user", "status", "-created_at"]),
             models.Index(fields=["club", "status", "-created_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "club", "checkout_idempotency_key"],
+                condition=Q(checkout_idempotency_key__isnull=False),
+                name="unique_store_checkout_per_user_club",
+            )
         ]
 
     def __str__(self) -> str:
@@ -924,6 +959,20 @@ class StoreOrderItem(TimeStampedUUIDModel):
     def save(self, *args, **kwargs):
         self.total_price = self.unit_price * self.quantity
         super().save(*args, **kwargs)
+
+
+class StoreOrderStatusHistory(TimeStampedUUIDModel):
+    order = models.ForeignKey(StoreOrder, on_delete=models.PROTECT, related_name="status_history")
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    previous_status = models.CharField(max_length=24, choices=StoreOrder.OrderStatus.choices)
+    new_status = models.CharField(max_length=24, choices=StoreOrder.OrderStatus.choices)
+    note = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"{self.order_id}: {self.previous_status} -> {self.new_status}"
 
 
 # =============================================================================

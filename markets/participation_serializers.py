@@ -125,6 +125,111 @@ class MarketPositionReadSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class MarketParticipationHistorySerializer(serializers.ModelSerializer):
+    market_id = serializers.UUIDField(source="market.id", read_only=True)
+    market_question = serializers.CharField(source="market.question", read_only=True)
+    market_state = serializers.CharField(source="market.status", read_only=True)
+    outcome = serializers.CharField(source="outcome.side", read_only=True)
+    outcome_id = serializers.UUIDField(source="outcome.id", read_only=True)
+    outcome_label = serializers.CharField(source="outcome.label", read_only=True)
+    participation_status = serializers.SerializerMethodField()
+    participated_quantity = serializers.SerializerMethodField()
+    current_open_quantity = serializers.DecimalField(
+        source="quantity", max_digits=18, decimal_places=4, read_only=True
+    )
+    total_cost = serializers.SerializerMethodField()
+    average_price = serializers.SerializerMethodField()
+    gross_payout = serializers.SerializerMethodField()
+    fees = serializers.SerializerMethodField()
+    net_payout = serializers.SerializerMethodField()
+    realized_pnl = serializers.SerializerMethodField()
+    settled_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MarketPosition
+        fields = (
+            "id",
+            "market_id",
+            "market_question",
+            "market_state",
+            "outcome",
+            "outcome_id",
+            "outcome_label",
+            "participation_status",
+            "participated_quantity",
+            "current_open_quantity",
+            "total_cost",
+            "average_price",
+            "gross_payout",
+            "fees",
+            "net_payout",
+            "realized_pnl",
+            "settled_at",
+            "created_at",
+        )
+
+    @staticmethod
+    def _record(obj):
+        return getattr(obj, "settlement_record", None) or getattr(obj, "void_refund_record", None)
+
+    def get_participation_status(self, obj):
+        if hasattr(obj, "void_refund_record"):
+            return "REFUNDED"
+        settlement = getattr(obj, "settlement_record", None)
+        if settlement:
+            return "WON" if settlement.was_winner else "LOST"
+        if obj.market.status == "RESOLVED":
+            return "PENDING_SETTLEMENT"
+        return "OPEN"
+
+    def get_participated_quantity(self, obj):
+        record = self._record(obj)
+        return (
+            record.settled_quantity
+            if hasattr(record, "settled_quantity")
+            else (record.refunded_quantity if record else obj.quantity)
+        )
+
+    def get_total_cost(self, obj):
+        record = self._record(obj)
+        return record.cost_basis if record else obj.total_cost
+
+    def get_average_price(self, obj):
+        quantity = self.get_participated_quantity(obj)
+        cost = self.get_total_cost(obj)
+        return cost / quantity if quantity else obj.average_entry_price
+
+    def get_gross_payout(self, obj):
+        record = self._record(obj)
+        return (
+            getattr(record, "payout_amount", getattr(record, "refund_amount", 0)) if record else 0
+        )
+
+    def get_fees(self, obj):
+        record = self._record(obj)
+        return (
+            getattr(record, "payout_fee_amount", getattr(record, "refund_fee_amount", 0))
+            if record
+            else 0
+        )
+
+    def get_net_payout(self, obj):
+        record = self._record(obj)
+        return (
+            getattr(record, "net_payout_amount", getattr(record, "net_refund_amount", 0))
+            if record
+            else 0
+        )
+
+    def get_realized_pnl(self, obj):
+        record = self._record(obj)
+        return record.realized_pnl_delta if record else obj.realized_pnl
+
+    def get_settled_at(self, obj):
+        record = self._record(obj)
+        return record.created_at if record else None
+
+
 class MarketFillReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = MarketFill

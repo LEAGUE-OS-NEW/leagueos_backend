@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from uuid import uuid4
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -20,6 +21,7 @@ from clubs.models import (
     TicketProduct,
 )
 from profiles.models import Club
+from wallets.services.wallet_service import WalletService
 
 
 @pytest.fixture
@@ -219,6 +221,9 @@ class TestPublicMerchandiseProductListView:
 class TestPublicStoreOrderCreateView:
     def test_create_paid_store_order(self, api_client, user, club):
         api_client.force_authenticate(user=user)
+        WalletService.credit(
+            user=user, currency="UGX", amount="200000.00", idempotency_reference=uuid4()
+        )
         product = MerchandiseProduct.objects.create(
             club=club,
             name="Public Jersey",
@@ -233,6 +238,7 @@ class TestPublicStoreOrderCreateView:
         response = api_client.post(
             url,
             {
+                "idempotency_key": str(uuid4()),
                 "items": [{"product": str(product.id), "quantity": 2, "size": "M"}],
                 "metadata": {"walletIdempotencyKey": "cart-key"},
             },
@@ -247,7 +253,7 @@ class TestPublicStoreOrderCreateView:
         assert order.total_amount == product.price * 2
         product.refresh_from_db()
         assert product.reserved_stock == 2
-        assert response.data["items"][0]["product_name"] == "Public Jersey"
+        assert response.data["orders"][0]["items"][0]["product_name"] == "Public Jersey"
 
     def test_rejects_mixed_club_order(self, api_client, user, club):
         other_club = Club.objects.create(name="Other Club", slug="other-club")

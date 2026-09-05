@@ -74,6 +74,7 @@ from markets.participation_views import (
     MarketOrderListView,
     MarketPositionDetailView,
     MarketPositionListView,
+    MarketParticipationHistoryListView,
 )
 from markets.portfolio_activity_views import MarketPortfolioActivityListView
 from markets.portfolio_views import (
@@ -427,6 +428,11 @@ urlpatterns = [
         "market-positions/",
         MarketPositionListView.as_view(),
         name="market-position-list",
+    ),
+    path(
+        "market-participations/history/",
+        MarketParticipationHistoryListView.as_view(),
+        name="market-participation-history",
     ),
     path(
         "market-positions/<uuid:position_id>/",

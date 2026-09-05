@@ -21,6 +21,7 @@ def test_unauthenticated_kyc_submission_rejected():
 
 @pytest.mark.django_db
 def test_fan_kyc_submission_success():
+    Country.objects.get_or_create(name="Uganda", iso_code="UG", defaults={"is_active": True})
     user = User.objects.create_user(
         username="fan1", email="fan1@example.com", password="Pass123!Password"
     )
@@ -36,6 +37,10 @@ def test_fan_kyc_submission_success():
     payload = {
         "document_type": "PASSPORT",
         "document_country": "UGA",
+        "profile_country": "UG",
+        "legal_name": "Test Fan",
+        "identity_number": "CM12345678",
+        "date_of_birth": "1990-01-01",
         "document_image": doc_file,
         "selfie_image": selfie_file,
     }
@@ -344,6 +349,9 @@ def test_kyc_submission_persists_dob_and_gender():
     payload = {
         "document_type": "PASSPORT",
         "document_country": "UGA",
+        "profile_country": "UG",
+        "legal_name": "Test Fan",
+        "identity_number": "CM22345678",
         "document_image": doc_file,
         "selfie_image": selfie_file,
         "date_of_birth": "1990-01-01",
@@ -360,6 +368,7 @@ def test_kyc_submission_persists_dob_and_gender():
 
 @pytest.mark.django_db
 def test_kyc_submission_creates_verification():
+    Country.objects.get_or_create(name="Uganda", iso_code="UG", defaults={"is_active": True})
     user = User.objects.create_user(
         username="fan_market", email="fan_market@example.com", password="Pass123!Password"
     )
@@ -374,6 +383,10 @@ def test_kyc_submission_creates_verification():
     payload = {
         "document_type": "PASSPORT",
         "document_country": "UGA",
+        "profile_country": "UG",
+        "legal_name": "Test Fan",
+        "identity_number": "CM32345678",
+        "date_of_birth": "1990-01-01",
         "document_image": doc_file,
         "selfie_image": selfie_file,
     }
@@ -390,6 +403,7 @@ def test_kyc_submission_creates_verification():
 
 @pytest.mark.django_db
 def test_kyc_multistep_preserves_earlier_information():
+    Country.objects.get_or_create(name="Uganda", iso_code="UG", defaults={"is_active": True})
     user = User.objects.create_user(
         username="fan_multi", email="fan_multi@example.com", password="Pass123!Password"
     )
@@ -406,6 +420,9 @@ def test_kyc_multistep_preserves_earlier_information():
     payload = {
         "document_type": "NATIONAL_ID",
         "document_country": "UGA",
+        "profile_country": "UG",
+        "legal_name": "Test Fan",
+        "identity_number": "CM42345678",
         "document_image": doc_file,
         "selfie_image": selfie_file,
         "date_of_birth": "1992-06-15",

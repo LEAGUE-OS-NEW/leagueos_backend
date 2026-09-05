@@ -1,9 +1,12 @@
+from decimal import Decimal
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -54,6 +57,10 @@ from platform_admin.serializers import (
     PlatformMembershipSubscriptionSerializer,
 )
 from wallets.services.wallet_service import WalletService
+from wallets.models import WalletTransaction, WithdrawalRequest
+from markets.models import MarketReconciliationMismatch, MarketSettlement, MarketPositionVoidRefund
+from clubs.models import MerchandiseProduct, StoreOrder
+from clubs.serializers.club_serializers import MerchandiseProductSerializer, StoreOrderSerializer
 
 
 def _can_manage_platform_memberships(user) -> bool:
@@ -1628,3 +1635,193 @@ class FixtureResultRejectView(APIView):
             verification=verification, actor=request.user, note=serializer.validated_data["note"]
         )
         return Response(self.serializer_class(updated).data)
+
+
+class AdminFinanceReportView(APIView):
+    """Read-only, ledger-backed finance queues for authorized administrators."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not (
+            request.user.is_superuser
+            or PermissionService.has_any_permission(
+                request.user, ("manage_finance", "view_finance", "reconcile_finance")
+            )
+        ):
+            raise PermissionDenied("Finance permission is required.")
+        transactions = WalletTransaction.objects.select_related("wallet__user", "provider")
+        deposits = transactions.filter(transaction_type=WalletTransaction.TransactionType.DEPOSIT)
+        settlements = MarketSettlement.objects.select_related(
+            "market", "winning_outcome"
+        ).prefetch_related("position_settlements__wallet_ledger_entry__transaction")
+        orders = StoreOrder.objects.select_related("club", "payment_transaction")
+        return Response(
+            {
+                "deposits": [
+                    {
+                        "id": str(tx.id),
+                        "fan": tx.wallet.user.email,
+                        "amount": str(tx.amount),
+                        "currency": tx.currency,
+                        "provider": tx.provider.name if tx.provider else "",
+                        "provider_reference": tx.provider_reference,
+                        "internal_reference": tx.reference,
+                        "status": tx.status,
+                        "initiated_at": tx.created_at,
+                        "completed_at": tx.completed_at,
+                        "ledger_entries": [
+                            str(value) for value in tx.ledger_entries.values_list("id", flat=True)
+                        ],
+                    }
+                    for tx in deposits.order_by("-created_at")[:500]
+                ],
+                "wallet_transactions": [
+                    {
+                        "id": str(tx.id),
+                        "fan": tx.wallet.user.email,
+                        "amount": str(tx.amount),
+                        "currency": tx.currency,
+                        "type": tx.transaction_type,
+                        "status": tx.status,
+                        "reference": tx.reference,
+                        "provider_reference": tx.provider_reference,
+                        "created_at": tx.created_at,
+                    }
+                    for tx in transactions.order_by("-created_at")[:500]
+                ],
+                "settlements": [
+                    {
+                        "id": str(batch.id),
+                        "market": batch.market.question,
+                        "winning_outcome": batch.winning_outcome.label,
+                        "participant_count": batch.total_position_count,
+                        "gross_payout": str(batch.total_payout_amount),
+                        "fees": str(
+                            sum(
+                                (p.payout_fee_amount for p in batch.position_settlements.all()),
+                                Decimal("0"),
+                            )
+                        ),
+                        "net_payout": str(
+                            sum(
+                                (p.net_payout_amount for p in batch.position_settlements.all()),
+                                Decimal("0"),
+                            )
+                        ),
+                        "settled_at": batch.executed_at,
+                        "participants": [
+                            {
+                                "fan": p.participant.email,
+                                "outcome": p.outcome.label,
+                                "gross": str(p.payout_amount),
+                                "fees": str(p.payout_fee_amount),
+                                "net": str(p.net_payout_amount),
+                                "ledger_reference": (
+                                    p.wallet_ledger_entry.transaction.reference
+                                    if p.wallet_ledger_entry and p.wallet_ledger_entry.transaction
+                                    else None
+                                ),
+                            }
+                            for p in batch.position_settlements.all()
+                        ],
+                    }
+                    for batch in settlements.order_by("-executed_at")[:200]
+                ],
+                "refunds": [
+                    {
+                        "id": str(r.id),
+                        "fan": r.participant.email,
+                        "market": r.market_void_refund.market.question,
+                        "gross": str(r.refund_amount),
+                        "fees": str(r.refund_fee_amount),
+                        "net": str(r.net_refund_amount),
+                        "created_at": r.created_at,
+                    }
+                    for r in MarketPositionVoidRefund.objects.select_related(
+                        "participant", "market_void_refund__market"
+                    ).order_by("-created_at")[:500]
+                ],
+                "withdrawals": [
+                    {
+                        "id": str(w.id),
+                        "fan": w.wallet.user.email,
+                        "amount": str(w.amount),
+                        "currency": w.currency,
+                        "status": w.status,
+                        "created_at": w.created_at,
+                    }
+                    for w in WithdrawalRequest.objects.select_related("wallet__user").order_by(
+                        "-created_at"
+                    )[:500]
+                ],
+                "club_commerce": [
+                    {
+                        "id": str(o.id),
+                        "club": o.club.name,
+                        "fan": o.user.email,
+                        "amount": str(o.total_amount),
+                        "status": o.status,
+                        "payment_reference": (
+                            o.payment_transaction.reference if o.payment_transaction else None
+                        ),
+                        "created_at": o.created_at,
+                    }
+                    for o in orders.order_by("-created_at")[:500]
+                ],
+                "reconciliation_exceptions": [
+                    {
+                        "id": str(item.id),
+                        "source_id": str(item.run.reference),
+                        "expected": str(item.expected_value or Decimal("0")),
+                        "actual": str(item.actual_value or Decimal("0")),
+                        "severity": item.severity,
+                        "status": item.resolution_status,
+                    }
+                    for item in MarketReconciliationMismatch.objects.select_related("run").order_by(
+                        "-detected_at"
+                    )[:500]
+                ],
+            }
+        )
+
+
+class AdminStoreReportView(APIView):
+    """Global read-only Store operations view for Super Admin."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_superuser:
+            raise PermissionDenied("Super Admin access is required.")
+        orders = StoreOrder.objects.select_related(
+            "club", "user", "payment_transaction"
+        ).prefetch_related("items__product", "status_history")
+        products = MerchandiseProduct.objects.select_related("club")
+        for key, lookup in (("club", "club_id"), ("status", "status")):
+            if request.query_params.get(key):
+                orders = orders.filter(**{lookup: request.query_params[key]})
+                products = products.filter(**{lookup: request.query_params[key]})
+        search = request.query_params.get("search", "").strip()
+        if search:
+            products = products.filter(Q(name__icontains=search) | Q(sku__icontains=search))
+            orders = orders.filter(user__email__icontains=search)
+        paid = orders.exclude(status=StoreOrder.OrderStatus.PENDING)
+        return Response(
+            {
+                "overview": {
+                    "total_orders": orders.count(),
+                    "sales": str(
+                        paid.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+                    ),
+                    "by_status": {
+                        row["status"]: row["count"]
+                        for row in orders.values("status").annotate(count=Count("id"))
+                    },
+                },
+                "products": MerchandiseProductSerializer(products[:1000], many=True).data,
+                "orders": StoreOrderSerializer(
+                    orders.order_by("-created_at")[:1000], many=True
+                ).data,
+            }
+        )

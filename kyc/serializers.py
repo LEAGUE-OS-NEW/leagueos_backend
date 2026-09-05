@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from profiles.models import Gender
+from profiles.models import Country, Gender
 from kyc.models import KYCVerification, KYCCheckResult, KYCConfiguration
 from kyc.services.image_validation_service import KYCImageValidationService, KYCValidationError
 
@@ -10,6 +10,12 @@ class KYCSubmissionSerializer(serializers.Serializer):
     document_image = serializers.FileField(required=True)
     selfie_image = serializers.FileField(required=True)
     date_of_birth = serializers.DateField(required=False, allow_null=True)
+    legal_name = serializers.CharField(max_length=255, trim_whitespace=True)
+    identity_number = serializers.CharField(max_length=64, trim_whitespace=True, write_only=True)
+    profile_country = serializers.SlugRelatedField(
+        queryset=Country.objects.filter(is_active=True),
+        slug_field="iso_code",
+    )
     gender = serializers.PrimaryKeyRelatedField(
         queryset=Gender.objects.filter(is_active=True),
         required=False,
@@ -21,6 +27,33 @@ class KYCSubmissionSerializer(serializers.Serializer):
         if len(val) != 3:
             raise serializers.ValidationError("Country must be a 3-letter ISO code.")
         return val
+
+    def validate_identity_number(self, value):
+        normalized = "".join(value.split()).upper()
+        if len(normalized) < 5:
+            raise serializers.ValidationError("Identity number is too short.")
+        return normalized
+
+    def validate_legal_name(self, value):
+        if len(value.split()) < 2:
+            raise serializers.ValidationError("Enter your full legal name.")
+        return " ".join(value.split())
+
+    def validate(self, attrs):
+        user = self.context.get("request").user if self.context.get("request") else None
+        if user:
+            account_name = " ".join(
+                part for part in (user.first_name.strip(), user.last_name.strip()) if part
+            ).casefold()
+            if account_name and attrs["legal_name"].casefold() != account_name:
+                raise serializers.ValidationError(
+                    {"legal_name": "Legal name must match the authenticated account profile."}
+                )
+        if not attrs.get("date_of_birth"):
+            profile = getattr(user, "profile", None)
+            if profile is None or not profile.date_of_birth:
+                raise serializers.ValidationError({"date_of_birth": "Date of birth is required."})
+        return attrs
 
     def validate_document_image(self, value):
         try:

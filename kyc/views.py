@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from django.conf import settings
 from django.core.signing import TimestampSigner
@@ -19,7 +20,6 @@ from kyc.serializers import (
     KYCSubmissionSerializer,
 )
 from kyc.tasks import process_kyc_attempt
-from markets.services.compliance_service import MarketComplianceService
 from markets.permissions import HasManageCompliancePermission
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ class FanKYCSubmitView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = KYCSubmissionSerializer(data=request.data)
+        serializer = KYCSubmissionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         user = request.user
@@ -130,6 +130,12 @@ class FanKYCSubmitView(APIView):
             verification.status = KYCVerification.Status.PENDING
             verification.document_type = serializer.validated_data["document_type"]
             verification.document_country = serializer.validated_data["document_country"]
+            identity_number = serializer.validated_data["identity_number"]
+            verification.document_number_hash = hashlib.sha256(
+                f"{settings.SECRET_KEY}:{identity_number}".encode()
+            ).hexdigest()
+            verification.document_number_last4 = identity_number[-4:]
+            verification.extracted_full_name = serializer.validated_data["legal_name"]
             verification.save()
 
             profile, _ = Profile.objects.get_or_create(user=user)
@@ -137,7 +143,8 @@ class FanKYCSubmitView(APIView):
                 profile.date_of_birth = serializer.validated_data["date_of_birth"]
             if "gender" in serializer.validated_data:
                 profile.gender = serializer.validated_data["gender"]
-            profile.save(update_fields=["date_of_birth", "gender", "updated_at"])
+            profile.country = serializer.validated_data["profile_country"]
+            profile.save(update_fields=["date_of_birth", "gender", "country", "updated_at"])
 
         log_kyc_audit(
             user=user,
@@ -473,14 +480,6 @@ class AdminKYCReviewActionView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # 1. Update the canonical KYC record (kyc app).
-            verification.status = decision
-            if decision == KYCVerification.Status.VERIFIED:
-                verification.verified_at = timezone.now()
-                user = verification.user
-                user.is_verified = True
-                user.save(update_fields=["is_verified", "updated_at"])
-
             verification.status = decision
             verification.verification_source = KYCVerification.VerificationSource.MANUAL
             verification.verification_completed_at = timezone.now()
@@ -498,29 +497,6 @@ class AdminKYCReviewActionView(APIView):
                 )
             verification.save()
 
-            # 2. Map the decision to the markets compliance kyc_status and
-            #    persist it on MarketParticipantCompliance so that
-            #    MarketEligibilityService.evaluate() sees the updated state.
-            #    REVIEW stays as PENDING in the compliance system — the
-            #    participant is not yet verified but not blocked either.
-            _COMPLIANCE_STATUS_MAP = {
-                KYCVerification.Status.VERIFIED: "VERIFIED",
-                KYCVerification.Status.REJECTED: "REJECTED",
-                KYCVerification.Status.REVIEW: "PENDING",
-            }
-            compliance_kyc_status = _COMPLIANCE_STATUS_MAP.get(decision)
-            if compliance_kyc_status:
-                MarketComplianceService.update(
-                    participant=verification.user,
-                    actor=request.user,
-                    source="ADMIN",
-                    changes={"kyc_status": compliance_kyc_status},
-                    reason=notes or f"Admin KYC review decision: {decision}",
-                )
-
-            # 3. Transition any open KYCVerificationSession (markets app) to
-            #    the same terminal state so the admin queue and session list
-            #    reflect the manual decision.
             log_kyc_audit(
                 user=request.user,
                 action=(
