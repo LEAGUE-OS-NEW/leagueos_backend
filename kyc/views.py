@@ -1,8 +1,11 @@
 import logging
+import mimetypes
 from django.conf import settings
-from django.core.signing import TimestampSigner
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import transaction
+from django.http import FileResponse
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import permissions, serializers, status, throttling
 from rest_framework.response import Response
@@ -459,6 +462,66 @@ class AdminKYCDocumentUrlView(APIView):
             ),
             status=status.HTTP_200_OK,
         )
+
+
+class AdminKYCDocumentServeView(APIView):
+    """Streams a private KYC document/selfie image after validating a signed token
+    minted by AdminKYCDocumentUrlView. The token binds verification_id, target and
+    attempt_id together, so it can't be replayed against a different record."""
+
+    permission_classes = [HasManageCompliancePermission]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("verification_id", type={"type": "string", "format": "uuid"}),
+            OpenApiParameter("token", type=str),
+            OpenApiParameter("target", type=str, description="document or selfie"),
+        ],
+        responses={200: OpenApiTypes.BINARY, 400: dict, 403: dict, 404: dict},
+        tags=["KYC"],
+    )
+    def get(self, request, verification_id):
+        token = request.query_params.get("token", "")
+        target = request.query_params.get("target", "document")
+
+        try:
+            payload = signer.unsign(token, max_age=300)
+        except (BadSignature, SignatureExpired):
+            return Response(
+                build_response(False, "Invalid or expired document access token."),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            token_verification_id, token_target, attempt_id = payload.split(":", 2)
+        except ValueError:
+            return Response(
+                build_response(False, "Malformed document access token."),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if token_verification_id != str(verification_id) or token_target != target:
+            return Response(
+                build_response(False, "Token does not match the requested document."),
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        attempt = KYCVerificationAttempt.objects.filter(
+            id=attempt_id, kyc_verification_id=verification_id
+        ).first()
+        if not attempt:
+            return Response(
+                build_response(False, "Document not found."), status=status.HTTP_404_NOT_FOUND
+            )
+
+        file_obj = attempt.selfie_image if target == "selfie" else attempt.document_image
+        if not file_obj or not file_obj.name:
+            return Response(
+                build_response(False, "Requested file not found."), status=status.HTTP_404_NOT_FOUND
+            )
+
+        content_type = mimetypes.guess_type(file_obj.name)[0] or "application/octet-stream"
+        return FileResponse(file_obj.open("rb"), content_type=content_type)
 
 
 class AdminKYCReviewActionView(APIView):
