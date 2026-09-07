@@ -448,3 +448,10 @@ class MarketPositionHistoryAPITests(APITestCase):
             detail_response.data["id"],
             str(position.id),
         )
+
+    def test_participation_history_marks_fully_sold_position_exited(self):
+        self.create_position(quantity=Decimal("0.0000"), total_cost=Decimal("0.0000"))
+        self.authenticate(self.owner)
+        response = self.client.get(reverse("markets:market-participation-history"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["results"][0]["participation_status"], "EXITED")

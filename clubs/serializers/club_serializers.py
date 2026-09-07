@@ -311,6 +311,8 @@ class StoreOrderSerializer(serializers.ModelSerializer):
         source="payment_transaction.reference", read_only=True
     )
     refund_reference = serializers.CharField(source="refund_transaction.reference", read_only=True)
+    payment = serializers.SerializerMethodField()
+    refund = serializers.SerializerMethodField()
 
     def get_status_history(self, obj):
         return [
@@ -318,11 +320,34 @@ class StoreOrderSerializer(serializers.ModelSerializer):
                 "previous_status": row.previous_status,
                 "new_status": row.new_status,
                 "changed_by": str(row.changed_by_id),
+                "changed_by_email": row.changed_by.email,
                 "note": row.note,
                 "created_at": row.created_at,
             }
             for row in obj.status_history.all()
         ]
+
+    @staticmethod
+    def _transaction(value):
+        if not value:
+            return None
+        return {
+            "id": str(value.id),
+            "reference": value.reference,
+            "provider_reference": value.provider_reference,
+            "amount": str(value.amount),
+            "currency": value.currency,
+            "status": value.status,
+            "created_at": value.created_at,
+            "completed_at": value.completed_at,
+            "ledger_entries": [str(entry.id) for entry in value.ledger_entries.all()],
+        }
+
+    def get_payment(self, obj):
+        return self._transaction(obj.payment_transaction)
+
+    def get_refund(self, obj):
+        return self._transaction(obj.refund_transaction)
 
     class Meta:
         model = StoreOrder
@@ -339,14 +364,18 @@ class StoreOrderSerializer(serializers.ModelSerializer):
             "metadata",
             "payment_transaction",
             "payment_reference",
+            "payment",
             "refund_transaction",
             "refund_reference",
+            "refund",
             "checkout_group",
             "delivery_reference",
             "status_history",
             "items",
             "fulfilled_at",
             "cancelled_at",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = fields
 

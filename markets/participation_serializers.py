@@ -180,6 +180,11 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
             return "WON" if settlement.was_winner else "LOST"
         if obj.market.status == "RESOLVED":
             return "PENDING_SETTLEMENT"
+        # A zero position backed by prior matched activity is a completely exited
+        # position, not an open holding.  The position row is retained as the
+        # authoritative participation record after a sell-out.
+        if obj.quantity == 0:
+            return "EXITED"
         return "OPEN"
 
     def get_participated_quantity(self, obj):
