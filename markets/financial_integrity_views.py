@@ -57,6 +57,7 @@ class FeePreviewView(GenericAPIView):
             market=market,
             quantity=serializer.validated_data["quantity"],
             limit_price=serializer.validated_data["limit_price"],
+            side=serializer.validated_data["side"],
         )
         return Response(data)
 

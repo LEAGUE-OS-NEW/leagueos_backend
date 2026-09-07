@@ -7,6 +7,7 @@ from markets.models import (
     MarketFill,
     MarketOrder,
     MarketPosition,
+    MarketPositionExit,
 )
 
 
@@ -144,6 +145,10 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
     net_payout = serializers.SerializerMethodField()
     realized_pnl = serializers.SerializerMethodField()
     settled_at = serializers.SerializerMethodField()
+    opened_at = serializers.SerializerMethodField()
+    closed_at = serializers.SerializerMethodField()
+    exited_quantity = serializers.SerializerMethodField()
+    realized_proceeds = serializers.SerializerMethodField()
 
     class Meta:
         model = MarketPosition
@@ -165,6 +170,10 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
             "net_payout",
             "realized_pnl",
             "settled_at",
+            "opened_at",
+            "closed_at",
+            "exited_quantity",
+            "realized_proceeds",
             "created_at",
         )
 
@@ -173,6 +182,8 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
         return getattr(obj, "settlement_record", None) or getattr(obj, "void_refund_record", None)
 
     def get_participation_status(self, obj):
+        if isinstance(obj, MarketPositionExit):
+            return "EXITED"
         if hasattr(obj, "void_refund_record"):
             return "REFUNDED"
         settlement = getattr(obj, "settlement_record", None)
@@ -188,6 +199,8 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
         return "OPEN"
 
     def get_participated_quantity(self, obj):
+        if isinstance(obj, MarketPositionExit):
+            return obj.acquired_quantity
         record = self._record(obj)
         return (
             record.settled_quantity
@@ -196,6 +209,8 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
         )
 
     def get_total_cost(self, obj):
+        if isinstance(obj, MarketPositionExit):
+            return obj.cost_basis
         record = self._record(obj)
         return record.cost_basis if record else obj.total_cost
 
@@ -205,12 +220,16 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
         return cost / quantity if quantity else obj.average_entry_price
 
     def get_gross_payout(self, obj):
+        if isinstance(obj, MarketPositionExit):
+            return obj.realized_proceeds
         record = self._record(obj)
         return (
             getattr(record, "payout_amount", getattr(record, "refund_amount", 0)) if record else 0
         )
 
     def get_fees(self, obj):
+        if isinstance(obj, MarketPositionExit):
+            return 0
         record = self._record(obj)
         return (
             getattr(record, "payout_fee_amount", getattr(record, "refund_fee_amount", 0))
@@ -219,6 +238,8 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
         )
 
     def get_net_payout(self, obj):
+        if isinstance(obj, MarketPositionExit):
+            return obj.realized_proceeds
         record = self._record(obj)
         return (
             getattr(record, "net_payout_amount", getattr(record, "net_refund_amount", 0))
@@ -227,12 +248,32 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
         )
 
     def get_realized_pnl(self, obj):
+        if isinstance(obj, MarketPositionExit):
+            return obj.realized_pnl
         record = self._record(obj)
         return record.realized_pnl_delta if record else obj.realized_pnl
 
     def get_settled_at(self, obj):
+        if isinstance(obj, MarketPositionExit):
+            return obj.exited_at
         record = self._record(obj)
         return record.created_at if record else None
+
+    def get_opened_at(self, obj):
+        return obj.opened_at if isinstance(obj, MarketPositionExit) else obj.created_at
+
+    def get_closed_at(self, obj):
+        return obj.exited_at if isinstance(obj, MarketPositionExit) else self.get_settled_at(obj)
+
+    def get_exited_quantity(self, obj):
+        return obj.exited_quantity if isinstance(obj, MarketPositionExit) else 0
+
+    def get_realized_proceeds(self, obj):
+        return (
+            obj.realized_proceeds
+            if isinstance(obj, MarketPositionExit)
+            else self.get_gross_payout(obj)
+        )
 
 
 class MarketFillReadSerializer(serializers.ModelSerializer):

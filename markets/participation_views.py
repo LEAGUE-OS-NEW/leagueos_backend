@@ -26,6 +26,7 @@ from markets.models import (
     MarketFill,
     MarketOrder,
     MarketPosition,
+    MarketPositionExit,
 )
 from markets.participation_serializers import (
     MarketFillReadSerializer,
@@ -326,7 +327,7 @@ class MarketParticipationHistoryListView(ListAPIView):
     pagination_class = PublicCatalogPagination
 
     def get_queryset(self):
-        return (
+        positions = list(
             MarketPosition.objects.filter(user=self.request.user)
             .select_related(
                 "market",
@@ -336,6 +337,25 @@ class MarketParticipationHistoryListView(ListAPIView):
                 "void_refund_record",
             )
             .order_by("-updated_at", "-id")
+        )
+        exits = list(
+            MarketPositionExit.objects.filter(participant=self.request.user).select_related(
+                "market", "market__sporting_event", "outcome"
+            )
+        )
+        exit_position_ids = {row.market_position_id for row in exits}
+        positions = [
+            row
+            for row in positions
+            if row.quantity > 0
+            or hasattr(row, "settlement_record")
+            or hasattr(row, "void_refund_record")
+            or row.id not in exit_position_ids
+        ]
+        return sorted(
+            [*positions, *exits],
+            key=lambda row: getattr(row, "exited_at", row.updated_at),
+            reverse=True,
         )
 
 

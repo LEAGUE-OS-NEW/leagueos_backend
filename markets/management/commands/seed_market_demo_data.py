@@ -7,6 +7,8 @@ from django.core.management.base import (
 )
 from django.db import transaction
 from django.utils import timezone
+from uuid import UUID, uuid5
+from decimal import Decimal
 
 from authentication.services.permission_service import (
     PermissionService,
@@ -16,6 +18,7 @@ from markets.models import (
     MarketCategory,
     MarketScope,
     MarketTemplate,
+    MarketLiquidityProvider,
 )
 from markets.services.catalog_service import (
     MarketCatalogService,
@@ -23,6 +26,9 @@ from markets.services.catalog_service import (
 from markets.services.lifecycle_service import (
     MarketLifecycleService,
 )
+from markets.services.liquidity_service import MarketLiquidityService
+from markets.services.opening_pricing_service import MarketOpeningPricingService
+from wallets.services.wallet_service import WalletService
 from sports.models import (
     Competition,
     EventParticipant,
@@ -32,6 +38,14 @@ from sports.models import (
 )
 
 DEMO_SOURCE = "LEAGUE_OS_DEMO"
+DEMO_LIQUIDITY_NAMESPACE = UUID("8ed08c99-2518-44a0-8922-bc1c81bf68fb")
+DEMO_INITIAL_LIQUIDITY = Decimal("500000")
+DEMO_YES_PROBABILITY = {
+    "Will Vipers SC beat KCCA FC?": 58,
+    "Will Vipers SC vs KCCA FC have over 2.5 goals?": 52,
+    "Will KOBS Rugby Club beat Platinum Credit Heathens?": 55,
+    "Will City Oilers beat Namuwongo Blazers?": 64,
+}
 
 
 COMPETITIONS = [
@@ -758,6 +772,39 @@ class Command(BaseCommand):
         market,
         creator,
     ):
+        provider_user, _ = get_user_model().objects.get_or_create(
+            email="liquidity.demo@leagueos.test",
+            defaults={"username": "liquidity.demo@leagueos.test", "is_active": True},
+        )
+        provider, _ = MarketLiquidityProvider.objects.update_or_create(
+            code="DEMO_PLATFORM_TREASURY",
+            defaults={
+                "provider_type": MarketLiquidityProvider.ProviderType.PLATFORM_TREASURY,
+                "user": provider_user,
+                "is_active": True,
+                "display_name": "League OS Demo Liquidity",
+            },
+        )
+        WalletService.credit(
+            user=provider_user,
+            currency="UGX",
+            amount=DEMO_INITIAL_LIQUIDITY,
+            idempotency_reference=uuid5(DEMO_LIQUIDITY_NAMESPACE, str(market.id)),
+            market=market,
+        )
+        MarketOpeningPricingService.configure(
+            market=market,
+            actor=creator,
+            face_value_ugx=market.face_value_ugx,
+            yes_probability=DEMO_YES_PROBABILITY[market.question],
+        )
+        MarketLiquidityService.configure(
+            market=market,
+            actor=creator,
+            initial_liquidity_ugx=DEMO_INITIAL_LIQUIDITY,
+            opening_spread_bps=100,
+            provider=provider,
+        )
         market = MarketLifecycleService.submit(
             market_id=market.id,
             actor=creator,
