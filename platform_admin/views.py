@@ -1861,6 +1861,21 @@ class LegacyAdminStoreReportView(APIView):
         )
 
 
+def _finance_ledger_reference(entry):
+    """Return the best traceable reference for a canonical ledger entry."""
+    if entry is None:
+        return None
+
+    transaction = getattr(entry, "transaction", None)
+    if transaction is not None and transaction.reference:
+        return transaction.reference
+
+    if entry.idempotency_reference:
+        return str(entry.idempotency_reference)
+
+    return str(entry.id)
+
+
 # Versioned authoritative reporting implementations.  These definitions intentionally
 # supersede the legacy capped report views above while retaining their public names.
 class AdminFinanceReportView(APIView):
@@ -2013,11 +2028,7 @@ class AdminFinanceReportView(APIView):
                         "gross": str(item.payout_amount),
                         "fees": str(item.payout_fee_amount),
                         "net": str(item.net_payout_amount),
-                        "ledger_reference": (
-                            item.wallet_ledger_entry.transaction.reference
-                            if item.wallet_ledger_entry_id
-                            else None
-                        ),
+                        "ledger_reference": (_finance_ledger_reference(item.wallet_ledger_entry)),
                         "created_at": item.created_at,
                     }
                     for item in rows
@@ -2046,9 +2057,7 @@ class AdminFinanceReportView(APIView):
                         "fees": str(x.refund_fee_amount),
                         "net": str(x.net_refund_amount),
                         "ledger_reference": (
-                            x.wallet_credit_ledger_entry.transaction.reference
-                            if x.wallet_credit_ledger_entry_id
-                            else None
+                            _finance_ledger_reference(x.wallet_credit_ledger_entry)
                         ),
                         "status": "COMPLETED",
                         "created_at": x.created_at,

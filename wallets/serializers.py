@@ -38,17 +38,41 @@ class WalletReadSerializer(serializers.ModelSerializer):
 
 
 class LedgerEntryReadSerializer(serializers.ModelSerializer):
+    transaction_reference = serializers.SerializerMethodField()
+    market_question = serializers.SerializerMethodField()
+
     class Meta:
         model = LedgerEntry
         fields = (
             "id",
+            "entry_type",
             "debit_account",
             "credit_account",
             "amount",
             "currency",
+            "available_balance_before",
+            "available_balance_after",
+            "reserved_balance_before",
+            "reserved_balance_after",
+            "idempotency_reference",
+            "market",
+            "market_question",
+            "order",
+            "fill",
+            "transaction_reference",
             "created_at",
         )
         read_only_fields = fields
+
+    def get_transaction_reference(self, entry):
+        if entry.transaction_id and entry.transaction:
+            return entry.transaction.reference
+        return None
+
+    def get_market_question(self, entry):
+        if entry.market_id and entry.market:
+            return entry.market.question
+        return None
 
 
 class LedgerEntryFilterSerializer(serializers.Serializer):

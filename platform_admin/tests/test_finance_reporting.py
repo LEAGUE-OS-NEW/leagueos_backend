@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 from authentication.models import Role
 from authentication.services.role_service import RoleService
 from authentication.tests.factories import UserFactory
+from platform_admin.views import _finance_ledger_reference
 from wallets.models import PaymentProvider, WalletTransaction
 from wallets.services.wallet_service import WalletService
 
@@ -89,3 +90,60 @@ def test_finance_deposit_pagination_filters_search_and_exact_aggregates():
     assert filtered.data["count"] == 1
     assert filtered.data["results"][0]["fan"] == "finance-fan@example.com"
     assert filtered.data["results"][0]["internal_reference"] == "DEPOSIT-EXACT-2"
+
+
+@pytest.mark.django_db
+def test_finance_ledger_reference_supports_ledger_only_settlement_credit():
+    fan = UserFactory(
+        email="ledger-only-finance@example.com",
+    )
+
+    reference = uuid4()
+
+    entry = WalletService.credit(
+        user=fan,
+        currency="UGX",
+        amount=Decimal("16528.9256"),
+        idempotency_reference=reference,
+    )
+
+    assert entry.transaction_id is None
+
+    assert _finance_ledger_reference(entry) == str(reference)
+
+
+@pytest.mark.django_db
+def test_finance_ledger_reference_prefers_wallet_transaction_reference():
+    fan = UserFactory(
+        email="transaction-finance@example.com",
+    )
+
+    WalletService.credit(
+        user=fan,
+        currency="UGX",
+        amount=Decimal("1.00"),
+        idempotency_reference=uuid4(),
+    )
+
+    wallet = fan.wallets.get(
+        currency="UGX",
+    )
+
+    transaction = WalletTransaction.objects.create(
+        wallet=wallet,
+        transaction_type=WalletTransaction.TransactionType.DEPOSIT,
+        amount=Decimal("50000.0000"),
+        currency="UGX",
+        status=WalletTransaction.Status.COMPLETED,
+        reference="FINANCE-TEST-DEPOSIT-001",
+    )
+
+    entry = WalletService.credit(
+        user=fan,
+        currency="UGX",
+        amount=Decimal("50000.0000"),
+        idempotency_reference=uuid4(),
+        transaction=transaction,
+    )
+
+    assert _finance_ledger_reference(entry) == "FINANCE-TEST-DEPOSIT-001"

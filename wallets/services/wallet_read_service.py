@@ -35,7 +35,12 @@ class WalletReadService:
             return None, LedgerEntry.objects.none()
 
         filters = filters or {}
-        queryset = LedgerEntry.objects.filter(wallet=wallet)
+        queryset = LedgerEntry.objects.select_related(
+            "transaction",
+            "market",
+            "order",
+            "fill",
+        ).filter(wallet=wallet)
         if filters.get("entry_type"):
             queryset = queryset.filter(entry_type=filters["entry_type"])
         for field in ("market_id", "order_id", "fill_id"):
