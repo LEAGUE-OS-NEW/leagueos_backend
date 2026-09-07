@@ -181,5 +181,5 @@ class AdminKYCVerificationDetailSerializer(serializers.ModelSerializer):
 
 
 class AdminKYCReviewActionSerializer(serializers.Serializer):
-    decision = serializers.ChoiceField(choices=["VERIFIED", "REJECTED", "REVIEW"])
+    decision = serializers.ChoiceField(choices=["VERIFIED", "REJECTED"])
     notes = serializers.CharField(max_length=255, required=False, allow_blank=True)

@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from markets.admin_serializers import MarketAdminReadSerializer
+from markets.services.settlement_service import MarketSettlementService
 
 
 class MarketResultAccelerationRequestSerializer(serializers.Serializer):
@@ -24,6 +25,7 @@ class MarketResultVerificationSerializer(MarketAdminReadSerializer):
     can_publish_provisional = serializers.SerializerMethodField()
     can_resolve = serializers.SerializerMethodField()
     can_settle = serializers.SerializerMethodField()
+    settlement_block_reason = serializers.SerializerMethodField()
     settlement = serializers.SerializerMethodField()
 
     class Meta(MarketAdminReadSerializer.Meta):
@@ -35,6 +37,7 @@ class MarketResultVerificationSerializer(MarketAdminReadSerializer):
             "can_publish_provisional",
             "can_resolve",
             "can_settle",
+            "settlement_block_reason",
             "settlement",
         ]
 
@@ -50,7 +53,13 @@ class MarketResultVerificationSerializer(MarketAdminReadSerializer):
         if obj.status == obj.Status.VOIDED:
             return "REFUNDED" if hasattr(obj, "void_refund") else "VOIDED"
         if obj.status == obj.Status.RESOLVED:
-            return "SETTLED" if hasattr(obj, "settlement") else "READY_TO_SETTLE"
+            if hasattr(obj, "settlement"):
+                return "SETTLED"
+            return (
+                "SETTLEMENT_PENDING"
+                if MarketSettlementService.settleability_errors(obj)
+                else "READY_TO_SETTLE"
+            )
 
         provisional, disputes, final_decision = self._facts(obj)
         if provisional is None:
@@ -105,6 +114,15 @@ class MarketResultVerificationSerializer(MarketAdminReadSerializer):
     @extend_schema_field(serializers.BooleanField())
     def get_can_settle(self, obj):
         return self.get_workflow_state(obj) == "READY_TO_SETTLE"
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_settlement_block_reason(self, obj):
+        if hasattr(obj, "settlement"):
+            return "This market has already been settled."
+        if obj.status != obj.Status.RESOLVED:
+            return None
+        errors = MarketSettlementService.settleability_errors(obj)
+        return next(iter(errors.values()), None)
 
     @extend_schema_field(serializers.DictField(allow_null=True))
     def get_settlement(self, obj):

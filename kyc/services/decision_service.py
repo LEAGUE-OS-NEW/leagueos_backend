@@ -4,6 +4,7 @@ from django.utils import timezone
 from typing import TYPE_CHECKING
 
 from kyc.models import KYCCheckResult, KYCConfiguration, KYCVerification
+from kyc.services.market_access_service import KYCMarketAccessService
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ class KYCDecisionService:
             if not user.is_verified:
                 user.is_verified = True
                 user.save(update_fields=["is_verified", "updated_at"])
+            KYCMarketAccessService.grant_verified_participant_role(user=user)
         elif final_status == KYCVerification.Status.RETRY_REQUIRED:
             verification.retry_reason = reason_code
         elif final_status == KYCVerification.Status.REJECTED:

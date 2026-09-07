@@ -20,6 +20,7 @@ from kyc.serializers import (
     KYCSubmissionSerializer,
 )
 from kyc.tasks import process_kyc_attempt
+from kyc.services.market_access_service import KYCMarketAccessService
 from markets.permissions import HasManageCompliancePermission
 
 logger = logging.getLogger(__name__)
@@ -218,6 +219,9 @@ class FanKYCDevelopmentBypassView(APIView):
             user = request.user
             user.is_verified = True
             user.save(update_fields=["is_verified", "updated_at"])
+            KYCMarketAccessService.grant_verified_participant_role(
+                user=user, assigned_by=request.user
+            )
             log_kyc_audit(
                 user=request.user,
                 action="KYC_VERIFIED",
@@ -480,6 +484,16 @@ class AdminKYCReviewActionView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+            if verification.status != KYCVerification.Status.REVIEW:
+                return Response(
+                    build_response(
+                        False,
+                        "Only a verification awaiting manual review can be approved or rejected.",
+                        data={"status": verification.status},
+                    ),
+                    status=status.HTTP_409_CONFLICT,
+                )
+
             verification.status = decision
             verification.verification_source = KYCVerification.VerificationSource.MANUAL
             verification.verification_completed_at = timezone.now()
@@ -491,6 +505,9 @@ class AdminKYCReviewActionView(APIView):
                 if not user.is_verified:
                     user.is_verified = True
                     user.save(update_fields=["is_verified", "updated_at"])
+                KYCMarketAccessService.grant_verified_participant_role(
+                    user=user, assigned_by=request.user
+                )
             elif decision == KYCVerification.Status.REJECTED:
                 verification.rejection_reason = (
                     f"Manual admin rejection: {notes}" if notes else "Manual admin rejection"
@@ -499,11 +516,7 @@ class AdminKYCReviewActionView(APIView):
 
             log_kyc_audit(
                 user=request.user,
-                action=(
-                    "KYC_REVIEW_REQUIRED"
-                    if decision == "REVIEW"
-                    else ("KYC_VERIFIED" if decision == "VERIFIED" else "KYC_REJECTED")
-                ),
+                action=("KYC_VERIFIED" if decision == "VERIFIED" else "KYC_REJECTED"),
                 resource_id=verification.id,
                 metadata={"admin_decision": decision, "notes": notes},
                 request=request,

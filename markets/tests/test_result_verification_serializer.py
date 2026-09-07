@@ -17,8 +17,15 @@ class ResultVerificationStateTests(SimpleTestCase):
     def setUp(self):
         self.serializer = MarketResultVerificationSerializer()
 
-    def market(self, status=Market.Status.CLOSED, provisional=None):
-        market = SimpleNamespace(status=status, Status=Market.Status)
+    def market(self, status=Market.Status.CLOSED, provisional=None, settles_by=None):
+        market = SimpleNamespace(
+            status=status,
+            Status=Market.Status,
+            winning_outcome_id="outcome-1" if status == Market.Status.RESOLVED else None,
+            winning_outcome=SimpleNamespace(market_id="market-1"),
+            id="market-1",
+            settles_by=settles_by,
+        )
         if provisional is not None:
             market.provisional_result = provisional
         return market
@@ -56,5 +63,25 @@ class ResultVerificationStateTests(SimpleTestCase):
     def test_resolved_and_settled_are_distinct(self):
         market = self.market(status=Market.Status.RESOLVED)
         self.assertEqual(self.serializer.get_workflow_state(market), "READY_TO_SETTLE")
+        self.assertTrue(self.serializer.get_can_settle(market))
         market.settlement = SimpleNamespace()
         self.assertEqual(self.serializer.get_workflow_state(market), "SETTLED")
+        self.assertFalse(self.serializer.get_can_settle(market))
+
+    def test_resolved_before_settlement_target_is_pending(self):
+        target = timezone.now() + timedelta(hours=1)
+        market = self.market(status=Market.Status.RESOLVED, settles_by=target)
+
+        self.assertEqual(self.serializer.get_workflow_state(market), "SETTLEMENT_PENDING")
+        self.assertFalse(self.serializer.get_can_settle(market))
+        self.assertEqual(
+            self.serializer.get_settlement_block_reason(market),
+            f"Settlement becomes available at {target.isoformat()}.",
+        )
+
+    def test_resolved_at_settlement_target_is_ready(self):
+        target = timezone.now()
+        market = self.market(status=Market.Status.RESOLVED, settles_by=target)
+
+        self.assertEqual(self.serializer.get_workflow_state(market), "READY_TO_SETTLE")
+        self.assertTrue(self.serializer.get_can_settle(market))

@@ -225,18 +225,25 @@ class MarketSettlementService:
             raise PermissionDenied("You do not have permission to verify or reject results.")
 
     @staticmethod
-    def _require_settleable_market(market):
+    def settleability_errors(market, *, now=None):
+        """Return the non-locking prerequisites shared by reads and execution."""
         errors = {}
+        now = now or timezone.now()
         if market.status != Market.Status.RESOLVED:
             errors["status"] = "Only a resolved market can be settled."
         if not market.winning_outcome_id:
             errors["winning_outcome"] = "A confirmed winning outcome is required."
         elif market.winning_outcome.market_id != market.id:
             errors["winning_outcome"] = "The winning outcome must belong to the market."
-        if market.settles_by is not None and timezone.now() < market.settles_by:
+        if market.settles_by is not None and now < market.settles_by:
             errors["settles_by"] = (
-                "Settlement cannot execute before the configured settlement time."
+                f"Settlement becomes available at {market.settles_by.isoformat()}."
             )
+        return errors
+
+    @classmethod
+    def _require_settleable_market(cls, market):
+        errors = cls.settleability_errors(market)
         if errors:
             raise ValidationError(errors)
 
