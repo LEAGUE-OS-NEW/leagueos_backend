@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from markets.models import (
@@ -181,6 +182,7 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
     def _record(obj):
         return getattr(obj, "settlement_record", None) or getattr(obj, "void_refund_record", None)
 
+    @extend_schema_field(serializers.CharField())
     def get_participation_status(self, obj):
         if isinstance(obj, MarketPositionExit):
             return "EXITED"
@@ -198,6 +200,7 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
             return "EXITED"
         return "OPEN"
 
+    @extend_schema_field(serializers.DecimalField(max_digits=18, decimal_places=4))
     def get_participated_quantity(self, obj):
         if isinstance(obj, MarketPositionExit):
             return obj.acquired_quantity
@@ -208,17 +211,20 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
             else (record.refunded_quantity if record else obj.quantity)
         )
 
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=4))
     def get_total_cost(self, obj):
         if isinstance(obj, MarketPositionExit):
             return obj.cost_basis
         record = self._record(obj)
         return record.cost_basis if record else obj.total_cost
 
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=5))
     def get_average_price(self, obj):
         quantity = self.get_participated_quantity(obj)
         cost = self.get_total_cost(obj)
         return cost / quantity if quantity else obj.average_entry_price
 
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=4))
     def get_gross_payout(self, obj):
         if isinstance(obj, MarketPositionExit):
             return obj.realized_proceeds
@@ -227,6 +233,7 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
             getattr(record, "payout_amount", getattr(record, "refund_amount", 0)) if record else 0
         )
 
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=4))
     def get_fees(self, obj):
         if isinstance(obj, MarketPositionExit):
             return 0
@@ -237,6 +244,7 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
             else 0
         )
 
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=4))
     def get_net_payout(self, obj):
         if isinstance(obj, MarketPositionExit):
             return obj.realized_proceeds
@@ -247,27 +255,33 @@ class MarketParticipationHistorySerializer(serializers.ModelSerializer):
             else 0
         )
 
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=4))
     def get_realized_pnl(self, obj):
         if isinstance(obj, MarketPositionExit):
             return obj.realized_pnl
         record = self._record(obj)
         return record.realized_pnl_delta if record else obj.realized_pnl
 
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
     def get_settled_at(self, obj):
         if isinstance(obj, MarketPositionExit):
             return obj.exited_at
         record = self._record(obj)
         return record.created_at if record else None
 
+    @extend_schema_field(serializers.DateTimeField())
     def get_opened_at(self, obj):
         return obj.opened_at if isinstance(obj, MarketPositionExit) else obj.created_at
 
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
     def get_closed_at(self, obj):
         return obj.exited_at if isinstance(obj, MarketPositionExit) else self.get_settled_at(obj)
 
+    @extend_schema_field(serializers.DecimalField(max_digits=18, decimal_places=4))
     def get_exited_quantity(self, obj):
         return obj.exited_quantity if isinstance(obj, MarketPositionExit) else 0
 
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=4))
     def get_realized_proceeds(self, obj):
         return (
             obj.realized_proceeds
