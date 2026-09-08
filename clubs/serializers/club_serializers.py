@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from clubs.models import (
@@ -400,6 +401,7 @@ class StoreOrderSerializer(serializers.ModelSerializer):
     payment = serializers.SerializerMethodField()
     refund = serializers.SerializerMethodField()
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_status_history(self, obj):
         return [
             {
@@ -429,9 +431,11 @@ class StoreOrderSerializer(serializers.ModelSerializer):
             "ledger_entries": [str(entry.id) for entry in value.ledger_entries.all()],
         }
 
+    @extend_schema_field(serializers.DictField(allow_null=True))
     def get_payment(self, obj):
         return self._transaction(obj.payment_transaction)
 
+    @extend_schema_field(serializers.DictField(allow_null=True))
     def get_refund(self, obj):
         return self._transaction(obj.refund_transaction)
 

@@ -64,11 +64,13 @@ class LedgerEntryReadSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_transaction_reference(self, entry):
         if entry.transaction_id and entry.transaction:
             return entry.transaction.reference
         return None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
     def get_market_question(self, entry):
         if entry.market_id and entry.market:
             return entry.market.question

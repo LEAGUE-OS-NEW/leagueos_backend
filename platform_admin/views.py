@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
 from rest_framework.permissions import IsAuthenticated
@@ -1881,6 +1882,7 @@ def _finance_ledger_reference(entry):
 class AdminFinanceReportView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         if not (
             request.user.is_superuser
@@ -2137,6 +2139,7 @@ class AdminFinanceReportView(APIView):
 class AdminStoreReportView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
     def get(self, request):
         if not request.user.is_superuser:
             raise PermissionDenied("Super Admin access is required.")
@@ -2203,6 +2206,7 @@ class AdminStoreReportView(APIView):
 class AdminStoreOrderDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: StoreOrderSerializer})
     def get(self, request, order_id):
         if not request.user.is_superuser:
             raise PermissionDenied("Super Admin access is required.")
