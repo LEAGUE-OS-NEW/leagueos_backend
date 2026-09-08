@@ -1,6 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid5
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -55,6 +56,56 @@ class MarketLiquidityService:
         )
         config.full_clean()
         config.save()
+        return config
+
+    @classmethod
+    @transaction.atomic
+    def configure_local_untraded_historical_market(
+        cls,
+        *,
+        market,
+        actor,
+        initial_liquidity_ugx,
+        opening_spread_bps=0,
+        provider=None,
+    ):
+        """Configure an already-open, untraded market for an explicit local demo repair."""
+        if not settings.DEBUG:
+            raise ValidationError({"debug": "Local market liquidity repair requires DEBUG=True."})
+        market = Market.objects.select_for_update().get(pk=market.pk)
+        if market.status != Market.Status.OPEN:
+            raise ValidationError({"status": "Local liquidity repair requires an open market."})
+        if (
+            market.orders.exists()
+            or market.fills.exists()
+            or market.positions.exists()
+            or market.complete_set_issuances.exists()
+            or hasattr(market, "settlement")
+        ):
+            raise ValidationError(
+                {"market": "Local liquidity repair requires no financial history."}
+            )
+
+        amount = Decimal(str(initial_liquidity_ugx))
+        if amount <= 0:
+            raise ValidationError({"initial_liquidity_ugx": "Liquidity must be positive."})
+        if not 0 <= opening_spread_bps <= 5000:
+            raise ValidationError({"opening_spread_bps": "Spread must be between 0 and 5000 bps."})
+
+        config, created = MarketLiquidityConfiguration.objects.get_or_create(
+            market=market,
+            defaults={
+                "source": MarketLiquidityConfiguration.Source.PLATFORM_TREASURY,
+                "initial_liquidity_ugx": amount,
+                "opening_spread_bps": opening_spread_bps,
+                "provider": provider,
+                "configured_by": actor,
+                "configured_at": timezone.now(),
+                "status": MarketLiquidityConfiguration.Status.CONFIGURED,
+            },
+        )
+        if not created:
+            raise ValidationError({"market": "An opening liquidity configuration already exists."})
         return config
 
     @classmethod
