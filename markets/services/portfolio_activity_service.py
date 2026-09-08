@@ -227,7 +227,7 @@ class MarketPortfolioActivityService:
             )
             event.update(
                 quantity=row.settled_quantity,
-                wallet_amount=row.payout_amount,
+                wallet_amount=row.net_payout_amount,
                 realized_pnl_delta=row.realized_pnl_delta,
             )
             events.append(event)
@@ -255,7 +255,7 @@ class MarketPortfolioActivityService:
             )
             event.update(
                 quantity=row.refunded_quantity,
-                wallet_amount=row.refund_amount,
+                wallet_amount=row.net_refund_amount,
                 realized_pnl_delta=row.realized_pnl_delta,
             )
             events.append(event)

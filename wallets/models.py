@@ -114,6 +114,8 @@ class WalletTransaction(TimeStampedUUIDModel):
         DEPOSIT = "DEPOSIT", _("Deposit")
         WITHDRAWAL = "WITHDRAWAL", _("Withdrawal")
         ADJUSTMENT = "ADJUSTMENT", _("Adjustment")
+        SETTLEMENT_PAYOUT = "SETTLEMENT_PAYOUT", _("Settlement payout")
+        VOID_REFUND = "VOID_REFUND", _("Void refund")
 
     class Status(models.TextChoices):
         PENDING = "PENDING", _("Pending")

@@ -111,12 +111,21 @@ class MarketNotificationService:
 
     @classmethod
     def settlement(cls, record):
+        if record.was_winner:
+            title = "You won!"
+            message = f"Settlement completed — you won {record.net_payout_amount}."
+        else:
+            title = "Market settled"
+            message = (
+                "Settlement completed — your pick didn't win. "
+                f"Net payout: {record.net_payout_amount}."
+            )
         cls.schedule(
             recipient=record.participant,
             category="MARKET_SETTLEMENTS",
             event_type="SETTLEMENT_WIN" if record.was_winner else "SETTLEMENT_LOSS",
-            title="Market settlement",
-            message=(f"Settlement completed with net payout {record.net_payout_amount}."),
+            title=title,
+            message=message,
             key=f"market-position-settlement:{record.id}",
             market_id=record.market_settlement.market_id,
             data={

@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.db.models import F
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
@@ -32,6 +32,7 @@ from clubs.models import (
     ProductCategory,
     StaffInvitation,
     StoreOrder,
+    TicketOrder,
     TicketProduct,
 )
 from clubs.permissions import IsClubAdmin, IsClubStaff
@@ -47,6 +48,7 @@ from clubs.serializers.club_serializers import (
     ClubPlayerSerializer,
     ClubProfileVersionSerializer,
     ClubWorkspaceSerializer,
+    FanTicketOrderSerializer,
     MembershipPlanSerializer,
     MerchandiseProductSerializer,
     ProductCategorySerializer,
@@ -55,6 +57,7 @@ from clubs.serializers.club_serializers import (
     StaffInvitationAcceptSerializer,
     StaffInvitationSerializer,
     StoreOrderSerializer,
+    TicketOrderSerializer,
     TicketProductSerializer,
 )
 from clubs.services.store_service import store_service
@@ -282,6 +285,93 @@ class TicketProductViewSet(viewsets.ModelViewSet):
         club = Club.objects.get(id=club_id)
         serializer.save(club=club, created_by=self.request.user)
 
+    def get_permissions(self):
+        # The manual `path()` routing in clubs/urls.py doesn't go through a
+        # DRF router, so `@action(permission_classes=...)` kwargs never
+        # reach the view — override explicitly for the one action (buying a
+        # ticket) that isn't club-staff-only.
+        if self.action == "purchase":
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    @action(detail=True, methods=["post"], permission_classes=[IsClubStaff])
+    def publish(self, request, club_pk=None, pk=None):
+        product = self.get_object()
+        from clubs.services.ticket_service import TicketService
+
+        published = TicketService.publish_product(product, request.user)
+        serializer = self.get_serializer(published)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], permission_classes=[IsClubStaff])
+    def orders(self, request, club_pk=None, pk=None):
+        product = self.get_object()
+        orders = product.orders.select_related("user").order_by("-created_at")
+        serializer = TicketOrderSerializer(orders, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def purchase(self, request, club_pk=None, pk=None):
+        product = self.get_object()
+        quantity = int(request.data.get("quantity") or 1)
+        if quantity < 1:
+            return Response(
+                {"quantity": "Quantity must be at least 1."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from clubs.services.ticket_service import TicketService
+
+        try:
+            order = TicketService.create_order(request.user, product, quantity=quantity)
+        except (ValueError, DjangoValidationError) as exc:
+            detail = exc.message_dict if isinstance(exc, DjangoValidationError) else str(exc)
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = TicketOrderSerializer(order)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class TicketOrderScanView(APIView):
+    permission_classes = [IsClubStaff]
+    serializer_class = TicketOrderSerializer
+
+    def post(self, request, club_pk=None):
+        code = str(request.data.get("code") or "").strip()
+        if not code:
+            return Response({"code": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            order = TicketOrder.objects.select_related("product").get(
+                code=code, product__club_id=club_pk
+            )
+        except TicketOrder.DoesNotExist:
+            return Response(
+                {"detail": "No ticket found for this code."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        from clubs.services.ticket_service import TicketService
+
+        try:
+            checked_in = TicketService.check_in(order, request.user)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = TicketOrderSerializer(checked_in)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class FanTicketOrderListView(generics.ListAPIView):
+    """A fan's own ticket purchases across every club — distinct from the
+    club-scoped, IsClubStaff-gated `orders` action on TicketProductViewSet."""
+
+    serializer_class = FanTicketOrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.ticket_orders.select_related(
+            "product", "product__event", "product__event__competition"
+        ).order_by("-created_at")
+
 
 class MerchandiseProductViewSet(viewsets.ModelViewSet):
     serializer_class = MerchandiseProductSerializer
@@ -303,7 +393,7 @@ class MerchandiseProductViewSet(viewsets.ModelViewSet):
         try:
             serializer.save(club=club, created_by=self.request.user)
         except IntegrityError as exc:
-            raise ValidationError({"sku": "This SKU already exists for the club."}) from exc
+            raise DRFValidationError({"sku": "This SKU already exists for the club."}) from exc
 
 
 class PublicMerchandiseProductListView(generics.ListAPIView):

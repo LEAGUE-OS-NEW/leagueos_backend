@@ -415,6 +415,13 @@ SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"].update(
             ("PUBLISHED", "Published"),
             ("ARCHIVED", "Archived"),
         ],
+        "StatusD00Enum": [
+            ("PENDING", "Pending"),
+            ("PAID", "Paid"),
+            ("FULFILLED", "Fulfilled"),
+            ("CANCELLED", "Cancelled"),
+            ("REFUNDED", "Refunded"),
+        ],
     }
 )
 

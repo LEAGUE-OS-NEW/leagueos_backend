@@ -37,6 +37,16 @@ def discover_club_tasks():
         )
 
 
+def discover_markets_tasks():
+    if app is None:
+        return
+    app.autodiscover_tasks(["markets"])
+
+    @app.on_after_configure.connect
+    def setup_markets_periodic_tasks(sender, **kwargs):
+        sender.add_periodic_task(300, close_due_markets_task.s(), name="markets-close-due")
+
+
 def discover_fantasy_tasks():
     """Register Fantasy Celery tasks so the worker can execute them."""
     if app is None:
@@ -56,9 +66,17 @@ def _publish_scheduled_club_content_task():
     return publish_scheduled_content()
 
 
+def _close_due_markets_task():
+    from markets.tasks import close_due_markets
+
+    return close_due_markets()
+
+
 if app is not None:
     retention_cleanup_task = app.task(_retention_cleanup_task)
     publish_scheduled_club_content_task = app.task(_publish_scheduled_club_content_task)
+    close_due_markets_task = app.task(_close_due_markets_task)
 else:
     retention_cleanup_task = None
     publish_scheduled_club_content_task = None
+    close_due_markets_task = None

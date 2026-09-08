@@ -60,6 +60,7 @@ from markets.lifecycle_views import (
     MarketOpenView,
     MarketRejectView,
     MarketReopenView,
+    MarketRevertToDraftView,
     MarketSubmitView,
     MarketSuspendView,
 )
@@ -121,6 +122,7 @@ from markets.result_dispute_views import (
 )
 from markets.result_verification_views import (
     MarketResultDevelopmentAcceleratorView,
+    MarketResultExposureView,
     MarketResultVerificationQueueView,
 )
 from markets.settlement_views import MarketSettlementView
@@ -150,6 +152,11 @@ urlpatterns = [
         "market-admin/result-verification/<uuid:market_id>/dev-end-dispute-window/",
         MarketResultDevelopmentAcceleratorView.as_view(),
         name="admin-result-verification-dev-end-window",
+    ),
+    path(
+        "market-admin/result-verification/<uuid:market_id>/exposure/",
+        MarketResultExposureView.as_view(),
+        name="admin-result-verification-exposure",
     ),
     path(
         "admin/compliance/risk-profiles/",
@@ -513,6 +520,11 @@ urlpatterns = [
         ("market-admin/markets/" "<uuid:market_id>/open/"),
         MarketOpenView.as_view(),
         name="admin-market-open",
+    ),
+    path(
+        ("market-admin/markets/" "<uuid:market_id>/revert-to-draft/"),
+        MarketRevertToDraftView.as_view(),
+        name="admin-market-revert-to-draft",
     ),
     path(
         ("market-admin/markets/" "<uuid:market_id>/suspend/"),

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from rest_framework import serializers
 
 from clubs.models import (
@@ -17,6 +19,7 @@ from clubs.models import (
     StaffInvitation,
     StoreOrder,
     StoreOrderItem,
+    TicketOrder,
     TicketProduct,
 )
 from profiles.models import Club
@@ -207,6 +210,89 @@ class TicketProductSerializer(serializers.ModelSerializer):
             "published_by",
             "created_by",
         ]
+
+
+class TicketOrderSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    buyer_email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = TicketOrder
+        fields = [
+            "id",
+            "product",
+            "product_name",
+            "buyer_email",
+            "quantity",
+            "unit_price",
+            "total_amount",
+            "currency",
+            "status",
+            "code",
+            "fulfilled_at",
+            "cancelled_at",
+            "checked_in_at",
+            "checked_in_by",
+            "metadata",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "unit_price",
+            "total_amount",
+            "currency",
+            "status",
+            "code",
+            "fulfilled_at",
+            "cancelled_at",
+            "checked_in_at",
+            "checked_in_by",
+            "created_at",
+        ]
+
+
+class FanTicketOrderSerializer(serializers.ModelSerializer):
+    """A fan's own ticket order, shaped for the fan dashboard's "My Tickets"
+    list — sourced from the real event/product relations rather than a
+    per-seat QR/check-in model, which doesn't exist for TicketOrder (one
+    order can cover `quantity` > 1 tickets)."""
+
+    ticket_code = serializers.CharField(source="code", read_only=True)
+    ticket_type_name = serializers.CharField(source="product.name", read_only=True)
+    match_label = serializers.SerializerMethodField()
+    match_date = serializers.SerializerMethodField()
+    venue = serializers.SerializerMethodField()
+    competition_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TicketOrder
+        fields = [
+            "id",
+            "ticket_code",
+            "ticket_type_name",
+            "match_label",
+            "match_date",
+            "venue",
+            "competition_name",
+            "quantity",
+            "status",
+            "created_at",
+        ]
+
+    def get_match_label(self, obj) -> str:
+        event = obj.product.event
+        return (event.name if event else "") or obj.product.name
+
+    def get_match_date(self, obj) -> datetime | None:
+        event = obj.product.event
+        return event.starts_at if event else None
+
+    def get_venue(self, obj) -> str:
+        return obj.product.venue or (obj.product.event.venue if obj.product.event else "")
+
+    def get_competition_name(self, obj) -> str:
+        event = obj.product.event
+        return event.competition.name if event and event.competition else ""
 
 
 class MerchandiseProductSerializer(serializers.ModelSerializer):

@@ -17,6 +17,7 @@ from clubs.views import (
     ClubPlayerViewSet,
     ClubProfileVersionViewSet,
     ClubWorkspaceViewSet,
+    FanTicketOrderListView,
     MembershipPlanViewSet,
     MerchandiseProductViewSet,
     NewsSubmissionView,
@@ -26,6 +27,7 @@ from clubs.views import (
     StaffInvitationAcceptView,
     StaffInvitationViewSet,
     StoreOrderViewSet,
+    TicketOrderScanView,
     TicketProductViewSet,
 )
 
@@ -60,6 +62,11 @@ urlpatterns = [
         "staff-invitations/accept/",
         StaffInvitationAcceptView.as_view(),
         name="staff-invitation-accept",
+    ),
+    path(
+        "ticketing/tickets/me/",
+        FanTicketOrderListView.as_view(),
+        name="fan-ticket-orders",
     ),
     path(
         "<uuid:club_pk>/workspaces/",
@@ -172,6 +179,26 @@ urlpatterns = [
             {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
         ),
         name="ticket-product-detail",
+    ),
+    path(
+        "<uuid:club_pk>/ticket-products/<uuid:pk>/publish/",
+        TicketProductViewSet.as_view({"post": "publish"}),
+        name="ticket-product-publish",
+    ),
+    path(
+        "<uuid:club_pk>/ticket-products/<uuid:pk>/orders/",
+        TicketProductViewSet.as_view({"get": "orders"}),
+        name="ticket-product-orders",
+    ),
+    path(
+        "<uuid:club_pk>/ticket-products/<uuid:pk>/purchase/",
+        TicketProductViewSet.as_view({"post": "purchase"}),
+        name="ticket-product-purchase",
+    ),
+    path(
+        "<uuid:club_pk>/ticket-orders/scan/",
+        TicketOrderScanView.as_view(),
+        name="ticket-order-scan",
     ),
     path(
         "<uuid:club_pk>/merchandise/",

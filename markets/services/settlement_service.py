@@ -25,6 +25,7 @@ from markets.services.provisional_result_service import (
 from markets.services.result_dispute_service import (
     MarketResultDisputeService,
 )
+from wallets.models import WalletTransaction
 from wallets.services.wallet_service import WalletService
 
 
@@ -139,17 +140,29 @@ class MarketSettlementService:
         ledger_entry = None
 
         if net_payout > Decimal("0.0000"):
+            payout_reference = cls.payout_idempotency_reference(
+                market_id=market.id,
+                position_id=position.id,
+                winning_outcome_id=market.winning_outcome_id,
+                payout_per_unit=cls.PAYOUT_PER_UNIT,
+            )
+            wallet_transaction = WalletTransaction.objects.create(
+                wallet=WalletService.get_or_create_wallet(position.user, cls.MARKET_CURRENCY),
+                reference=str(payout_reference),
+                transaction_type=WalletTransaction.TransactionType.SETTLEMENT_PAYOUT,
+                amount=net_payout,
+                currency=cls.MARKET_CURRENCY,
+                status=WalletTransaction.Status.COMPLETED,
+                completed_at=timezone.now(),
+                description=f"Market settlement payout — {market.question}",
+            )
             ledger_entry = WalletService.credit(
                 user=position.user,
                 currency=cls.MARKET_CURRENCY,
                 amount=net_payout,
-                idempotency_reference=cls.payout_idempotency_reference(
-                    market_id=market.id,
-                    position_id=position.id,
-                    winning_outcome_id=market.winning_outcome_id,
-                    payout_per_unit=cls.PAYOUT_PER_UNIT,
-                ),
+                idempotency_reference=payout_reference,
                 market=market,
+                transaction=wallet_transaction,
             )
 
         if payout_amount > Decimal("0.0000"):

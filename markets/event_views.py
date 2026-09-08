@@ -98,6 +98,8 @@ class MarketEventMarketListView(ListAPIView):
                 "participant",
                 "winning_outcome",
                 "liquidity_configuration__provider",
+                "settlement",
+                "void_refund",
             )
             .prefetch_related("outcomes", "sporting_event__event_participants__participant")
         )
