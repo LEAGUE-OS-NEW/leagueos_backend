@@ -201,6 +201,16 @@ class MarketFillService:
                 {"execution_reference": ("This execution reference " "has already been used.")}
             ) from error
 
+        if seller_position.quantity == Decimal("0.0000"):
+            from markets.services.position_lifecycle_service import (
+                MarketPositionLifecycleService,
+            )
+
+            MarketPositionLifecycleService.record_exit(
+                position=seller_position,
+                closing_fill=fill,
+            )
+
         cls._settle_buy_wallet(
             fill=fill,
             buy_order=buy_order,

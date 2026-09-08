@@ -2454,6 +2454,71 @@ class MarketPosition(TimeStampedUUIDModel):
             raise ValidationError(errors)
 
 
+class MarketPositionExitQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Completed position lifecycles are immutable.")
+
+    def delete(self):
+        raise ValidationError("Completed position lifecycles cannot be deleted.")
+
+
+class MarketPositionExit(TimeStampedUUIDModel):
+    """Immutable snapshot of one fully exited trading lifecycle."""
+
+    market_position = models.ForeignKey(
+        MarketPosition, on_delete=models.PROTECT, related_name="exit_history"
+    )
+    participant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="market_position_exit_history",
+    )
+    market = models.ForeignKey(Market, on_delete=models.PROTECT, related_name="position_exits")
+    outcome = models.ForeignKey(
+        MarketOutcome, on_delete=models.PROTECT, related_name="position_exits"
+    )
+    closing_fill = models.OneToOneField(
+        "MarketFill", on_delete=models.PROTECT, related_name="position_exit"
+    )
+    opened_at = models.DateTimeField()
+    exited_at = models.DateTimeField()
+    acquired_quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    exited_quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    cost_basis = models.DecimalField(max_digits=20, decimal_places=4)
+    realized_proceeds = models.DecimalField(max_digits=20, decimal_places=4)
+    realized_pnl = models.DecimalField(max_digits=20, decimal_places=4)
+    objects = MarketPositionExitQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-exited_at", "-id"]
+        indexes = [models.Index(fields=["participant", "-exited_at"])]
+
+    def __str__(self):
+        return f"{self.participant_id}: {self.outcome_id} exited at {self.exited_at}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Completed position lifecycles are immutable.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Completed position lifecycles cannot be deleted.")
+
+    @property
+    def quantity(self):
+        return Decimal("0.0000")
+
+    @property
+    def total_cost(self):
+        return self.cost_basis
+
+    @property
+    def average_entry_price(self):
+        if not self.acquired_quantity:
+            return Decimal("0.00000")
+        return self.cost_basis / self.acquired_quantity
+
+
 class MarketLiquidityProvider(TimeStampedUUIDModel):
     class ProviderType(models.TextChoices):
         PLATFORM_TREASURY = "PLATFORM_TREASURY", "Platform treasury"

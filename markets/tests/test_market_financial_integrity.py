@@ -174,6 +174,16 @@ class FinancialIntegrityServiceTests(MarketOrderExpiryServiceTests):
         self.assertEqual(preview["estimated_maker_fee"], Decimal("0.0500"))
         self.assertEqual(preview["estimated_taker_fee"], Decimal("0.1000"))
         self.assertEqual(preview["estimated_maximum_buyer_reservation"], Decimal("5.1000"))
+        self.assertEqual(preview["effective_fee_bps"], 200)
+        self.assertEqual(preview["estimated_fee"], Decimal("0.1000"))
+        self.assertEqual(preview["estimated_total_debit"], Decimal("5.1000"))
+        sell_preview = MarketFeeService.preview(
+            market=self.market,
+            quantity=Decimal("10.0000"),
+            limit_price=Decimal("0.50000"),
+            side="SELL",
+        )
+        self.assertEqual(sell_preview["estimated_net_proceeds"], Decimal("4.9000"))
         schedule.maker_fee_bps = 0
         with self.assertRaises(ValidationError):
             schedule.save()
@@ -245,6 +255,8 @@ class FinancialIntegrityHardeningTests(FinancialIntegrityServiceTests):
         )
         self.assertIsNone(preview["schedule_id"])
         self.assertEqual(preview["estimated_taker_fee"], Decimal("0.0000"))
+        self.assertEqual(preview["estimated_fee"], Decimal("0.0000"))
+        self.assertEqual(preview["estimated_total_debit"], Decimal("1.0000"))
         with self.assertRaises(PermissionDenied):
             MarketFeeService.create_draft(
                 actor=self.owner,

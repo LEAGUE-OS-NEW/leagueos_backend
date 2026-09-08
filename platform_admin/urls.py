@@ -38,6 +38,9 @@ from platform_admin.views import (
     AdminUserRoleAssignView,
     AdminUserRoleListView,
     AdminUserRoleRevokeView,
+    AdminFinanceReportView,
+    AdminStoreReportView,
+    AdminStoreOrderDetailView,
     FixtureResultRejectView,
     FixtureResultVerifyView,
     FixtureResultVerificationQueueView,
@@ -46,6 +49,13 @@ from platform_admin.views import (
 app_name = "platform_admin"
 
 urlpatterns = [
+    path("finance/", AdminFinanceReportView.as_view(), name="finance-report"),
+    path("store/", AdminStoreReportView.as_view(), name="store-report"),
+    path(
+        "store/orders/<uuid:order_id>/",
+        AdminStoreOrderDetailView.as_view(),
+        name="store-order-detail",
+    ),
     path("me/", AdminMeView.as_view(), name="me"),
     path("me/roles/", AdminMeRolesView.as_view(), name="me-roles"),
     path("me/permissions/", AdminMePermissionsView.as_view(), name="me-permissions"),

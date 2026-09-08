@@ -25,6 +25,7 @@ from markets.models import (
     MarketOrder,
     MarketOutcome,
     MarketPosition,
+    MarketPositionExit,
     MarketScope,
 )
 from markets.services.catalog_service import (
@@ -917,6 +918,9 @@ class MarketFillServiceTests(TestCase):
             self.seller_position.reserved_quantity,
             Decimal("6.0000"),
         )
+        self.assertFalse(
+            MarketPositionExit.objects.filter(market_position=self.seller_position).exists()
+        )
 
     def test_full_sell_fill_consumes_full_reservation(self):
         self.execute_fill(quantity=Decimal("10.0000"), price=Decimal("0.55000"))
@@ -924,6 +928,9 @@ class MarketFillServiceTests(TestCase):
         self.seller_position.refresh_from_db()
         self.assertEqual(self.seller_position.quantity, Decimal("0.0000"))
         self.assertEqual(self.seller_position.reserved_quantity, Decimal("0.0000"))
+        self.assertEqual(
+            MarketPositionExit.objects.filter(market_position=self.seller_position).count(), 1
+        )
 
     def test_fill_rejects_under_reserved_sell_order(self):
         self.seller_position.reserved_quantity = Decimal("3.9999")
@@ -1378,6 +1385,86 @@ class MarketFillServiceTests(TestCase):
         self.assertEqual(self.seller_wallet.available_balance, Decimal("1000005.5000"))
         self.assertEqual(self.seller_wallet.reserved_balance, Decimal("0.0000"))
         self.assertEqual(credit_entry.amount, Decimal("5.5000"))
+        history = MarketPositionExit.objects.get(closing_fill=fill)
+        self.assertEqual(history.acquired_quantity, Decimal("10.0000"))
+        self.assertEqual(history.exited_quantity, Decimal("10.0000"))
+        self.assertEqual(history.cost_basis, Decimal("4.5000"))
+        self.assertEqual(history.realized_proceeds, Decimal("5.5000"))
+        self.assertEqual(history.realized_pnl, Decimal("1.0000"))
+
+    def test_exit_reentry_cycles_keep_distinct_immutable_history(self):
+        first_closing_fill = self.execute_fill(
+            quantity=Decimal("10.0000"), price=Decimal("0.55000")
+        )
+        first_history = MarketPositionExit.objects.get(closing_fill=first_closing_fill)
+        first_snapshot = (
+            first_history.id,
+            first_history.exited_at,
+            first_history.realized_pnl,
+        )
+
+        buyer_sell = self.create_order(
+            user=self.buyer,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.SELL,
+            quantity=Decimal("10.0000"),
+            limit_price=Decimal("0.50000"),
+        )
+        seller_reentry = self.create_order(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.BUY,
+            quantity=Decimal("10.0000"),
+            limit_price=Decimal("0.50000"),
+        )
+        self.execute_fill(
+            buy_order=seller_reentry,
+            sell_order=buyer_sell,
+            quantity=Decimal("10.0000"),
+            price=Decimal("0.50000"),
+        )
+
+        self.seller_position.refresh_from_db()
+        self.assertEqual(self.seller_position.quantity, Decimal("10.0000"))
+        first_history.refresh_from_db()
+        self.assertEqual(
+            (first_history.id, first_history.exited_at, first_history.realized_pnl),
+            first_snapshot,
+        )
+
+        second_sell = self.create_order(
+            user=self.seller,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.SELL,
+            quantity=Decimal("10.0000"),
+            limit_price=Decimal("0.60000"),
+        )
+        buyer_reentry = self.create_order(
+            user=self.buyer,
+            market=self.market,
+            outcome=self.outcome,
+            side=MarketOrder.Side.BUY,
+            quantity=Decimal("10.0000"),
+            limit_price=Decimal("0.60000"),
+        )
+        self.execute_fill(
+            buy_order=buyer_reentry,
+            sell_order=second_sell,
+            quantity=Decimal("10.0000"),
+            price=Decimal("0.60000"),
+        )
+
+        histories = list(
+            MarketPositionExit.objects.filter(market_position=self.seller_position).order_by(
+                "exited_at", "id"
+            )
+        )
+        self.assertEqual(len(histories), 2)
+        self.assertNotEqual(histories[0].id, histories[1].id)
+        self.assertEqual(histories[1].realized_pnl, Decimal("1.0000"))
 
     def test_seller_credit_uses_money_rounding_and_not_position_cost_basis(self):
         MarketParticipationService.cancel_order(

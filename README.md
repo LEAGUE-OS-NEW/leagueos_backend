@@ -1,5 +1,25 @@
 # League OS Backend
 
+## Financial and identity workflows
+
+Fan KYC submission requires the authenticated account's legal name, identity number, date of birth,
+and an explicit residence country. Identity numbers are stored only as a keyed hash and masked last
+four digits. Required automated checks must positively pass; uncertain or missing checks enter
+manual review. Markets eligibility reads the canonical KYC record plus profile DOB and country.
+
+Final market settlement atomically creates participant settlement records and credits each winner's
+League OS wallet through the canonical ledger service. External Mobile Money withdrawal remains a
+separate request and approval workflow. `GET /api/v1/market-participations/history/` retains open,
+won, lost, pending-settlement, and refunded participation. Authorized finance administrators read
+ledger-backed deposits, settlements, refunds, withdrawals and Store commerce at
+`GET /api/v1/admin/finance/`.
+
+Store checkout uses one `POST /api/v1/store/orders/` request with product IDs, quantities, variants,
+shipping data and a UUID idempotency key. The backend locks inventory, prices every line, debits the
+wallet, creates all club orders and reserves stock in one transaction. Club fulfilment transitions
+are recorded through the order `fulfilment` action; payment and delivery references remain attached
+to the order.
+
 Fan registration, email OTP verification, authentication, authorization, session management, and role-based access control API built with Django, Django REST Framework, PostgreSQL, JWT authentication, and drf-spectacular.
 
 ## Features

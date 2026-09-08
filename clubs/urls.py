@@ -242,6 +242,11 @@ urlpatterns = [
         name="store-order-list",
     ),
     path(
+        "<uuid:club_pk>/orders/<uuid:pk>/fulfilment/",
+        StoreOrderViewSet.as_view({"post": "fulfilment"}),
+        name="store-order-fulfilment",
+    ),
+    path(
         "<uuid:club_pk>/audit-logs/",
         ClubAuditLogViewSet.as_view({"get": "list"}),
         name="club-audit-log-list",

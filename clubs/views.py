@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
 from django.db.models import F
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -10,6 +11,7 @@ from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
@@ -51,6 +53,7 @@ from clubs.serializers.club_serializers import (
     MerchandiseProductSerializer,
     ProductCategorySerializer,
     StoreCheckoutSerializer,
+    StoreFulfilmentSerializer,
     StaffInvitationAcceptSerializer,
     StaffInvitationSerializer,
     StoreOrderSerializer,
@@ -320,8 +323,8 @@ class TicketProductViewSet(viewsets.ModelViewSet):
 
         try:
             order = TicketService.create_order(request.user, product, quantity=quantity)
-        except (ValueError, ValidationError) as exc:
-            detail = exc.message_dict if isinstance(exc, ValidationError) else str(exc)
+        except (ValueError, DjangoValidationError) as exc:
+            detail = exc.message_dict if isinstance(exc, DjangoValidationError) else str(exc)
             return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = TicketOrderSerializer(order)
@@ -379,10 +382,18 @@ class MerchandiseProductViewSet(viewsets.ModelViewSet):
             "-is_featured", "name"
         )
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["club"] = Club.objects.get(id=self.kwargs.get("club_pk"))
+        return context
+
     def perform_create(self, serializer):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
-        serializer.save(club=club, created_by=self.request.user)
+        try:
+            serializer.save(club=club, created_by=self.request.user)
+        except IntegrityError as exc:
+            raise DRFValidationError({"sku": "This SKU already exists for the club."}) from exc
 
 
 class PublicMerchandiseProductListView(generics.ListAPIView):
@@ -413,7 +424,7 @@ class PublicMerchandiseProductListView(generics.ListAPIView):
 
 
 class PublicStoreOrderCreateView(APIView):
-    """Create a paid store order from fan checkout items."""
+    """Atomically price, debit and create one or more club orders."""
 
     permission_classes = [IsAuthenticated]
     serializer_class = StoreCheckoutSerializer
@@ -422,51 +433,23 @@ class PublicStoreOrderCreateView(APIView):
         serializer = StoreCheckoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        values = serializer.validated_data
-        product_ids = [item["product"] for item in values["items"]]
-        products = {
-            product.id: product
-            for product in MerchandiseProduct.objects.select_related("club").filter(
-                id__in=product_ids,
-                status=MerchandiseProduct.Status.ACTIVE,
-                club__is_active=True,
-            )
-        }
-
-        if len(products) != len(set(product_ids)):
-            return Response(
-                {"detail": "One or more products are unavailable."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        clubs = {product.club_id for product in products.values()}
-        if len(clubs) != 1:
-            return Response(
-                {"detail": "Submit one club's products per store order."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        order_items = [
-            {
-                "product": products[item["product"]],
-                "quantity": item["quantity"],
-            }
-            for item in values["items"]
-        ]
-
         try:
-            order = store_service.create_order(
-                request.user,
-                next(iter(products.values())).club,
-                order_items,
-                shipping_address=values.get("shipping_address") or {},
-                metadata=values.get("metadata") or {},
-                status=StoreOrder.OrderStatus.PAID,
+            orders = store_service.checkout(
+                user=request.user,
+                items_data=serializer.validated_data["items"],
+                idempotency_key=serializer.validated_data["idempotency_key"],
+                shipping_address=serializer.validated_data.get("shipping_address") or {},
+                metadata=serializer.validated_data.get("metadata") or {},
             )
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except (ValueError, DjangoValidationError) as exc:
+            detail = (
+                getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or str(exc)
+            )
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(StoreOrderSerializer(order).data, status=status.HTTP_201_CREATED)
+        return Response(
+            {"orders": StoreOrderSerializer(orders, many=True).data}, status=status.HTTP_201_CREATED
+        )
 
 
 @extend_schema_view(
@@ -508,7 +491,28 @@ class StoreOrderViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsClubStaff]
 
     def get_queryset(self):
-        return StoreOrder.objects.filter(club_id=self.kwargs.get("club_pk")).order_by("-created_at")
+        return (
+            StoreOrder.objects.filter(club_id=self.kwargs.get("club_pk"))
+            .select_related("user", "club", "payment_transaction")
+            .prefetch_related("items__product", "status_history")
+            .order_by("-created_at")
+        )
+
+    @action(detail=True, methods=["post"])
+    def fulfilment(self, request, club_pk=None, pk=None):
+        serializer = StoreFulfilmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            order = store_service.transition_order(
+                order=self.get_object(),
+                actor=request.user,
+                new_status=serializer.validated_data["status"],
+                note=serializer.validated_data.get("note", ""),
+                delivery_reference=serializer.validated_data.get("delivery_reference", ""),
+            )
+        except DjangoValidationError as exc:
+            return Response(getattr(exc, "message_dict", {"detail": exc.messages}), status=400)
+        return Response(StoreOrderSerializer(order).data)
 
 
 class ClubAuditLogViewSet(viewsets.ReadOnlyModelViewSet):

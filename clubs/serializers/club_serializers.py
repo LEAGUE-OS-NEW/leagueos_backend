@@ -339,6 +339,18 @@ class MerchandiseProductSerializer(serializers.ModelSerializer):
             "created_by",
         ]
 
+    def validate_sku(self, value):
+        normalized = value.strip().upper()
+        if not normalized:
+            return ""
+        club = self.context.get("club") or getattr(self.instance, "club", None)
+        duplicate = MerchandiseProduct.objects.filter(club=club, sku__iexact=normalized)
+        if self.instance:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if club and duplicate.exists():
+            raise serializers.ValidationError("This SKU already exists for the club.")
+        return normalized
+
 
 class StoreOrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
@@ -378,23 +390,80 @@ class ClubPlayerSerializer(serializers.ModelSerializer):
 
 class StoreOrderSerializer(serializers.ModelSerializer):
     items = StoreOrderItemSerializer(many=True, read_only=True)
+    status_history = serializers.SerializerMethodField()
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    club_name = serializers.CharField(source="club.name", read_only=True)
+    payment_reference = serializers.CharField(
+        source="payment_transaction.reference", read_only=True
+    )
+    refund_reference = serializers.CharField(source="refund_transaction.reference", read_only=True)
+    payment = serializers.SerializerMethodField()
+    refund = serializers.SerializerMethodField()
+
+    def get_status_history(self, obj):
+        return [
+            {
+                "previous_status": row.previous_status,
+                "new_status": row.new_status,
+                "changed_by": str(row.changed_by_id),
+                "changed_by_email": row.changed_by.email,
+                "note": row.note,
+                "created_at": row.created_at,
+            }
+            for row in obj.status_history.all()
+        ]
+
+    @staticmethod
+    def _transaction(value):
+        if not value:
+            return None
+        return {
+            "id": str(value.id),
+            "reference": value.reference,
+            "provider_reference": value.provider_reference,
+            "amount": str(value.amount),
+            "currency": value.currency,
+            "status": value.status,
+            "created_at": value.created_at,
+            "completed_at": value.completed_at,
+            "ledger_entries": [str(entry.id) for entry in value.ledger_entries.all()],
+        }
+
+    def get_payment(self, obj):
+        return self._transaction(obj.payment_transaction)
+
+    def get_refund(self, obj):
+        return self._transaction(obj.refund_transaction)
 
     class Meta:
         model = StoreOrder
         fields = [
             "id",
             "user",
+            "user_email",
             "club",
+            "club_name",
             "status",
             "total_amount",
             "currency",
             "shipping_address",
             "metadata",
+            "payment_transaction",
+            "payment_reference",
+            "payment",
+            "refund_transaction",
+            "refund_reference",
+            "refund",
+            "checkout_group",
+            "delivery_reference",
+            "status_history",
             "items",
             "fulfilled_at",
             "cancelled_at",
+            "created_at",
+            "updated_at",
         ]
-        read_only_fields = ["id", "total_amount", "fulfilled_at", "cancelled_at"]
+        read_only_fields = fields
 
 
 class StoreCheckoutItemSerializer(serializers.Serializer):
@@ -404,9 +473,18 @@ class StoreCheckoutItemSerializer(serializers.Serializer):
 
 
 class StoreCheckoutSerializer(serializers.Serializer):
+    idempotency_key = serializers.UUIDField()
     items = StoreCheckoutItemSerializer(many=True, allow_empty=False)
     shipping_address = serializers.JSONField(required=False)
     metadata = serializers.JSONField(required=False)
+
+
+class StoreFulfilmentSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=["PROCESSING", "READY_FOR_COLLECTION", "SHIPPED", "DELIVERED", "CANCELLED"]
+    )
+    note = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    delivery_reference = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
 class ClubAuditLogSerializer(serializers.ModelSerializer):
