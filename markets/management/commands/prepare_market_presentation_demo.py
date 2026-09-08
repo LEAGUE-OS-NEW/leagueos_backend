@@ -38,6 +38,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--confirm", action="store_true")
         parser.add_argument("--market-admin-email")
+        parser.add_argument(
+            "--exclusive-catalogue",
+            action="store_true",
+            help=("Hide every non-curated market from the " "public presentation catalogue."),
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -104,7 +109,16 @@ class Command(BaseCommand):
                 )
                 MarketLiquidityService.activate_opening_liquidity(market=market, actor=actor)
 
-        archived = self._archive_stale(now, actor, set(markets.values()))
+        curated = set(markets.values())
+        archived = self._archive_stale(
+            now,
+            actor,
+            curated,
+        )
+
+        if options["exclusive_catalogue"]:
+            archived.extend(self._hide_non_curated(curated))
+
         self._report(markets.values(), archived)
 
     @staticmethod
@@ -195,6 +209,37 @@ class Command(BaseCommand):
                 )
             )
         return archived
+
+    @staticmethod
+    def _hide_non_curated(curated):
+        curated_ids = [market.id for market in curated]
+
+        extras = list(
+            Market.objects.exclude(
+                id__in=curated_ids,
+            )
+            .filter(
+                is_catalog_visible=True,
+            )
+            .order_by("created_at")
+        )
+
+        if not extras:
+            return []
+
+        Market.objects.filter(id__in=[market.id for market in extras]).update(
+            is_catalog_visible=False,
+            is_featured=False,
+        )
+
+        return [
+            (
+                market.question,
+                market.status,
+                ("hidden from exclusive presentation " "catalogue; history preserved"),
+            )
+            for market in extras
+        ]
 
     def _report(self, markets, archived):
         self.stdout.write("\nACTIVE PRESENTATION MARKETS")

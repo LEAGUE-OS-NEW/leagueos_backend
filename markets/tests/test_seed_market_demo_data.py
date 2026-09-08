@@ -10,6 +10,8 @@ from authentication.tests.factories import (
 )
 from markets.models import (
     Market,
+    MarketLiquidityConfiguration,
+    MarketOrder,
     MarketTemplate,
 )
 from sports.models import (
@@ -110,6 +112,74 @@ class SeedMarketDemoDataTests(TestCase):
             "Market demo seed complete",
             output,
         )
+
+    def test_presentation_only_creates_four_liquid_markets(self):
+        output = StringIO()
+
+        call_command(
+            "seed_market_demo_data",
+            "--confirm",
+            "--creator-email",
+            self.admin.email,
+            "--presentation-only",
+            stdout=output,
+        )
+
+        markets = Market.objects.filter(
+            status=Market.Status.OPEN,
+        )
+
+        expected = {
+            "Will KOBS Rugby Club score 3 or more tries in their next league match?",
+            "Will City Oilers win the National Basketball League?",
+            "Will KOBS Rugby Club win the Nile Special Rugby Premiership?",
+            "Will Vipers SC win the Uganda Premier League?",
+        }
+
+        self.assertEqual(
+            set(
+                markets.values_list(
+                    "question",
+                    flat=True,
+                )
+            ),
+            expected,
+        )
+
+        self.assertEqual(
+            SportingEvent.objects.filter(
+                source_name="LEAGUE_OS_DEMO",
+            ).count(),
+            0,
+        )
+
+        for market in markets:
+            config = market.liquidity_configuration
+
+            self.assertEqual(
+                config.status,
+                MarketLiquidityConfiguration.Status.ACTIVE,
+            )
+            self.assertEqual(
+                config.initial_liquidity_ugx,
+                500000,
+            )
+            self.assertEqual(
+                market.orders.filter(
+                    status=MarketOrder.Status.OPEN,
+                ).count(),
+                2,
+            )
+
+            prices = dict(
+                market.outcomes.values_list(
+                    "side",
+                    "opening_price",
+                )
+            )
+
+            self.assertIsNotNone(prices["YES"])
+            self.assertIsNotNone(prices["NO"])
 
     def test_seed_is_idempotent(self):
         self.run_seed()
