@@ -116,6 +116,47 @@ class PrepareMarketPresentationDemoTests(TestCase):
         self.assertIn("ACTIVE PRESENTATION MARKETS", output.getvalue())
         self.assertIn("ARCHIVED / HIDDEN", output.getvalue())
 
+    def test_exclusive_catalogue_hides_all_non_curated_markets(self):
+        stale_id = self.stale.id
+        resolved_id = self.resolved.id
+
+        call_command(
+            "prepare_market_presentation_demo",
+            "--confirm",
+            "--exclusive-catalogue",
+            stdout=StringIO(),
+        )
+
+        self.stale.refresh_from_db()
+        self.resolved.refresh_from_db()
+
+        self.assertFalse(self.stale.is_catalog_visible)
+        self.assertFalse(self.resolved.is_catalog_visible)
+
+        self.assertTrue(
+            Market.objects.filter(
+                pk=stale_id,
+            ).exists()
+        )
+        self.assertTrue(
+            Market.objects.filter(
+                pk=resolved_id,
+            ).exists()
+        )
+
+        self.assertTrue(
+            LedgerEntry.objects.filter(
+                pk=self.history_entry.pk,
+            ).exists()
+        )
+
+        self.assertEqual(
+            Market.objects.filter(
+                is_catalog_visible=True,
+            ).count(),
+            len(DEMO_MARKETS),
+        )
+
     def test_repeated_run_is_idempotent_and_wallet_changes_are_ledger_backed(self):
         call_command("prepare_market_presentation_demo", "--confirm", stdout=StringIO())
         counts = (

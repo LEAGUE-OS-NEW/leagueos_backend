@@ -45,6 +45,10 @@ DEMO_YES_PROBABILITY = {
     "Will Vipers SC vs KCCA FC have over 2.5 goals?": 52,
     "Will KOBS Rugby Club beat Platinum Credit Heathens?": 55,
     "Will City Oilers beat Namuwongo Blazers?": 64,
+    "Will KOBS Rugby Club score 3 or more tries in their next league match?": 62,
+    "Will City Oilers win the National Basketball League?": 71,
+    "Will KOBS Rugby Club win the Nile Special Rugby Premiership?": 58,
+    "Will Vipers SC win the Uganda Premier League?": 66,
 }
 
 
@@ -286,6 +290,11 @@ class Command(BaseCommand):
             default="admin@leagueos.com",
             help=("Existing administrator used as the " "creator/approver of demo markets."),
         )
+        parser.add_argument(
+            "--presentation-only",
+            action="store_true",
+            help="Create only the four curated long-horizon presentation markets.",
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -367,21 +376,30 @@ class Command(BaseCommand):
         participants = self._seed_participants(
             sports,
         )
-        events = self._seed_events(
-            sports=sports,
-            competitions=competitions,
-            participants=participants,
-        )
         templates = self._seed_templates(
             categories,
         )
 
-        created_markets = self._seed_event_markets(
-            creator=creator,
-            events=events,
-            categories=categories,
-            templates=templates,
-        )
+        if options["presentation_only"]:
+            created_markets = self._seed_long_horizon_markets(
+                creator=creator,
+                competitions=competitions,
+                participants=participants,
+                categories=categories,
+                templates=templates,
+            )
+        else:
+            events = self._seed_events(
+                sports=sports,
+                competitions=competitions,
+                participants=participants,
+            )
+            created_markets = self._seed_event_markets(
+                creator=creator,
+                events=events,
+                categories=categories,
+                templates=templates,
+            )
 
         self.stdout.write(
             self.style.SUCCESS(
