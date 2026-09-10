@@ -1,5 +1,6 @@
 import pytest
 from datetime import date
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
@@ -10,6 +11,24 @@ from kyc.models import KYCVerification, KYCVerificationAttempt
 from kyc.tests.helpers import create_test_image_bytes
 
 User = get_user_model()
+
+
+class _SyncThread:
+    """Stand-in for threading.Thread that runs its target immediately, in
+    the calling thread. FanKYCSubmitView's Celery-unavailable fallback
+    spawns a real background thread (so the HTTP response isn't blocked
+    on the pipeline), but a real thread can't see the just-created
+    KYCVerificationAttempt row inside pytest-django's per-test transaction
+    — so tests asserting the pipeline's outcome need it to run inline.
+    """
+
+    def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs or {}
+
+    def start(self):
+        self._target(*self._args, **self._kwargs)
 
 
 @pytest.mark.django_db
@@ -359,6 +378,7 @@ def test_kyc_submission_persists_dob_and_gender():
 
 
 @pytest.mark.django_db
+@patch("kyc.views.threading.Thread", _SyncThread)
 def test_kyc_submission_creates_verification():
     user = User.objects.create_user(
         username="fan_market", email="fan_market@example.com", password="Pass123!Password"
@@ -389,6 +409,7 @@ def test_kyc_submission_creates_verification():
 
 
 @pytest.mark.django_db
+@patch("kyc.views.threading.Thread", _SyncThread)
 def test_kyc_multistep_preserves_earlier_information():
     user = User.objects.create_user(
         username="fan_multi", email="fan_multi@example.com", password="Pass123!Password"
