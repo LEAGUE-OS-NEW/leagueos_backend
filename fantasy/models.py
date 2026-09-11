@@ -393,10 +393,22 @@ class FantasyLeagueMembership(UUIDTimeStampedModel):
 
 
 class FantasyScoringRule(UUIDTimeStampedModel):
+    class RuleType(models.TextChoices):
+        PER_UNIT = "PER_UNIT", "Per unit"        # value × points
+        FLAT = "FLAT", "Flat"                    # fixed points when value > 0
+        BRACKET = "BRACKET", "Bracket"           # fixed points when min ≤ value ≤ max
+        PER_N = "PER_N", "Per N units"           # floor(value / n) × points
+        POSITION = "POSITION", "Position-based"  # points keyed by player position
+
     fantasy_competition = models.ForeignKey(
         FantasyCompetition, on_delete=models.CASCADE, related_name="scoring_rules"
     )
     statistic_type = models.CharField(max_length=50)
+    rule_type = models.CharField(
+        max_length=20,
+        choices=RuleType.choices,
+        default=RuleType.PER_UNIT,
+    )
     points = models.DecimalField(max_digits=8, decimal_places=2)
     conditions = models.JSONField(default=dict, blank=True)
     enabled = models.BooleanField(default=True)
@@ -410,7 +422,7 @@ class FantasyScoringRule(UUIDTimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.statistic_type}: {self.points}"
+        return f"{self.statistic_type} ({self.rule_type}): {self.points}"
 
 
 class FantasyPlayerGameweekPoints(UUIDTimeStampedModel):
@@ -486,6 +498,15 @@ class FantasyStatisticReview(UUIDTimeStampedModel):
 
     This model lives entirely in the Fantasy app and does NOT modify
     MatchPlayerStatistic or the discovery/clubs pipeline.
+
+    MVP NOTE: Approval status (PENDING/APPROVED) is INFORMATIONAL ONLY.
+    The scoring engine (score_gameweek) does NOT gate on review status —
+    all MatchPlayerStatistic records are scored regardless of whether
+    the corresponding FantasyStatisticReview has been approved.
+    This is an intentional MVP decision: approval is a data-quality workflow
+    for admins to track reviews, not a prerequisite for scoring.
+    If mandatory approval is required in a future release, the scoring engine
+    must be updated to filter stats via FantasyStatisticReview.status == APPROVED.
     """
 
     class Status(models.TextChoices):

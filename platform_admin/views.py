@@ -1,4 +1,5 @@
 from decimal import Decimal
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -37,6 +38,8 @@ from discovery.serializers import (
     NewsModerationUpdateSerializer,
     NewsRejectSerializer,
     NewsTrendingSerializer,
+    StatisticsEntryRequestSerializer,
+    StatisticsEntryResponseSerializer,
 )
 from discovery.services.fixture_admin_service import fixture_admin_service
 from discovery.services.news_moderation_service import news_moderation_service
@@ -766,22 +769,39 @@ class AdminMePermissionsView(APIView):
 class AdminMeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_permissions(self):
+        # In DEBUG mode, allow unauthenticated requests so the local admin UI
+        # can bootstrap without tokens. Production always requires auth.
+        if getattr(settings, "DEBUG", False) and not self.request.user.is_authenticated:
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
     @extend_schema(
         operation_id="admin_me",
         responses={200: dict},
     )
     def get(self, request):
-        roles = RoleService.get_user_roles(request.user)
-        permissions = PermissionService.get_user_permissions(request.user)
+        if request.user.is_authenticated:
+            user = request.user
+        elif getattr(settings, "DEBUG", False):
+            # Development fallback: use the first superuser as the dev identity.
+            user = User.objects.filter(is_superuser=True).order_by("id").first()
+            if user is None:
+                return Response({"detail": "No superuser found."}, status=503)
+        else:
+            return Response(status=401)
+
+        roles = RoleService.get_user_roles(user)
+        perms = PermissionService.get_user_permissions(user)
 
         return Response(
             {
-                "id": request.user.id,
-                "email": request.user.email,
-                "first_name": request.user.first_name,
-                "last_name": request.user.last_name,
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
                 "roles": [role.name for role in roles],
-                "permissions": permissions,
+                "permissions": perms,
             }
         )
 
@@ -2221,3 +2241,131 @@ class AdminStoreOrderDetailView(APIView):
         if not order:
             return Response({"detail": "Order not found."}, status=404)
         return Response(StoreOrderSerializer(order).data)
+
+class AdminFixtureStatisticsView(APIView):
+    """GET and POST player statistics for a specific fixture.
+
+    GET  /api/v1/admin/fixtures/<fixture_id>/player-statistics/
+         Returns all players associated with the fixture and their current
+         MatchPlayerStatistic records.  Requires manage_statistics permission.
+
+    POST /api/v1/admin/fixtures/<fixture_id>/player-statistics/
+         Bulk upserts MatchPlayerStatistic records for the fixture.
+         Validates all rows before writing any.  Calls
+         SportsFeedService.complete_ingestion() with the fixture id when
+         trigger_scoring=True (default), which schedules
+         score_affected_gameweeks via on_commit.
+         For LIVE/partial saves pass trigger_scoring=false to persist stats
+         without triggering Fantasy scoring.
+         Requires manage_statistics permission.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_statistics"):
+            return Response(
+                {"detail": "You do not have permission to view fixture statistics."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.select_related("sport").filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        from discovery.services.statistics_entry_service import statistics_entry_service
+
+        data = statistics_entry_service.get_fixture_statistics(fixture)
+        return Response(data)
+
+    @extend_schema(
+        operation_id="admin_fixture_statistics_save",
+        request=StatisticsEntryRequestSerializer,
+        responses={
+            202: StatisticsEntryResponseSerializer,
+            400: None,
+            403: None,
+            404: None,
+        },
+    )
+    def post(self, request, fixture_id):
+        if not PermissionService.has_permission(request.user, "manage_statistics"):
+            return Response(
+                {"detail": "You do not have permission to save fixture statistics."},
+                status=403,
+            )
+
+        fixture = SportingEvent.objects.select_related("sport").filter(id=fixture_id).first()
+        if not fixture:
+            return Response({"detail": "Fixture not found."}, status=404)
+
+        # Only allow statistics entry for LIVE or COMPLETED fixtures.
+        allowed_statuses = {
+            SportingEvent.Status.LIVE,
+            SportingEvent.Status.COMPLETED,
+        }
+        if fixture.status not in allowed_statuses:
+            return Response(
+                {
+                    "detail": (
+                        f"Statistics can only be entered for LIVE or COMPLETED fixtures. "
+                        f"This fixture is {fixture.status}."
+                    )
+                },
+                status=400,
+            )
+
+        serializer = StatisticsEntryRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        # Convert DRF-validated rows to plain dicts the service expects.
+        raw_rows = [
+            {
+                "participant": str(row["participant"]),
+                "stat_type": row["stat_type"],
+                "value": row["value"],
+            }
+            for row in serializer.validated_data["statistics"]
+        ]
+        trigger_scoring = serializer.validated_data["trigger_scoring"]
+
+        from discovery.services.statistics_entry_service import statistics_entry_service
+
+        result = statistics_entry_service.save_fixture_statistics(
+            fixture=fixture,
+            raw_rows=raw_rows,
+            actor=request.user,
+            trigger_scoring=trigger_scoring,
+        )
+
+        if not result.success:
+            payload: dict = {
+                "success": False,
+                "message": result.message,
+            }
+            if result.row_errors:
+                payload["errors"] = [
+                    {
+                        "index": e.index,
+                        "participant_id": e.participant_id,
+                        "stat_type": e.stat_type,
+                        "error": e.error,
+                    }
+                    for e in result.row_errors
+                ]
+            return Response(payload, status=400)
+
+        return Response(
+            {
+                "fixture_id": str(fixture.id),
+                "fixture_name": fixture.name,
+                "records_created": result.records_created,
+                "records_updated": result.records_updated,
+                "records_unchanged": result.records_unchanged,
+                "scoring_scheduled": result.scoring_scheduled,
+                "ingestion_id": result.ingestion_id,
+                "message": result.message,
+            },
+            status=202,
+        )

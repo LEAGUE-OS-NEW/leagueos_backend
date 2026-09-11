@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -9,6 +9,7 @@ from discovery.models import MatchLineup, MatchPlayerStatistic
 
 from .models import (
     FantasyPlayerGameweekPoints,
+    FantasyScoringRule,
     FantasyTeamGameweekScore,
     FantasyTeamGameweekState,
     FantasyTeamPlayer,
@@ -20,6 +21,10 @@ SUPPORTED_TIE_BREAK_RULES = {
     "earlier_registration",
 }
 
+
+# ---------------------------------------------------------------------------
+# Ranking helper
+# ---------------------------------------------------------------------------
 
 def rank_rows(rows, configured_rules, *, points_key="total_points"):
     """Apply configured Fantasy tie breaks and a deterministic UUID fallback."""
@@ -42,6 +47,10 @@ def rank_rows(rows, configured_rules, *, points_key="total_points"):
     ranked = sorted(rows, key=key)
     return [{"rank": index, **row} for index, row in enumerate(ranked, 1)]
 
+
+# ---------------------------------------------------------------------------
+# Notification helper
+# ---------------------------------------------------------------------------
 
 def notify_fantasy(*, recipient, event_type, title, message, deduplication_key, data=None):
     """Use the shared notification domain when its seeded Fantasy category exists."""
@@ -66,6 +75,10 @@ def notify_fantasy(*, recipient, event_type, title, message, deduplication_key, 
 
 UNSELECTABLE_AVAILABILITY = {"INJURED", "SUSPENDED", "UNAVAILABLE"}
 
+
+# ---------------------------------------------------------------------------
+# Squad / selection validation
+# ---------------------------------------------------------------------------
 
 def validate_selections(competition, selections, *, budget=None):
     if len(selections) != competition.squad_size:
@@ -168,42 +181,210 @@ def replace_lineup(team, selections):
     return team
 
 
+# ---------------------------------------------------------------------------
+# Participation detection
+# ---------------------------------------------------------------------------
+
 def _participated(gameweek, fantasy_player):
+    """
+    Return True if the player genuinely participated in a gameweek fixture.
+
+    Priority order (approved in FANTASY_SCORING_FINAL_VALIDATION.md):
+    1. MINUTES_PLAYED > 0  — strongest: explicit on-pitch time recorded.
+    2. Any other MatchPlayerStatistic exists  — secondary: events imply play.
+    3. MatchLineup is_starter=True  — final fallback: confirmed starter.
+
+    Explicitly does NOT count is_starter=False lineup rows (named bench
+    players who never came on must not be treated as having participated).
+
+    MINUTES_PLAYED=0 is an explicit zero that overrides all fallbacks —
+    the player was listed but did not play.
+    """
     fixture_ids = gameweek.fixtures.values_list("id", flat=True)
     participant_id = fantasy_player.player_id
-    if MatchPlayerStatistic.objects.filter(
-        match_centre__fixture_id__in=fixture_ids, participant_id=participant_id
-    ).exists():
+
+    # Fetch all stats for this player in this gameweek's fixtures.
+    stats = MatchPlayerStatistic.objects.filter(
+        match_centre__fixture_id__in=fixture_ids,
+        participant_id=participant_id,
+    )
+
+    # Check for an explicit MINUTES_PLAYED stat first.
+    minutes_stat = stats.filter(stat_type__iexact="MINUTES_PLAYED").first()
+    if minutes_stat is not None:
+        # Explicit zero means did not play; any positive value means played.
+        return minutes_stat.value > 0
+
+    # No MINUTES_PLAYED stat: check for any other stat (goals, assists, etc.)
+    # These stats can only exist if the player was on the pitch.
+    if stats.exists():
         return True
+
+    # Final fallback: a confirmed starter in the lineup (is_starter=True only).
     return MatchLineup.objects.filter(
-        match_centre__fixture_id__in=fixture_ids, participant_id=participant_id
+        match_centre__fixture_id__in=fixture_ids,
+        participant_id=participant_id,
+        is_starter=True,
     ).exists()
 
 
+# ---------------------------------------------------------------------------
+# Scoring rule dispatcher
+# ---------------------------------------------------------------------------
+
+def apply_rule(rule, stat_value, player_position, stat_map):
+    """
+    Compute fantasy points for a single (rule, stat_value) pair.
+
+    Parameters
+    ----------
+    rule : FantasyScoringRule
+    stat_value : Decimal  — raw value from MatchPlayerStatistic
+    player_position : str — e.g. "GK", "DEF", "MID", "FWD"
+    stat_map : dict[str, Decimal]
+        Map of ALL stat_type.upper() → value for this player in this
+        gameweek.  Used for cross-stat gates (e.g. CLEAN_SHEETS needs
+        to read MINUTES_PLAYED).
+
+    Returns
+    -------
+    Decimal  — points contribution (may be negative)
+    """
+    RT = FantasyScoringRule.RuleType
+    rt = rule.rule_type
+
+    # ------------------------------------------------------------------
+    # CLEAN_SHEETS gate — enforced regardless of rule type.
+    # The 60-minute threshold is a scoring rule, not a data-quality rule.
+    # Raw MatchPlayerStatistic is never mutated.
+    # ------------------------------------------------------------------
+    if rule.statistic_type.upper() == "CLEAN_SHEETS":
+        minutes = stat_map.get("MINUTES_PLAYED", Decimal("0"))
+        if minutes < Decimal("60"):
+            return Decimal("0")
+
+    if rt == RT.PER_UNIT:
+        return stat_value * rule.points
+
+    if rt == RT.FLAT:
+        return rule.points if stat_value > 0 else Decimal("0")
+
+    if rt == RT.BRACKET:
+        min_v = Decimal(str(rule.conditions.get("min", 0)))
+        max_v = rule.conditions.get("max")
+        max_v = Decimal(str(max_v)) if max_v is not None else None
+        if stat_value >= min_v and (max_v is None or stat_value <= max_v):
+            return rule.points
+        return Decimal("0")
+
+    if rt == RT.PER_N:
+        per_n = int(rule.conditions.get("per_n", 1))
+        if per_n < 1:
+            return Decimal("0")
+        return (int(stat_value) // per_n) * rule.points
+
+    if rt == RT.POSITION:
+        positions = rule.conditions.get("positions", {})
+        pts = positions.get(player_position, 0)
+        return stat_value * Decimal(str(pts))
+
+    # Unknown rule_type — safe default, never award unexpected points.
+    return Decimal("0")
+
+
+def _describe_rule(rule, player_position):
+    """Return a human-readable description for a breakdown entry."""
+    RT = FantasyScoringRule.RuleType
+    rt = rule.rule_type
+    stat_label = rule.statistic_type.replace("_", " ").title()
+
+    if rt == RT.POSITION:
+        positions = rule.conditions.get("positions", {})
+        pts = positions.get(player_position, 0)
+        return f"{player_position} {stat_label} (+{pts} pts)"
+
+    if rt == RT.BRACKET:
+        min_v = rule.conditions.get("min", 0)
+        max_v = rule.conditions.get("max")
+        if max_v is not None:
+            return f"{min_v}–{max_v} {stat_label}"
+        return f"{min_v}+ {stat_label}"
+
+    if rt == RT.PER_N:
+        per_n = rule.conditions.get("per_n", 1)
+        return f"per {per_n} {stat_label}"
+
+    if rt == RT.FLAT:
+        return f"{stat_label} (flat)"
+
+    # PER_UNIT
+    return stat_label
+
+
+# ---------------------------------------------------------------------------
+# Core scoring engine
+# ---------------------------------------------------------------------------
+
 @transaction.atomic
 def score_gameweek(gameweek):
+    """
+    Score all players and teams for a gameweek.
+
+    Changes from the original:
+    - Loads ALL enabled rules (not just conditions={}).
+    - Groups rules by statistic_type so multiple rules per stat coexist
+      (e.g. two BRACKET rules for MINUTES_PLAYED).
+    - Builds a stat_map per player for cross-stat gates.
+    - Dispatches each rule through apply_rule() which handles all five
+      rule types and enforces the CLEAN_SHEETS 60-minute gate.
+    - Enriches breakdown entries with rule_type and rule_description.
+    - Preserves all existing team-scoring, captain, vice-captain fallback,
+      transfer penalty, correction, and idempotency behaviour unchanged.
+    """
     fixture_ids = list(gameweek.fixtures.values_list("id", flat=True))
-    rules = {
-        rule.statistic_type.upper(): rule
-        for rule in gameweek.fantasy_competition.scoring_rules.filter(enabled=True, conditions={})
-    }
+
+    # ------------------------------------------------------------------
+    # Build rules index: stat_type.upper() → [rule, rule, ...]
+    # Multiple rules per stat_type are allowed (e.g. two BRACKET rows for
+    # MINUTES_PLAYED).  The old single-rule dict is replaced with a list.
+    # ------------------------------------------------------------------
+    rules_by_stat: dict[str, list] = defaultdict(list)
+    for rule in gameweek.fantasy_competition.scoring_rules.filter(enabled=True):
+        rules_by_stat[rule.statistic_type.upper()].append(rule)
+
+    # ------------------------------------------------------------------
+    # Per-player scoring
+    # ------------------------------------------------------------------
     for player in gameweek.fantasy_competition.player_pool.all():
         stats = MatchPlayerStatistic.objects.filter(
-            match_centre__fixture_id__in=fixture_ids, participant=player.player
+            match_centre__fixture_id__in=fixture_ids,
+            participant=player.player,
         )
-        breakdown, base = [], Decimal("0")
+
+        # Build a flat {STAT_TYPE: value} map for gate checks.
+        stat_map: dict[str, Decimal] = {
+            s.stat_type.upper(): s.value for s in stats
+        }
+
+        breakdown: list[dict] = []
+        base = Decimal("0")
+
         for stat in stats:
-            rule = rules.get(stat.stat_type.upper())
-            if rule:
-                points = stat.value * rule.points
-                base += points
-                breakdown.append(
-                    {
-                        "statistic_type": stat.stat_type,
-                        "value": str(stat.value),
-                        "points": str(points),
-                    }
-                )
+            applicable_rules = rules_by_stat.get(stat.stat_type.upper(), [])
+            for rule in applicable_rules:
+                pts = apply_rule(rule, stat.value, player.position, stat_map)
+                if pts != Decimal("0"):
+                    base += pts
+                    breakdown.append(
+                        {
+                            "statistic_type": stat.stat_type,
+                            "value": str(stat.value),
+                            "rule_type": rule.rule_type,
+                            "rule_description": _describe_rule(rule, player.position),
+                            "points": str(pts),
+                        }
+                    )
+
         record, _ = FantasyPlayerGameweekPoints.objects.get_or_create(
             gameweek=gameweek, fantasy_player=player
         )
@@ -216,16 +397,20 @@ def score_gameweek(gameweek):
         record.statistics_available = stats.exists()
         record.save()
 
+    # ------------------------------------------------------------------
+    # Per-team scoring — identical logic to before, fully preserved.
+    # ------------------------------------------------------------------
     for team in gameweek.fantasy_competition.teams.all():
-        selections = list(team.selections.select_related("fantasy_player").order_by("bench_order"))
-        starters = [selection for selection in selections if selection.is_starter]
-        total = Decimal("0")
-        captain_bonus = Decimal("0")
-        detail = []
-        captain = next((selection for selection in starters if selection.is_captain), None)
-        vice = next((selection for selection in starters if selection.is_vice_captain), None)
+        selections = list(
+            team.selections.select_related("fantasy_player").order_by("bench_order")
+        )
+        starters = [s for s in selections if s.is_starter]
+
+        captain = next((s for s in starters if s.is_captain), None)
+        vice = next((s for s in starters if s.is_vice_captain), None)
         effective_captain = captain
         fallback = False
+
         if (
             captain
             and vice
@@ -234,22 +419,33 @@ def score_gameweek(gameweek):
             and _participated(gameweek, vice.fantasy_player)
         ):
             effective_captain, fallback = vice, True
+
+        total = Decimal("0")
+        captain_bonus = Decimal("0")
+        detail: list[dict] = []
+
         for selection in starters:
             point_record = FantasyPlayerGameweekPoints.objects.filter(
                 gameweek=gameweek, fantasy_player=selection.fantasy_player
             ).first()
             points = point_record.total_points if point_record else Decimal("0")
             total += points
+
             player_captain_bonus = Decimal("0")
             if effective_captain and selection.id == effective_captain.id:
-                captain_bonus = points * (gameweek.fantasy_competition.captain_multiplier - 1)
+                captain_bonus = points * (
+                    gameweek.fantasy_competition.captain_multiplier - 1
+                )
                 player_captain_bonus = captain_bonus
+
             detail.append(
                 {
                     "player_id": str(selection.fantasy_player_id),
                     "player_name": selection.fantasy_player.player.name,
                     "position": selection.fantasy_player.position,
-                    "base_points": str(point_record.base_points if point_record else Decimal("0")),
+                    "base_points": str(
+                        point_record.base_points if point_record else Decimal("0")
+                    ),
                     "correction_points": str(
                         point_record.correction_points if point_record else Decimal("0")
                     ),
@@ -258,11 +454,15 @@ def score_gameweek(gameweek):
                     "statistics_available": bool(
                         point_record and point_record.statistics_available
                     ),
-                    "captain": bool(effective_captain and selection.id == effective_captain.id),
+                    "captain": bool(
+                        effective_captain and selection.id == effective_captain.id
+                    ),
                 }
             )
+
         state = gameweek_state(team, gameweek)
         penalty = Decimal(state.transfer_penalty)
+
         FantasyTeamGameweekScore.objects.update_or_create(
             team=team,
             gameweek=gameweek,
@@ -275,9 +475,12 @@ def score_gameweek(gameweek):
                     "players": detail,
                     "vice_captain_fallback": fallback,
                     "effective_captain_id": (
-                        str(effective_captain.fantasy_player_id) if effective_captain else None
+                        str(effective_captain.fantasy_player_id)
+                        if effective_captain
+                        else None
                     ),
                 },
             },
         )
+
     return gameweek

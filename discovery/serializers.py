@@ -900,3 +900,87 @@ class FollowSerializer(serializers.ModelSerializer):
             "club_slug",
             "created_at",
         ]
+
+
+# =============================================================================
+# Statistics Entry — Sports Data Admin bulk write
+# =============================================================================
+
+
+class StatisticsEntryRowSerializer(serializers.Serializer):
+    """A single statistic row in the bulk POST body.
+
+    Field names match what the frontend sends:
+      participant  — Participant UUID (kind=ATHLETE)
+      stat_type    — e.g. "GOALS" (case-insensitive; normalised to UPPER in service)
+      value        — numeric >= 0
+    """
+
+    participant = serializers.UUIDField(
+        help_text="UUID of the Participant (ATHLETE) who recorded the statistic.",
+    )
+    stat_type = serializers.CharField(
+        max_length=100,
+        help_text="Statistic type code, e.g. GOALS, ASSISTS.",
+    )
+    value = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Numeric value >= 0.",
+    )
+
+    def validate_stat_type(self, value: str) -> str:
+        return value.strip().upper()
+
+    def validate_value(self, value) -> object:
+        from decimal import Decimal
+
+        if value < Decimal("0"):
+            raise serializers.ValidationError("Value must be zero or greater.")
+        return value
+
+
+class StatisticsEntryRequestSerializer(serializers.Serializer):
+    """Body for POST /admin/fixtures/<id>/player-statistics/.
+
+    statistics      — list of StatisticsEntryRowSerializer rows
+    trigger_scoring — bool (default True)
+                      True  → complete_ingestion fires scoring after commit
+                      False → statistics saved without triggering Fantasy scoring
+    """
+
+    statistics = StatisticsEntryRowSerializer(many=True, allow_empty=False)
+    trigger_scoring = serializers.BooleanField(
+        default=True,
+        help_text=(
+            "True triggers Fantasy scoring after save (use for COMPLETED fixtures). "
+            "False saves statistics without scoring (use for LIVE/partial saves)."
+        ),
+    )
+
+    def validate_statistics(self, value: list) -> list:
+        if not value:
+            raise serializers.ValidationError("At least one statistic row is required.")
+        return value
+
+
+class StatisticsEntryRowErrorSerializer(serializers.Serializer):
+    """Shape for a single row-level validation error in the POST 400 response."""
+
+    index = serializers.IntegerField()
+    participant_id = serializers.CharField()
+    stat_type = serializers.CharField()
+    error = serializers.CharField()
+
+
+class StatisticsEntryResponseSerializer(serializers.Serializer):
+    """202 response body for a successful POST."""
+
+    fixture_id = serializers.UUIDField()
+    fixture_name = serializers.CharField()
+    records_created = serializers.IntegerField()
+    records_updated = serializers.IntegerField()
+    records_unchanged = serializers.IntegerField()
+    scoring_scheduled = serializers.BooleanField()
+    ingestion_id = serializers.UUIDField(allow_null=True)
+    message = serializers.CharField()

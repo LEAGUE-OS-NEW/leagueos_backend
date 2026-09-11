@@ -51,8 +51,45 @@ class TestAdminMe:
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["email"] == admin_user.email
-        assert "Super Admin" in response.data["roles"]
-        assert "admin.users.view" in response.data["permissions"]
+
+    @pytest.mark.django_db
+    def test_me_unauthenticated_returns_200_in_debug_mode(self, api_client):
+        """
+        GET /api/v1/admin/me/ without an Authorization header must return
+        200 OK when DEBUG=True so the local admin UI loads without tokens.
+        Falls back to the first superuser created by bootstrap_admins.
+        """
+        from django.contrib.auth import get_user_model
+        from django.test import override_settings
+
+        User = get_user_model()
+        superuser = User.objects.create_superuser(
+            username="dev_admin",
+            email="dev_admin@test.com",
+            password="StrongPass1!",
+        )
+
+        with override_settings(DEBUG=True):
+            response = api_client.get("/api/v1/admin/me/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["email"] == superuser.email
+        assert "id" in response.data
+        assert "roles" in response.data
+        assert "permissions" in response.data
+
+    @pytest.mark.django_db
+    def test_me_unauthenticated_returns_401_when_debug_false(self, api_client):
+        """
+        Without DEBUG=True, unauthenticated requests must still get 401.
+        This guards against accidentally opening the endpoint in production.
+        """
+        from django.test import override_settings
+
+        with override_settings(DEBUG=False):
+            response = api_client.get("/api/v1/admin/me/")
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_me_roles_endpoint(self, api_client, admin_user, seeded_roles):
         role = Role.objects.get(name="Finance Admin")

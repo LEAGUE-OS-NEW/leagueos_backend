@@ -74,10 +74,6 @@ class CompetitionViewSet(viewsets.ModelViewSet):
                 "retrieve",
                 "rules",
                 "leaderboard",
-                # --- Local testing: admin endpoints temporarily open ---
-                "admin_list",
-                "canonical_options",
-                "statistic_types",
             }
             else [CanManageFantasy()]
         )
@@ -191,7 +187,8 @@ class CompetitionViewSet(viewsets.ModelViewSet):
 
 class GameweekViewSet(viewsets.ModelViewSet):
     queryset = FantasyGameweek.objects.select_related("fantasy_competition").prefetch_related(
-        "fixtures"
+        "fixtures__event_participants__participant",
+        "fixtures__match_centre",
     )
     serializer_class = GameweekSerializer
 
@@ -204,7 +201,8 @@ class GameweekViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = FantasyGameweek.objects.select_related("fantasy_competition").prefetch_related(
-            "fixtures"
+            "fixtures__event_participants__participant",
+            "fixtures__match_centre",
         )
         if self.action in {"list", "retrieve", "points", "leaderboard"}:
             qs = qs.filter(
@@ -223,11 +221,6 @@ class GameweekViewSet(viewsets.ModelViewSet):
                 "retrieve",
                 "points",
                 "leaderboard",
-                # --- Local testing: admin endpoints temporarily open ---
-                "transition",
-                "recalculate",
-                "finalize",
-                "fixture_candidates",
             }
             else [CanManageFantasy()]
         )
@@ -366,18 +359,7 @@ class PlayerViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         return (
             [AllowAny()]
-            if self.action
-            in {
-                "list",
-                "retrieve",
-                # --- Local testing: admin endpoints temporarily open ---
-                "candidates",
-                "create_full",
-                "create",
-                "update",
-                "partial_update",
-                "destroy",
-            }
+            if self.action in {"list", "retrieve"}
             else [CanManageFantasy()]
         )
 
@@ -650,7 +632,7 @@ class LeagueViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action == "admin_overview":
-            # --- Local testing: admin endpoint temporarily open ---
+            # Local development: admin overview is open without authentication.
             return [AllowAny()]
         return (
             [AllowAny()]
@@ -746,16 +728,21 @@ class LeagueViewSet(viewsets.ModelViewSet):
         membership, created = FantasyLeagueMembership.objects.get_or_create(
             league=league, team=team
         )
-        if created:
-            notify_fantasy(
-                recipient=team.owner,
-                event_type="FANTASY_LEAGUE_JOINED",
-                title=f"Joined {league.name}",
-                message="Your Fantasy team is now in the league.",
-                deduplication_key=f"fantasy:league-joined:{membership.id}",
-                data={"league_id": str(league.id)},
+        if not created:
+            return Response(
+                {"detail": "You're already a member of this league."},
+                status=status.HTTP_200_OK,
+                headers={"X-Already-Member": "true"},
             )
-        return Response(LeagueSerializer(league).data)
+        notify_fantasy(
+            recipient=team.owner,
+            event_type="FANTASY_LEAGUE_JOINED",
+            title=f"Joined {league.name}",
+            message="Your Fantasy team is now in the league.",
+            deduplication_key=f"fantasy:league-joined:{membership.id}",
+            data={"league_id": str(league.id)},
+        )
+        return Response(LeagueSerializer(league).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"])
     def leave(self, request, pk=None):
@@ -822,16 +809,37 @@ class LeagueViewSet(viewsets.ModelViewSet):
 class ScoringRuleViewSet(viewsets.ModelViewSet):
     queryset = FantasyScoringRule.objects.all()
     serializer_class = ScoringRuleSerializer
-    # --- Local testing: admin endpoint temporarily open ---
-    permission_classes = [AllowAny]
+    permission_classes = [CanManageFantasy]
     fantasy_permission = "platform.fantasy.scoring.manage"
+
+    def _rescore_competition(self, fantasy_competition):
+        """
+        Re-run score_gameweek() for every non-FINALIZED gameweek in the
+        competition.  Called after a scoring rule is created or updated so
+        that existing FantasyPlayerGameweekPoints records immediately reflect
+        the new/changed rule.
+
+        FINALIZED gameweeks are intentionally skipped — they may only be
+        re-scored through the explicit admin correction flow.
+        """
+        for gameweek in fantasy_competition.gameweeks.exclude(
+            status=FantasyGameweek.Status.FINALIZED
+        ):
+            score_gameweek(gameweek)
+
+    def perform_create(self, serializer):
+        rule = serializer.save()
+        self._rescore_competition(rule.fantasy_competition)
+
+    def perform_update(self, serializer):
+        rule = serializer.save()
+        self._rescore_competition(rule.fantasy_competition)
 
 
 class CorrectionViewSet(viewsets.ModelViewSet):
     queryset = FantasyScoringCorrection.objects.select_related("player_points")
     serializer_class = CorrectionSerializer
-    # --- Local testing: admin endpoint temporarily open ---
-    permission_classes = [AllowAny]
+    permission_classes = [CanManageFantasy]
     fantasy_permission = "platform.fantasy.scoring.manage"
     http_method_names = ["get", "post", "head", "options"]
 
@@ -849,12 +857,7 @@ class CorrectionViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def perform_create(self, serializer):
         player_points = serializer.validated_data["player_points"]
-        # --- Local testing: fall back to first user when unauthenticated ---
         actor = self.request.user
-        if not actor.is_authenticated:
-            from django.contrib.auth import get_user_model
-
-            actor = get_user_model().objects.order_by("pk").first()
         correction = serializer.save(actor=actor, previous_value=player_points.total_points)
         player_points.correction_points = correction.new_value - player_points.base_points
         player_points.total_points = correction.new_value
@@ -905,9 +908,9 @@ class MatchStatisticViewSet(viewsets.ViewSet):
        GET  /fantasy/admin/match-statistics/   — list all stats (raw)
     """
 
-    # --- Local testing: admin endpoint temporarily open ---
+    # Admin scoring endpoint — requires fantasy management permission.
     serializer_class = MatchPlayerStatisticCreateSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [CanManageFantasy]
     fantasy_permission = "platform.fantasy.scoring.manage"
 
     # ── helpers ────────────────────────────────────────────────────────────
@@ -1060,12 +1063,14 @@ class MatchStatisticViewSet(viewsets.ViewSet):
             fixture_qs = fixture_qs.filter(id=fixture_filter)
 
         # Find all (participant, fixture) pairs that have at least one stat.
+        # .order_by() clears the default model ordering so that Django does not
+        # inject extra ORDER BY columns (stat_type, match_centre.updated_at)
+        # into the DISTINCT projection.  Without it, DISTINCT operates on
+        # (participant_id, fixture_id, stat_type, updated_at) and returns one
+        # row per statistic rather than one row per (participant, fixture) pair.
         stat_qs = (
             MatchPlayerStatistic.objects.filter(match_centre__fixture__in=fixture_qs)
-            .select_related(
-                "match_centre__fixture",
-                "participant__player_profile__club",
-            )
+            .order_by()
             .values("participant_id", "match_centre__fixture_id")
             .distinct()
         )
@@ -1303,11 +1308,11 @@ class MatchStatisticViewSet(viewsets.ViewSet):
                     correction_points = str(pts_record.correction_points)
                     breakdown = pts_record.breakdown or []
 
-            # Include the scoring rules so the UI can show points-per-unit.
+            # Include the scoring rules so the UI can show rule type and points.
             scoring_rules = list(
                 FantasyScoringRule.objects.filter(
-                    fantasy_competition=fantasy_comp, enabled=True, conditions={}
-                ).values("statistic_type", "points")
+                    fantasy_competition=fantasy_comp, enabled=True
+                ).values("statistic_type", "rule_type", "points", "conditions")
             )
         except FantasyPlayer.DoesNotExist:
             pass
@@ -1356,7 +1361,12 @@ class MatchStatisticViewSet(viewsets.ViewSet):
                 "correction_points": correction_points,
                 "breakdown": breakdown,
                 "scoring_rules": [
-                    {"statistic_type": r["statistic_type"], "points": str(r["points"])}
+                    {
+                        "statistic_type": r["statistic_type"],
+                        "rule_type": r["rule_type"],
+                        "points": str(r["points"]),
+                        "conditions": r["conditions"],
+                    }
                     for r in scoring_rules
                 ],
                 "review_status": review.status if review else "PENDING",
@@ -1473,12 +1483,7 @@ class MatchStatisticViewSet(viewsets.ViewSet):
 
         from django.utils import timezone as tz
 
-        # Determine the actor.
-        actor = request.user if request.user.is_authenticated else None
-        if actor is None:
-            from django.contrib.auth import get_user_model
-
-            actor = get_user_model().objects.order_by("pk").first()
+        actor = request.user
 
         review, _ = FantasyStatisticReview.objects.get_or_create(
             fantasy_competition=fantasy_comp,

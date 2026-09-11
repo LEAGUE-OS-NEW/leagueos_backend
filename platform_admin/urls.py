@@ -9,6 +9,7 @@ from platform_admin.views import (
     AdminFixtureListCreateView,
     AdminFixtureRescheduleView,
     AdminFixtureScoreView,
+    AdminFixtureStatisticsView,
     AdminFixtureStatusView,
     AdminFixtureSubmitVerificationView,
     AdminInvitationAcceptView,
@@ -151,6 +152,11 @@ urlpatterns = [
         "fixtures/<uuid:fixture_id>/submit-verification/",
         AdminFixtureSubmitVerificationView.as_view(),
         name="fixture-submit-verification",
+    ),
+    path(
+        "fixtures/<uuid:fixture_id>/player-statistics/",
+        AdminFixtureStatisticsView.as_view(),
+        name="fixture-player-statistics",
     ),
     path(
         "fixture-results/",

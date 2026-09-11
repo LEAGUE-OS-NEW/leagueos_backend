@@ -509,6 +509,7 @@ ROLE_PERMISSIONS = {
         "update_sports",
         "delete_sports",
         "manage_sports",
+        "manage_statistics",
         "view_news",
         "manage_news",
     ],

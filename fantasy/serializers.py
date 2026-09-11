@@ -108,16 +108,20 @@ class ScoringRuleSerializer(CleanModelSerializer):
         model = FantasyScoringRule
         fields = "__all__"
 
-    def validate_conditions(self, value):
-        if value:
-            raise serializers.ValidationError(
-                "Conditional scoring rules are not supported; "
-                "create an unconditional statistic rule."
-            )
-        return value
+    # ------------------------------------------------------------------
+    # conditions validation — schema depends on rule_type
+    # ------------------------------------------------------------------
+
+    def _get_rule_type(self, attrs):
+        """Return the effective rule_type from incoming attrs or the existing instance."""
+        return attrs.get(
+            "rule_type",
+            getattr(self.instance, "rule_type", FantasyScoringRule.RuleType.PER_UNIT),
+        )
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+
         competition = attrs.get(
             "fantasy_competition", getattr(self.instance, "fantasy_competition", None)
         )
@@ -131,7 +135,73 @@ class ScoringRuleSerializer(CleanModelSerializer):
                 {"statistic_type": "Select an approved statistic type for this sport."}
             )
         attrs["statistic_type"] = statistic_type
+
+        # Validate conditions according to rule_type
+        rule_type = self._get_rule_type(attrs)
+        conditions = attrs.get("conditions", getattr(self.instance, "conditions", {})) or {}
+        errors = self._validate_conditions_for_rule_type(rule_type, conditions)
+        if errors:
+            raise serializers.ValidationError({"conditions": errors})
+
         return attrs
+
+    @staticmethod
+    def _validate_conditions_for_rule_type(rule_type, conditions):
+        """
+        Return a list of error strings for any schema violation,
+        or an empty list when the conditions are valid for the given rule_type.
+        """
+        RT = FantasyScoringRule.RuleType
+        errors = []
+
+        if rule_type in (RT.PER_UNIT, RT.FLAT):
+            # conditions must be empty for these two types
+            if conditions:
+                errors.append(
+                    f"{rule_type} rules do not accept conditions; send an empty object."
+                )
+
+        elif rule_type == RT.BRACKET:
+            # Required: {"min": int >= 0}
+            # Optional: {"max": int > min  OR  null for no upper bound}
+            if "min" not in conditions:
+                errors.append("BRACKET rules require a 'min' key in conditions.")
+            else:
+                min_v = conditions["min"]
+                if not isinstance(min_v, (int, float)) or min_v < 0:
+                    errors.append("'min' must be a non-negative number.")
+                max_v = conditions.get("max")
+                if max_v is not None:
+                    if not isinstance(max_v, (int, float)):
+                        errors.append("'max' must be a number or null.")
+                    elif max_v <= min_v:
+                        errors.append("'max' must be greater than 'min'.")
+
+        elif rule_type == RT.PER_N:
+            # Required: {"per_n": int >= 1}
+            if "per_n" not in conditions:
+                errors.append("PER_N rules require a 'per_n' key in conditions.")
+            else:
+                per_n = conditions["per_n"]
+                if not isinstance(per_n, (int, float)) or per_n < 1:
+                    errors.append("'per_n' must be a positive integer (>= 1).")
+
+        elif rule_type == RT.POSITION:
+            # Required: {"positions": {str: numeric, ...}}
+            if "positions" not in conditions:
+                errors.append("POSITION rules require a 'positions' key in conditions.")
+            else:
+                pos_map = conditions["positions"]
+                if not isinstance(pos_map, dict):
+                    errors.append("'positions' must be a JSON object mapping position codes to point values.")
+                else:
+                    for key, val in pos_map.items():
+                        if not isinstance(val, (int, float)):
+                            errors.append(
+                                f"Point value for position '{key}' must be a number, got {val!r}."
+                            )
+
+        return errors
 
 
 class GameweekSerializer(CleanModelSerializer):
@@ -145,15 +215,30 @@ class GameweekSerializer(CleanModelSerializer):
         fields = "__all__"
 
     def get_fixture_details(self, obj) -> list[dict]:
-        return [
-            {
-                "id": str(fixture.id),
-                "name": fixture.name,
-                "starts_at": fixture.starts_at,
-                "status": fixture.status,
+        rows = []
+        for fixture in obj.fixtures.prefetch_related(
+            "event_participants__participant"
+        ).select_related("match_centre"):
+            parts = {
+                ep.role: ep.participant.name
+                for ep in fixture.event_participants.all()
+                if ep.role in ("HOME", "AWAY")
             }
-            for fixture in obj.fixtures.all()
-        ]
+            mc = getattr(fixture, "match_centre", None)
+            rows.append(
+                {
+                    "id": str(fixture.id),
+                    "name": fixture.name,
+                    "home_team": parts.get("HOME"),
+                    "away_team": parts.get("AWAY"),
+                    "starts_at": fixture.starts_at,
+                    "status": fixture.status,
+                    "venue": fixture.venue or None,
+                    "home_score": mc.home_score if mc else None,
+                    "away_score": mc.away_score if mc else None,
+                }
+            )
+        return rows
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
