@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import mimetypes
+import threading
 from django.conf import settings
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import transaction
@@ -158,14 +159,22 @@ class FanKYCSubmitView(APIView):
             request=request,
         )
 
-        # Trigger processing task (asynchronously or inline fallback)
+        # Trigger processing task. The response below promises "PROCESSING
+        # started" and returns immediately, so the Celery-unavailable
+        # fallback must not block this request on the pipeline itself
+        # (OCR, face comparison, liveness — the first DeepFace call alone
+        # can take 60-90s loading its model) — it runs in a background
+        # thread instead, same as a Celery worker would run it.
         try:
             process_kyc_attempt.delay(str(attempt.id))
         except Exception as exc:
             logger.warning(
-                "Celery queue unavailable, executing process_kyc_attempt inline: %s", exc
+                "Celery queue unavailable, running process_kyc_attempt in a background thread: %s",
+                exc,
             )
-            process_kyc_attempt(str(attempt.id))
+            threading.Thread(
+                target=process_kyc_attempt, args=(str(attempt.id),), daemon=True
+            ).start()
 
         from authentication.services.auth_context_service import AuthContextService
         from authentication.services.token_service import TokenService
