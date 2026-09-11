@@ -25,6 +25,11 @@ from platform_admin.views import (
     AdminNewsRejectView,
     AdminNewsSetFeaturedView,
     AdminNewsSetTrendingView,
+    AdminPlatformMembershipPlanDetailView,
+    AdminPlatformMembershipPlanListCreateView,
+    AdminPlatformMembershipPlanStatusView,
+    AdminPlatformMembershipSubscriberCancelView,
+    AdminPlatformMembershipSubscriberListView,
     AdminPermissionListView,
     AdminRoleDetailView,
     AdminRoleListView,
@@ -33,6 +38,9 @@ from platform_admin.views import (
     AdminUserRoleAssignView,
     AdminUserRoleListView,
     AdminUserRoleRevokeView,
+    AdminFinanceReportView,
+    AdminStoreReportView,
+    AdminStoreOrderDetailView,
     FixtureResultRejectView,
     FixtureResultVerifyView,
     FixtureResultVerificationQueueView,
@@ -41,6 +49,13 @@ from platform_admin.views import (
 app_name = "platform_admin"
 
 urlpatterns = [
+    path("finance/", AdminFinanceReportView.as_view(), name="finance-report"),
+    path("store/", AdminStoreReportView.as_view(), name="store-report"),
+    path(
+        "store/orders/<uuid:order_id>/",
+        AdminStoreOrderDetailView.as_view(),
+        name="store-order-detail",
+    ),
     path("me/", AdminMeView.as_view(), name="me"),
     path("me/roles/", AdminMeRolesView.as_view(), name="me-roles"),
     path("me/permissions/", AdminMePermissionsView.as_view(), name="me-permissions"),
@@ -69,6 +84,31 @@ urlpatterns = [
     path("invitations/accept/", AdminInvitationAcceptView.as_view(), name="invitation-accept"),
     path("audit/", AdminAuditLogListView.as_view(), name="audit-list"),
     path("dashboard/", AdminDashboardSummaryView.as_view(), name="dashboard-summary"),
+    path(
+        "membership/plans/",
+        AdminPlatformMembershipPlanListCreateView.as_view(),
+        name="membership-plan-list-create",
+    ),
+    path(
+        "membership/plans/<uuid:plan_id>/",
+        AdminPlatformMembershipPlanDetailView.as_view(),
+        name="membership-plan-detail",
+    ),
+    path(
+        "membership/plans/<uuid:plan_id>/status/",
+        AdminPlatformMembershipPlanStatusView.as_view(),
+        name="membership-plan-status",
+    ),
+    path(
+        "membership/subscribers/",
+        AdminPlatformMembershipSubscriberListView.as_view(),
+        name="membership-subscriber-list",
+    ),
+    path(
+        "membership/subscribers/<uuid:subscription_id>/cancel/",
+        AdminPlatformMembershipSubscriberCancelView.as_view(),
+        name="membership-subscriber-cancel",
+    ),
     path("clubs/", ClubListView.as_view(), name="club-list"),
     path("news/", AdminNewsComposeView.as_view(), name="news-compose"),
     path("news/queue/", AdminNewsQueueListView.as_view(), name="news-queue"),

@@ -1,8 +1,14 @@
+from decimal import Decimal
+from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Count, Q
+from django.db import transaction
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -14,6 +20,7 @@ from authentication.services.permission_service import PermissionService
 from authentication.services.role_service import RoleService, SUPER_ADMIN_ROLE_NAME
 from authentication.services.session_service import SessionService
 from authentication.services.user_admin_service import UserAdminService
+from dashboard.services.dashboard_cache_service import DashboardCacheService
 from discovery.models import FixtureResultVerification, News
 from discovery.serializers import (
     FixtureCreateSerializer,
@@ -34,6 +41,7 @@ from discovery.serializers import (
 from discovery.services.fixture_admin_service import fixture_admin_service
 from discovery.services.news_moderation_service import news_moderation_service
 from sports.models import SportingEvent
+from platform_admin.models import PlatformMembershipPlan, PlatformMembershipSubscription
 from platform_admin.serializers import (
     AdminAuditLogSerializer,
     AdminDashboardSummarySerializer,
@@ -45,7 +53,68 @@ from platform_admin.serializers import (
     AdminRoleSerializer,
     AdminUserListSerializer,
     AdminUserRoleUpdateSerializer,
+    PlatformMembershipPlanSerializer,
+    PlatformMembershipStatusSerializer,
+    PlatformMembershipSubscribeSerializer,
+    PlatformMembershipSubscriptionSerializer,
 )
+from wallets.services.wallet_service import WalletService
+from wallets.models import WalletTransaction, WithdrawalRequest
+from markets.models import (
+    MarketPositionSettlement,
+    MarketPositionVoidRefund,
+    MarketReconciliationMismatch,
+    MarketSettlement,
+)
+from clubs.models import MerchandiseProduct, StoreOrder
+from clubs.serializers.club_serializers import MerchandiseProductSerializer, StoreOrderSerializer
+
+
+def _page_response(request, queryset, serializer):
+    """Return a stable, bounded page envelope for administrative reports."""
+    try:
+        page_size = min(max(int(request.query_params.get("page_size", 50)), 1), 200)
+        page_number = max(int(request.query_params.get("page", 1)), 1)
+    except (TypeError, ValueError):
+        page_size, page_number = 50, 1
+    paginator = Paginator(queryset, page_size)
+    page = paginator.get_page(page_number)
+    return {
+        "count": paginator.count,
+        "page": page.number,
+        "page_size": page_size,
+        "total_pages": paginator.num_pages,
+        "results": serializer(list(page.object_list)),
+    }
+
+
+def _date_filter(request, queryset, field="created_at"):
+    date_from = request.query_params.get("date_from")
+    date_to = request.query_params.get("date_to")
+    if date_from:
+        queryset = queryset.filter(**{f"{field}__date__gte": date_from})
+    if date_to:
+        queryset = queryset.filter(**{f"{field}__date__lte": date_to})
+    return queryset
+
+
+def _can_manage_platform_memberships(user) -> bool:
+    return bool(
+        user
+        and user.is_authenticated
+        and (
+            user.is_superuser or PermissionService.has_permission(user, "admin.memberships.manage")
+        )
+    )
+
+
+def _membership_renews_at(plan: PlatformMembershipPlan):
+    days_by_period = {
+        PlatformMembershipPlan.BillingPeriod.MONTHLY: 30,
+        PlatformMembershipPlan.BillingPeriod.QUARTERLY: 90,
+        PlatformMembershipPlan.BillingPeriod.ANNUAL: 365,
+    }
+    return timezone.now() + timezone.timedelta(days=days_by_period[plan.billing_period])
 
 
 class AdminPermissionListView(APIView):
@@ -793,6 +862,268 @@ class AdminDashboardSummaryView(APIView):
         return Response(serializer.data)
 
 
+class AdminPlatformMembershipPlanListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipPlanSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_plans_list",
+        responses={200: PlatformMembershipPlanSerializer(many=True), 403: None},
+    )
+    def get(self, request):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        plans = (
+            PlatformMembershipPlan.objects.annotate(
+                subscriber_count=Count(
+                    "subscriptions",
+                    filter=Q(subscriptions__status=PlatformMembershipSubscription.Status.ACTIVE),
+                )
+            )
+            .all()
+            .order_by("-created_at")
+        )
+        return Response(self.serializer_class(plans, many=True).data)
+
+    @extend_schema(
+        operation_id="admin_platform_membership_plan_create",
+        request=PlatformMembershipPlanSerializer,
+        responses={201: PlatformMembershipPlanSerializer, 400: None, 403: None},
+    )
+    def post(self, request):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        plan = serializer.save(created_by=request.user)
+        return Response(self.serializer_class(plan).data, status=201)
+
+
+class AdminPlatformMembershipPlanDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipPlanSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_plan_update",
+        request=PlatformMembershipPlanSerializer,
+        responses={200: PlatformMembershipPlanSerializer, 400: None, 403: None, 404: None},
+    )
+    def patch(self, request, plan_id):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        plan = PlatformMembershipPlan.objects.filter(id=plan_id).first()
+        if not plan:
+            return Response({"detail": "Membership plan not found."}, status=404)
+
+        serializer = self.serializer_class(plan, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        return Response(self.serializer_class(updated).data)
+
+
+class AdminPlatformMembershipPlanStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipStatusSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_plan_status",
+        request=PlatformMembershipStatusSerializer,
+        responses={200: PlatformMembershipPlanSerializer, 400: None, 403: None, 404: None},
+    )
+    def patch(self, request, plan_id):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        plan = PlatformMembershipPlan.objects.filter(id=plan_id).first()
+        if not plan:
+            return Response({"detail": "Membership plan not found."}, status=404)
+
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        plan.status = serializer.validated_data["status"]
+        plan.save(update_fields=["status", "published_at", "updated_at"])
+        return Response(PlatformMembershipPlanSerializer(plan).data)
+
+
+class AdminPlatformMembershipSubscriberListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscriptionSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_subscribers_list",
+        responses={200: PlatformMembershipSubscriptionSerializer(many=True), 403: None},
+    )
+    def get(self, request):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to view platform memberships."},
+                status=403,
+            )
+
+        subscriptions = PlatformMembershipSubscription.objects.select_related(
+            "user", "plan"
+        ).order_by("-subscribed_at")
+        return Response(self.serializer_class(subscriptions, many=True).data)
+
+
+class AdminPlatformMembershipSubscriberCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscriptionSerializer
+
+    @extend_schema(
+        operation_id="admin_platform_membership_subscriber_cancel",
+        responses={200: PlatformMembershipSubscriptionSerializer, 403: None, 404: None},
+    )
+    def post(self, request, subscription_id):
+        if not _can_manage_platform_memberships(request.user):
+            return Response(
+                {"detail": "You do not have permission to manage platform memberships."},
+                status=403,
+            )
+
+        subscription = (
+            PlatformMembershipSubscription.objects.select_related("user", "plan")
+            .filter(id=subscription_id)
+            .first()
+        )
+        if not subscription:
+            return Response({"detail": "Subscription not found."}, status=404)
+
+        subscription.status = PlatformMembershipSubscription.Status.CANCELLED
+        subscription.cancelled_at = timezone.now()
+        subscription.save(update_fields=["status", "cancelled_at", "updated_at"])
+        DashboardCacheService.invalidate_dashboard(subscription.user)
+        return Response(self.serializer_class(subscription).data)
+
+
+class PublicPlatformMembershipPlanListView(APIView):
+    permission_classes = [permissions.AllowAny]
+    serializer_class = PlatformMembershipPlanSerializer
+
+    @extend_schema(
+        operation_id="platform_membership_plans_list",
+        responses={200: PlatformMembershipPlanSerializer(many=True)},
+    )
+    def get(self, request):
+        plans = PlatformMembershipPlan.objects.filter(
+            status=PlatformMembershipPlan.Status.ACTIVE
+        ).order_by("price", "name")
+        return Response(self.serializer_class(plans, many=True).data)
+
+
+class MyPlatformMembershipView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscriptionSerializer
+
+    @extend_schema(
+        operation_id="platform_membership_me",
+        responses={200: PlatformMembershipSubscriptionSerializer(many=True), 403: None},
+    )
+    def get(self, request):
+        subscriptions = PlatformMembershipSubscription.objects.select_related(
+            "user", "plan"
+        ).filter(user=request.user)
+        return Response(self.serializer_class(subscriptions, many=True).data)
+
+
+class PlatformMembershipSubscribeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscribeSerializer
+
+    @extend_schema(
+        operation_id="platform_membership_subscribe",
+        request=PlatformMembershipSubscribeSerializer,
+        responses={201: PlatformMembershipSubscriptionSerializer, 400: None, 404: None},
+    )
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        plan = PlatformMembershipPlan.objects.filter(
+            id=serializer.validated_data["plan_id"],
+            status=PlatformMembershipPlan.Status.ACTIVE,
+        ).first()
+        if not plan:
+            return Response({"detail": "Active membership plan not found."}, status=404)
+
+        try:
+            with transaction.atomic():
+                wallet_transaction = WalletService.spend_available_balance(
+                    user=request.user,
+                    amount=plan.price,
+                    currency=plan.currency,
+                    description=f"Membership purchase - {plan.name}",
+                    idempotency_key=serializer.validated_data.get("idempotency_key"),
+                )
+
+                PlatformMembershipSubscription.objects.filter(
+                    user=request.user,
+                    status=PlatformMembershipSubscription.Status.ACTIVE,
+                ).update(
+                    status=PlatformMembershipSubscription.Status.CANCELLED,
+                    cancelled_at=timezone.now(),
+                )
+
+                subscription = PlatformMembershipSubscription.objects.create(
+                    user=request.user,
+                    plan=plan,
+                    status=PlatformMembershipSubscription.Status.ACTIVE,
+                    renews_at=_membership_renews_at(plan),
+                    amount_paid=plan.price,
+                    currency=plan.currency,
+                    metadata={
+                        "wallet_transaction_id": str(wallet_transaction.id),
+                        "wallet_reference": wallet_transaction.reference,
+                    },
+                )
+        except DjangoValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                return Response(exc.message_dict, status=400)
+            return Response({"detail": " ".join(exc.messages)}, status=400)
+
+        DashboardCacheService.invalidate_dashboard(request.user)
+        return Response(PlatformMembershipSubscriptionSerializer(subscription).data, status=201)
+
+
+class PlatformMembershipCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PlatformMembershipSubscriptionSerializer
+
+    @extend_schema(
+        operation_id="platform_membership_cancel",
+        responses={200: PlatformMembershipSubscriptionSerializer, 404: None},
+    )
+    def post(self, request, subscription_id):
+        subscription = (
+            PlatformMembershipSubscription.objects.select_related("user", "plan")
+            .filter(id=subscription_id, user=request.user)
+            .first()
+        )
+        if not subscription:
+            return Response({"detail": "Subscription not found."}, status=404)
+
+        subscription.status = PlatformMembershipSubscription.Status.CANCELLED
+        subscription.cancelled_at = timezone.now()
+        subscription.save(update_fields=["status", "cancelled_at", "updated_at"])
+        DashboardCacheService.invalidate_dashboard(request.user)
+        return Response(self.serializer_class(subscription).data)
+
+
 class AdminNewsComposeView(APIView):
     """Staff Compose News — create-and-publish directly (no club, no review
     step). Distinct from the club submission -> queue -> approve pipeline."""
@@ -1339,3 +1670,554 @@ class FixtureResultRejectView(APIView):
             verification=verification, actor=request.user, note=serializer.validated_data["note"]
         )
         return Response(self.serializer_class(updated).data)
+
+
+class LegacyAdminFinanceReportView(APIView):
+    """Read-only, ledger-backed finance queues for authorized administrators."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not (
+            request.user.is_superuser
+            or PermissionService.has_any_permission(
+                request.user, ("manage_finance", "view_finance", "reconcile_finance")
+            )
+        ):
+            raise PermissionDenied("Finance permission is required.")
+        transactions = WalletTransaction.objects.select_related("wallet__user", "provider")
+        deposits = transactions.filter(transaction_type=WalletTransaction.TransactionType.DEPOSIT)
+        settlements = MarketSettlement.objects.select_related(
+            "market", "winning_outcome"
+        ).prefetch_related("position_settlements__wallet_ledger_entry__transaction")
+        orders = StoreOrder.objects.select_related("club", "payment_transaction")
+        return Response(
+            {
+                "deposits": [
+                    {
+                        "id": str(tx.id),
+                        "fan": tx.wallet.user.email,
+                        "amount": str(tx.amount),
+                        "currency": tx.currency,
+                        "provider": tx.provider.name if tx.provider else "",
+                        "provider_reference": tx.provider_reference,
+                        "internal_reference": tx.reference,
+                        "status": tx.status,
+                        "initiated_at": tx.created_at,
+                        "completed_at": tx.completed_at,
+                        "ledger_entries": [
+                            str(value) for value in tx.ledger_entries.values_list("id", flat=True)
+                        ],
+                    }
+                    for tx in deposits.order_by("-created_at")[:500]
+                ],
+                "wallet_transactions": [
+                    {
+                        "id": str(tx.id),
+                        "fan": tx.wallet.user.email,
+                        "amount": str(tx.amount),
+                        "currency": tx.currency,
+                        "type": tx.transaction_type,
+                        "status": tx.status,
+                        "reference": tx.reference,
+                        "provider_reference": tx.provider_reference,
+                        "created_at": tx.created_at,
+                    }
+                    for tx in transactions.order_by("-created_at")[:500]
+                ],
+                "settlements": [
+                    {
+                        "id": str(batch.id),
+                        "market": batch.market.question,
+                        "winning_outcome": batch.winning_outcome.label,
+                        "participant_count": batch.total_position_count,
+                        "gross_payout": str(batch.total_payout_amount),
+                        "fees": str(
+                            sum(
+                                (p.payout_fee_amount for p in batch.position_settlements.all()),
+                                Decimal("0"),
+                            )
+                        ),
+                        "net_payout": str(
+                            sum(
+                                (p.net_payout_amount for p in batch.position_settlements.all()),
+                                Decimal("0"),
+                            )
+                        ),
+                        "settled_at": batch.executed_at,
+                        "participants": [
+                            {
+                                "fan": p.participant.email,
+                                "outcome": p.outcome.label,
+                                "gross": str(p.payout_amount),
+                                "fees": str(p.payout_fee_amount),
+                                "net": str(p.net_payout_amount),
+                                "ledger_reference": (
+                                    p.wallet_ledger_entry.transaction.reference
+                                    if p.wallet_ledger_entry and p.wallet_ledger_entry.transaction
+                                    else None
+                                ),
+                            }
+                            for p in batch.position_settlements.all()
+                        ],
+                    }
+                    for batch in settlements.order_by("-executed_at")[:200]
+                ],
+                "refunds": [
+                    {
+                        "id": str(r.id),
+                        "fan": r.participant.email,
+                        "market": r.market_void_refund.market.question,
+                        "gross": str(r.refund_amount),
+                        "fees": str(r.refund_fee_amount),
+                        "net": str(r.net_refund_amount),
+                        "created_at": r.created_at,
+                    }
+                    for r in MarketPositionVoidRefund.objects.select_related(
+                        "participant", "market_void_refund__market"
+                    ).order_by("-created_at")[:500]
+                ],
+                "withdrawals": [
+                    {
+                        "id": str(w.id),
+                        "fan": w.wallet.user.email,
+                        "amount": str(w.amount),
+                        "currency": w.currency,
+                        "status": w.status,
+                        "created_at": w.created_at,
+                    }
+                    for w in WithdrawalRequest.objects.select_related("wallet__user").order_by(
+                        "-created_at"
+                    )[:500]
+                ],
+                "club_commerce": [
+                    {
+                        "id": str(o.id),
+                        "club": o.club.name,
+                        "fan": o.user.email,
+                        "amount": str(o.total_amount),
+                        "status": o.status,
+                        "payment_reference": (
+                            o.payment_transaction.reference if o.payment_transaction else None
+                        ),
+                        "created_at": o.created_at,
+                    }
+                    for o in orders.order_by("-created_at")[:500]
+                ],
+                "reconciliation_exceptions": [
+                    {
+                        "id": str(item.id),
+                        "source_id": str(item.run.reference),
+                        "expected": str(item.expected_value or Decimal("0")),
+                        "actual": str(item.actual_value or Decimal("0")),
+                        "severity": item.severity,
+                        "status": item.resolution_status,
+                    }
+                    for item in MarketReconciliationMismatch.objects.select_related("run").order_by(
+                        "-detected_at"
+                    )[:500]
+                ],
+            }
+        )
+
+
+class LegacyAdminStoreReportView(APIView):
+    """Global read-only Store operations view for Super Admin."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_superuser:
+            raise PermissionDenied("Super Admin access is required.")
+        orders = StoreOrder.objects.select_related(
+            "club", "user", "payment_transaction"
+        ).prefetch_related("items__product", "status_history")
+        products = MerchandiseProduct.objects.select_related("club")
+        for key, lookup in (("club", "club_id"), ("status", "status")):
+            if request.query_params.get(key):
+                orders = orders.filter(**{lookup: request.query_params[key]})
+                products = products.filter(**{lookup: request.query_params[key]})
+        search = request.query_params.get("search", "").strip()
+        if search:
+            products = products.filter(Q(name__icontains=search) | Q(sku__icontains=search))
+            orders = orders.filter(user__email__icontains=search)
+        paid = orders.exclude(status=StoreOrder.OrderStatus.PENDING)
+        return Response(
+            {
+                "overview": {
+                    "total_orders": orders.count(),
+                    "sales": str(
+                        paid.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+                    ),
+                    "by_status": {
+                        row["status"]: row["count"]
+                        for row in orders.values("status").annotate(count=Count("id"))
+                    },
+                },
+                "products": MerchandiseProductSerializer(products[:1000], many=True).data,
+                "orders": StoreOrderSerializer(
+                    orders.order_by("-created_at")[:1000], many=True
+                ).data,
+            }
+        )
+
+
+def _finance_ledger_reference(entry):
+    """Return the best traceable reference for a canonical ledger entry."""
+    if entry is None:
+        return None
+
+    transaction = getattr(entry, "transaction", None)
+    if transaction is not None and transaction.reference:
+        return transaction.reference
+
+    if entry.idempotency_reference:
+        return str(entry.idempotency_reference)
+
+    return str(entry.id)
+
+
+# Versioned authoritative reporting implementations.  These definitions intentionally
+# supersede the legacy capped report views above while retaining their public names.
+class AdminFinanceReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        if not (
+            request.user.is_superuser
+            or PermissionService.has_any_permission(
+                request.user, ("manage_finance", "view_finance", "reconcile_finance")
+            )
+        ):
+            raise PermissionDenied("Finance permission is required.")
+
+        resource = request.query_params.get("resource", "deposits")
+        search = request.query_params.get("search", "").strip()
+        status_value = request.query_params.get("status")
+        transactions = WalletTransaction.objects.select_related("wallet__user", "provider")
+        deposits = transactions.filter(transaction_type=WalletTransaction.TransactionType.DEPOSIT)
+        withdrawals = WithdrawalRequest.objects.select_related("wallet__user")
+        settlements = MarketSettlement.objects.select_related("market", "winning_outcome")
+        participants = MarketPositionSettlement.objects.select_related(
+            "participant",
+            "market_settlement__market",
+            "outcome",
+            "wallet_ledger_entry__transaction",
+        )
+        refunds = MarketPositionVoidRefund.objects.select_related(
+            "participant", "market_void_refund__market", "wallet_credit_ledger_entry__transaction"
+        )
+        orders = StoreOrder.objects.select_related("club", "user", "payment_transaction")
+        exceptions = MarketReconciliationMismatch.objects.select_related("run")
+
+        overview = {
+            "deposit_count": deposits.count(),
+            "deposit_total": str(deposits.aggregate(v=Sum("amount"))["v"] or Decimal("0.00")),
+            "wallet_transaction_count": transactions.count(),
+            "settlement_count": settlements.count(),
+            "settlement_gross_total": str(
+                settlements.aggregate(v=Sum("total_payout_amount"))["v"] or Decimal("0.00")
+            ),
+            "refund_count": refunds.count(),
+            "refund_total": str(
+                refunds.aggregate(v=Sum("net_refund_amount"))["v"] or Decimal("0.00")
+            ),
+            "withdrawal_count": withdrawals.count(),
+            "withdrawal_total": str(withdrawals.aggregate(v=Sum("amount"))["v"] or Decimal("0.00")),
+            "club_commerce_count": orders.count(),
+            "club_commerce_total": str(
+                orders.aggregate(v=Sum("total_amount"))["v"] or Decimal("0.00")
+            ),
+            "reconciliation_exception_count": exceptions.count(),
+        }
+
+        if resource in {"deposits", "wallet_transactions"}:
+            queryset = deposits if resource == "deposits" else transactions
+            queryset = _date_filter(request, queryset)
+            if status_value:
+                queryset = queryset.filter(status=status_value)
+            if request.query_params.get("provider"):
+                queryset = queryset.filter(provider__name__iexact=request.query_params["provider"])
+            if request.query_params.get("user"):
+                queryset = queryset.filter(wallet__user_id=request.query_params["user"])
+            if request.query_params.get("reference"):
+                queryset = queryset.filter(reference__icontains=request.query_params["reference"])
+            if search:
+                queryset = queryset.filter(
+                    Q(wallet__user__email__icontains=search)
+                    | Q(reference__icontains=search)
+                    | Q(provider_reference__icontains=search)
+                )
+            page = _page_response(
+                request,
+                queryset.order_by("-created_at"),
+                lambda rows: [
+                    {
+                        "id": str(tx.id),
+                        "fan": tx.wallet.user.email,
+                        "amount": str(tx.amount),
+                        "currency": tx.currency,
+                        "type": tx.transaction_type,
+                        "status": tx.status,
+                        "provider": tx.provider.name if tx.provider else "",
+                        "provider_reference": tx.provider_reference,
+                        "internal_reference": tx.reference,
+                        "reference": tx.reference,
+                        "created_at": tx.created_at,
+                        "completed_at": tx.completed_at,
+                        "ledger_entries": [
+                            str(v) for v in tx.ledger_entries.values_list("id", flat=True)
+                        ],
+                    }
+                    for tx in rows
+                ],
+            )
+        elif resource == "settlements":
+            queryset = _date_filter(request, settlements, "executed_at")
+            if request.query_params.get("market"):
+                queryset = queryset.filter(market_id=request.query_params["market"])
+            if search:
+                queryset = queryset.filter(
+                    Q(market__question__icontains=search) | Q(id__icontains=search)
+                )
+            page = _page_response(
+                request,
+                queryset.order_by("-executed_at"),
+                lambda rows: [
+                    {
+                        "id": str(x.id),
+                        "market": x.market.question,
+                        "market_id": str(x.market_id),
+                        "winning_outcome": x.winning_outcome.label,
+                        "participant_count": x.total_position_count,
+                        "gross_payout": str(x.total_payout_amount),
+                        "settled_at": x.executed_at,
+                    }
+                    for x in rows
+                ],
+            )
+        elif resource == "settlement_participants":
+            queryset = _date_filter(request, participants)
+            if request.query_params.get("market"):
+                queryset = queryset.filter(
+                    market_settlement__market_id=request.query_params["market"]
+                )
+            if request.query_params.get("user"):
+                queryset = queryset.filter(participant_id=request.query_params["user"])
+            if status_value == "WON":
+                queryset = queryset.filter(was_winner=True)
+            elif status_value == "LOST":
+                queryset = queryset.filter(was_winner=False)
+            if search:
+                queryset = queryset.filter(
+                    Q(participant__email__icontains=search)
+                    | Q(market_settlement__market__question__icontains=search)
+                    | Q(wallet_ledger_entry__transaction__reference__icontains=search)
+                )
+            page = _page_response(
+                request,
+                queryset.order_by("-created_at"),
+                lambda rows: [
+                    {
+                        "id": str(item.id),
+                        "settlement_id": str(item.market_settlement_id),
+                        "market": item.market_settlement.market.question,
+                        "fan": item.participant.email,
+                        "outcome": item.outcome.label,
+                        "status": "WON" if item.was_winner else "LOST",
+                        "quantity": str(item.settled_quantity),
+                        "gross": str(item.payout_amount),
+                        "fees": str(item.payout_fee_amount),
+                        "net": str(item.net_payout_amount),
+                        "ledger_reference": (_finance_ledger_reference(item.wallet_ledger_entry)),
+                        "created_at": item.created_at,
+                    }
+                    for item in rows
+                ],
+            )
+        elif resource == "refunds":
+            queryset = _date_filter(request, refunds)
+            if request.query_params.get("market"):
+                queryset = queryset.filter(
+                    market_void_refund__market_id=request.query_params["market"]
+                )
+            if search:
+                queryset = queryset.filter(
+                    Q(participant__email__icontains=search)
+                    | Q(wallet_credit_ledger_entry__transaction__reference__icontains=search)
+                )
+            page = _page_response(
+                request,
+                queryset.order_by("-created_at"),
+                lambda rows: [
+                    {
+                        "id": str(x.id),
+                        "fan": x.participant.email,
+                        "market": x.market_void_refund.market.question,
+                        "gross": str(x.refund_amount),
+                        "fees": str(x.refund_fee_amount),
+                        "net": str(x.net_refund_amount),
+                        "ledger_reference": (
+                            _finance_ledger_reference(x.wallet_credit_ledger_entry)
+                        ),
+                        "status": "COMPLETED",
+                        "created_at": x.created_at,
+                    }
+                    for x in rows
+                ],
+            )
+        elif resource == "withdrawals":
+            queryset = _date_filter(request, withdrawals)
+            if status_value:
+                queryset = queryset.filter(status=status_value)
+            if search:
+                queryset = queryset.filter(
+                    Q(wallet__user__email__icontains=search) | Q(id__icontains=search)
+                )
+            page = _page_response(
+                request,
+                queryset.order_by("-created_at"),
+                lambda rows: [
+                    {
+                        "id": str(x.id),
+                        "fan": x.wallet.user.email,
+                        "amount": str(x.amount),
+                        "currency": x.currency,
+                        "status": x.status,
+                        "created_at": x.created_at,
+                    }
+                    for x in rows
+                ],
+            )
+        elif resource == "club_commerce":
+            queryset = _date_filter(request, orders)
+            if status_value:
+                queryset = queryset.filter(status=status_value)
+            if request.query_params.get("club"):
+                queryset = queryset.filter(club_id=request.query_params["club"])
+            if search:
+                queryset = queryset.filter(
+                    Q(user__email__icontains=search)
+                    | Q(payment_transaction__reference__icontains=search)
+                )
+            page = _page_response(
+                request,
+                queryset.order_by("-created_at"),
+                lambda rows: StoreOrderSerializer(rows, many=True).data,
+            )
+        elif resource == "reconciliation_exceptions":
+            queryset = _date_filter(request, exceptions, "detected_at")
+            if status_value:
+                queryset = queryset.filter(resolution_status=status_value)
+            if search:
+                queryset = queryset.filter(
+                    Q(code__icontains=search) | Q(run__reference__icontains=search)
+                )
+            page = _page_response(
+                request,
+                queryset.order_by("-detected_at"),
+                lambda rows: [
+                    {
+                        "id": str(x.id),
+                        "source_id": str(x.run.reference),
+                        "code": x.code,
+                        "expected": str(x.expected_value or Decimal("0")),
+                        "actual": str(x.actual_value or Decimal("0")),
+                        "severity": x.severity,
+                        "status": x.resolution_status,
+                        "detected_at": x.detected_at,
+                    }
+                    for x in rows
+                ],
+            )
+        else:
+            return Response({"detail": "Unknown finance resource."}, status=400)
+        return Response({"overview": overview, "resource": resource, **page})
+
+
+class AdminStoreReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        if not request.user.is_superuser:
+            raise PermissionDenied("Super Admin access is required.")
+        resource = request.query_params.get("resource", "orders")
+        all_orders = StoreOrder.objects.select_related(
+            "club", "user", "payment_transaction", "refund_transaction"
+        ).prefetch_related("items__product", "status_history__changed_by")
+        all_products = MerchandiseProduct.objects.select_related("club")
+        paid = all_orders.exclude(status=StoreOrder.OrderStatus.PENDING)
+        overview = {
+            "total_orders": all_orders.count(),
+            "sales": str(paid.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")),
+            "total_products": all_products.count(),
+            "payments": all_orders.filter(payment_transaction__isnull=False).count(),
+            "refunds": all_orders.filter(refund_transaction__isnull=False).count(),
+            "by_status": {
+                r["status"]: r["count"]
+                for r in all_orders.values("status").annotate(count=Count("id"))
+            },
+        }
+        queryset = all_products if resource == "products" else all_orders
+        if request.query_params.get("club"):
+            queryset = queryset.filter(club_id=request.query_params["club"])
+        if request.query_params.get("status"):
+            queryset = queryset.filter(status=request.query_params["status"])
+        queryset = _date_filter(request, queryset) if resource != "products" else queryset
+        search = request.query_params.get("search", "").strip()
+        if search:
+            if resource == "products":
+                queryset = queryset.filter(
+                    Q(name__icontains=search)
+                    | Q(sku__icontains=search)
+                    | Q(club__name__icontains=search)
+                )
+            else:
+                queryset = queryset.filter(
+                    Q(user__email__icontains=search)
+                    | Q(id__icontains=search)
+                    | Q(payment_transaction__reference__icontains=search)
+                    | Q(refund_transaction__reference__icontains=search)
+                    | Q(delivery_reference__icontains=search)
+                )
+        if resource == "payments":
+            queryset = queryset.filter(payment_transaction__isnull=False)
+        elif resource == "deliveries":
+            queryset = queryset.exclude(status=StoreOrder.OrderStatus.PENDING)
+        elif resource not in {"orders", "products"}:
+            return Response({"detail": "Unknown Store resource."}, status=400)
+        serializer = (
+            (lambda rows: MerchandiseProductSerializer(rows, many=True).data)
+            if resource == "products"
+            else (lambda rows: StoreOrderSerializer(rows, many=True).data)
+        )
+        ordering = "name" if resource == "products" else "-created_at"
+        return Response(
+            {
+                "overview": overview,
+                "resource": resource,
+                **_page_response(request, queryset.order_by(ordering), serializer),
+            }
+        )
+
+
+class AdminStoreOrderDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: StoreOrderSerializer})
+    def get(self, request, order_id):
+        if not request.user.is_superuser:
+            raise PermissionDenied("Super Admin access is required.")
+        order = (
+            StoreOrder.objects.select_related(
+                "club", "user", "payment_transaction", "refund_transaction"
+            )
+            .prefetch_related("items__product", "status_history__changed_by")
+            .filter(id=order_id)
+            .first()
+        )
+        if not order:
+            return Response({"detail": "Order not found."}, status=404)
+        return Response(StoreOrderSerializer(order).data)

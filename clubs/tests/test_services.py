@@ -151,6 +151,80 @@ class TestTicketService:
         product.save(update_fields=["status"])
         assert TicketService.validate_sale(product, 1) is True
 
+    def test_publish_product(self, user, club, admin_workspace):
+        product = TicketService.create_product(
+            club, user, name="Final Ticket", price=Decimal("10000.00")
+        )
+        published = TicketService.publish_product(product, user)
+        assert published.status == TicketProduct.Status.ACTIVE
+        assert published.published_by == user
+
+    def test_create_order_debits_buyer_wallet(self, user, club, admin_workspace):
+        from uuid import uuid4
+
+        from wallets.services.wallet_service import WalletService
+
+        product = TicketService.create_product(
+            club, user, name="Final Ticket", price=Decimal("10000.00"), capacity=10
+        )
+        TicketService.publish_product(product, user)
+        WalletService.credit(
+            user=user,
+            currency="UGX",
+            amount=Decimal("20000.00"),
+            idempotency_reference=uuid4(),
+        )
+
+        order = TicketService.create_order(user, product, quantity=2)
+
+        assert order.status == "PAID"
+        assert order.total_amount == Decimal("20000.00")
+        assert order.code.startswith("TK-")
+        product.refresh_from_db()
+        assert product.sold == 2
+
+    def test_create_order_without_funds_is_cancelled(self, user, club, admin_workspace):
+        from django.core.exceptions import ValidationError
+
+        product = TicketService.create_product(
+            club, user, name="Final Ticket", price=Decimal("10000.00"), capacity=10
+        )
+        TicketService.publish_product(product, user)
+
+        with pytest.raises(ValidationError):
+            TicketService.create_order(user, product, quantity=1)
+
+        product.refresh_from_db()
+        assert product.sold == 0
+        order = product.orders.get()
+        assert order.status == "CANCELLED"
+
+    def test_check_in_marks_order_fulfilled(self, user, club, admin_workspace):
+        from uuid import uuid4
+
+        from wallets.services.wallet_service import WalletService
+
+        product = TicketService.create_product(
+            club, user, name="Final Ticket", price=Decimal("10000.00"), capacity=10
+        )
+        TicketService.publish_product(product, user)
+        WalletService.credit(
+            user=user,
+            currency="UGX",
+            amount=Decimal("10000.00"),
+            idempotency_reference=uuid4(),
+        )
+        order = TicketService.create_order(user, product, quantity=1)
+
+        checked_in = TicketService.check_in(order, user)
+
+        assert checked_in.status == "FULFILLED"
+        assert checked_in.checked_in_by == user
+        assert checked_in.checked_in_at is not None
+
+        with pytest.raises(ValueError):
+            TicketService.check_in(order, user)
+
 
 class TestStoreService:
     def test_create_product(self, user, club, admin_workspace):

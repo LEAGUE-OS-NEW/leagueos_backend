@@ -23,6 +23,7 @@ from wallets.views import (
     WalletDetailView,
     WalletLedgerListView,
     WalletListView,
+    WalletSpendView,
     WithdrawalRequestDetailView,
     WithdrawalRequestView,
 )
@@ -53,6 +54,8 @@ urlpatterns = [
         DepositIntentDetailView.as_view(),
         name="deposit-intent-detail",
     ),
+    # Immediate wallet spends for fan purchases
+    path("spend/", WalletSpendView.as_view(), name="wallet-spend"),
     # Withdrawals
     path("withdrawals/", WithdrawalRequestView.as_view(), name="withdrawal-request-create"),
     path(

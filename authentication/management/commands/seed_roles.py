@@ -453,6 +453,12 @@ SYSTEM_PERMISSIONS = [
         "description": "Manage platform configuration.",
     },
     {
+        "name": "admin.memberships.manage",
+        "resource": "admin",
+        "action": "memberships.manage",
+        "description": "Manage platform membership plans and subscribers.",
+    },
+    {
         "name": "admin.clubs.manage",
         "resource": "admin",
         "action": "clubs.manage",

@@ -12,6 +12,8 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -667,6 +669,15 @@ class TicketOrder(TimeStampedUUIDModel):
     )
     fulfilled_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    code = models.CharField(max_length=32, unique=True, editable=False, blank=True)
+    checked_in_at = models.DateTimeField(null=True, blank=True)
+    checked_in_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="checked_in_ticket_orders",
+    )
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -678,6 +689,11 @@ class TicketOrder(TimeStampedUUIDModel):
 
     def __str__(self) -> str:
         return f"Order {self.id} - {self.product}"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = f"TK-{uuid.uuid4().hex[:10].upper()}"
+        super().save(*args, **kwargs)
 
 
 # =============================================================================
@@ -780,14 +796,22 @@ class MerchandiseProduct(TimeStampedUUIDModel):
             models.Index(fields=["status", "is_featured"]),
             models.Index(fields=["sku", "status"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("sku"), "club", condition=~Q(sku=""), name="unique_club_normalized_sku"
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.club.name} - {self.name}"
 
     def save(self, *args, **kwargs):
         self.name = self.name.strip()
+        self.sku = self.sku.strip().upper()
         if not self.slug:
             self.slug = slugify(self.name)
+        if self.price is not None and not isinstance(self.price, Decimal):
+            self.price = Decimal(str(self.price))
         if self.price is not None and self.price < Decimal("0.00"):
             raise ValidationError({"price": "Price cannot be negative."})
         if self.stock < 0 or self.reserved_stock < 0:
@@ -805,6 +829,49 @@ class MerchandiseProduct(TimeStampedUUIDModel):
         return self.available_stock <= self.low_stock_threshold
 
 
+class ClubPlayer(TimeStampedUUIDModel):
+    """A club-administered squad player entry — distinct from the public
+    discovery app's PlayerProfile, this is the Club Admin's own roster
+    management record."""
+
+    class Status(models.TextChoices):
+        FIT = "FIT", "Fit"
+        INJURED = "INJURED", "Injured"
+        SUSPENDED = "SUSPENDED", "Suspended"
+
+    club = models.ForeignKey(
+        "profiles.Club",
+        on_delete=models.CASCADE,
+        related_name="squad_players",
+    )
+    name = models.CharField(max_length=200)
+    position = models.CharField(max_length=100, blank=True)
+    nationality = models.CharField(max_length=100, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.FIT,
+        db_index=True,
+    )
+    contract_end = models.DateField(null=True, blank=True)
+    market_value = models.CharField(max_length=100, blank=True)
+    jersey_number = models.PositiveSmallIntegerField(null=True, blank=True)
+    photo = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["jersey_number", "name"]
+        indexes = [
+            models.Index(fields=["club", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.club.name} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        self.name = self.name.strip()
+        super().save(*args, **kwargs)
+
+
 class StoreOrder(TimeStampedUUIDModel):
     """Merchandise order."""
 
@@ -812,6 +879,9 @@ class StoreOrder(TimeStampedUUIDModel):
         PENDING = "PENDING", "Pending"
         PAID = "PAID", "Paid"
         PROCESSING = "PROCESSING", "Processing"
+        READY_FOR_COLLECTION = "READY_FOR_COLLECTION", "Ready for collection"
+        SHIPPED = "SHIPPED", "Shipped"
+        DELIVERED = "DELIVERED", "Delivered"
         FULFILLED = "FULFILLED", "Fulfilled"
         CANCELLED = "CANCELLED", "Cancelled"
         REFUNDED = "REFUNDED", "Refunded"
@@ -836,6 +906,23 @@ class StoreOrder(TimeStampedUUIDModel):
     currency = models.CharField(max_length=3, default="UGX")
     shipping_address = models.JSONField(default=dict, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
+    checkout_idempotency_key = models.UUIDField(null=True, blank=True, db_index=True)
+    checkout_group = models.UUIDField(null=True, blank=True, db_index=True)
+    payment_transaction = models.ForeignKey(
+        "wallets.WalletTransaction",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="store_orders",
+    )
+    refund_transaction = models.ForeignKey(
+        "wallets.WalletTransaction",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="refunded_store_orders",
+    )
+    delivery_reference = models.CharField(max_length=255, blank=True)
     fulfilled_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
 
@@ -844,6 +931,13 @@ class StoreOrder(TimeStampedUUIDModel):
         indexes = [
             models.Index(fields=["user", "status", "-created_at"]),
             models.Index(fields=["club", "status", "-created_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "club", "checkout_idempotency_key"],
+                condition=Q(checkout_idempotency_key__isnull=False),
+                name="unique_store_checkout_per_user_club",
+            )
         ]
 
     def __str__(self) -> str:
@@ -879,6 +973,20 @@ class StoreOrderItem(TimeStampedUUIDModel):
     def save(self, *args, **kwargs):
         self.total_price = self.unit_price * self.quantity
         super().save(*args, **kwargs)
+
+
+class StoreOrderStatusHistory(TimeStampedUUIDModel):
+    order = models.ForeignKey(StoreOrder, on_delete=models.PROTECT, related_name="status_history")
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    previous_status = models.CharField(max_length=24, choices=StoreOrder.OrderStatus.choices)
+    new_status = models.CharField(max_length=24, choices=StoreOrder.OrderStatus.choices)
+    note = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"{self.order_id}: {self.previous_status} -> {self.new_status}"
 
 
 # =============================================================================
@@ -998,6 +1106,10 @@ class ClubAuditLog(TimeStampedUUIDModel):
         ("NEWS_SUBMITTED", "News submitted for review"),
         ("MEMBERSHIP_CREATED", "Membership created"),
         ("TICKET_CREATED", "Ticket created"),
+        ("TICKET_PUBLISHED", "Ticket published"),
+        ("TICKET_ORDER_CREATED", "Ticket order created"),
+        ("TICKET_ORDER_PAID", "Ticket order paid"),
+        ("TICKET_SCANNED", "Ticket scanned"),
         ("PRODUCT_CREATED", "Product created"),
         ("INVENTORY_UPDATED", "Inventory updated"),
         ("STAFF_INVITED", "Staff invited"),
@@ -1006,6 +1118,7 @@ class ClubAuditLog(TimeStampedUUIDModel):
         ("ROLE_REVOKED", "Role revoked"),
         ("PERMISSION_CHANGED", "Permission changed"),
         ("ANALYTICS_VIEWED", "Analytics viewed"),
+        ("MATCH_DATA_UPLOADED", "Match data uploaded"),
     ]
 
     club = models.ForeignKey(

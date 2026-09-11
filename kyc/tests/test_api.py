@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APIClient
+from authentication.models import Permission, Role, RolePermission, UserRole
+from authentication.services.permission_service import PermissionService
 from profiles.models import Gender, Country
 from markets.services.eligibility_service import MarketEligibilityService
 from kyc.models import KYCVerification, KYCVerificationAttempt
@@ -40,6 +42,7 @@ def test_unauthenticated_kyc_submission_rejected():
 
 @pytest.mark.django_db
 def test_fan_kyc_submission_success():
+    Country.objects.get_or_create(name="Uganda", iso_code="UG", defaults={"is_active": True})
     user = User.objects.create_user(
         username="fan1", email="fan1@example.com", password="Pass123!Password"
     )
@@ -55,6 +58,10 @@ def test_fan_kyc_submission_success():
     payload = {
         "document_type": "PASSPORT",
         "document_country": "UGA",
+        "profile_country": "UG",
+        "legal_name": "Test Fan",
+        "identity_number": "CM12345678",
+        "date_of_birth": "1990-01-01",
         "document_image": doc_file,
         "selfie_image": selfie_file,
     }
@@ -131,12 +138,12 @@ def _make_admin(username, email):
 
 
 def _seed_pending_verification(fan):
-    """Helper: create a KYCVerification in PENDING state for *fan*."""
+    """Helper: create a KYCVerification in REVIEW state for *fan*."""
     verification, _ = KYCVerification.objects.get_or_create(
         user=fan,
-        defaults={"status": KYCVerification.Status.PENDING},
+        defaults={"status": KYCVerification.Status.REVIEW},
     )
-    verification.status = KYCVerification.Status.PENDING
+    verification.status = KYCVerification.Status.REVIEW
     verification.save(update_fields=["status"])
     return verification
 
@@ -278,24 +285,138 @@ def test_admin_reject_kyc_blocks_eligibility():
 
 
 @pytest.mark.django_db(transaction=True)
-def test_admin_review_decision_keeps_kyc_pending():
+def test_manual_review_endpoint_rejects_non_decision_value():
     fan = _make_fan("fan_rev1", "fan_rev1@example.com")
     admin = _make_admin("adm_rev1", "adm_rev1@example.com")
     verification = _seed_pending_verification(fan)
 
     admin_client = APIClient()
     admin_client.force_authenticate(user=admin)
-    admin_client.post(
+    response = admin_client.post(
         f"/api/v1/admin/kyc/verifications/{verification.id}/review/",
         {"decision": "REVIEW"},
         format="json",
     )
 
     verification.refresh_from_db()
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert verification.status == KYCVerification.Status.REVIEW
 
     result = MarketEligibilityService.evaluate(participant=fan)
     assert result.kyc_eligible is False
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(
+    ("initial_status", "decision"),
+    [
+        (KYCVerification.Status.REJECTED, "VERIFIED"),
+        (KYCVerification.Status.VERIFIED, "REJECTED"),
+        (KYCVerification.Status.RETRY_REQUIRED, "VERIFIED"),
+    ],
+)
+def test_manual_review_rejects_illegal_state_transition(initial_status, decision):
+    fan = _make_fan(f"fan_{initial_status.lower()}", f"{initial_status.lower()}@example.com")
+    admin = _make_admin(
+        f"admin_{initial_status.lower()}", f"admin_{initial_status.lower()}@example.com"
+    )
+    verification = KYCVerification.objects.create(user=fan, status=initial_status)
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post(
+        f"/api/v1/admin/kyc/verifications/{verification.id}/review/",
+        {"decision": decision, "notes": "Must remain unchanged"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    verification.refresh_from_db()
+    assert verification.status == initial_status
+
+
+@pytest.mark.django_db(transaction=True)
+def test_retry_only_succeeds_for_retry_required_with_attempts_remaining():
+    fan = _make_fan("fan_retry", "fan_retry@example.com")
+    verification = KYCVerification.objects.create(
+        user=fan, status=KYCVerification.Status.RETRY_REQUIRED
+    )
+    KYCVerificationAttempt.objects.create(
+        kyc_verification=verification,
+        attempt_number=1,
+        document_type=KYCVerification.DocumentType.PASSPORT,
+        document_image=SimpleUploadedFile("doc.jpg", create_test_image_bytes()),
+        selfie_image=SimpleUploadedFile("selfie.jpg", create_test_image_bytes()),
+    )
+    client = APIClient()
+    client.force_authenticate(user=fan)
+
+    response = client.post("/api/v1/fans/kyc/retry/")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["data"]["can_retry"] is True
+
+
+@pytest.mark.django_db(transaction=True)
+def test_retry_cap_and_terminal_rejection_are_enforced():
+    fan = _make_fan("fan_retry_cap", "fan_retry_cap@example.com")
+    verification = KYCVerification.objects.create(
+        user=fan, status=KYCVerification.Status.RETRY_REQUIRED
+    )
+    for number in range(1, 4):
+        KYCVerificationAttempt.objects.create(
+            kyc_verification=verification,
+            attempt_number=number,
+            document_type=KYCVerification.DocumentType.PASSPORT,
+            document_image=SimpleUploadedFile(f"doc-{number}.jpg", create_test_image_bytes()),
+            selfie_image=SimpleUploadedFile(f"selfie-{number}.jpg", create_test_image_bytes()),
+        )
+    client = APIClient()
+    client.force_authenticate(user=fan)
+
+    assert client.post("/api/v1/fans/kyc/retry/").status_code == status.HTTP_400_BAD_REQUEST
+    verification.status = KYCVerification.Status.REJECTED
+    verification.save(update_fields=["status"])
+    response = client.get("/api/v1/fans/kyc/status/")
+    assert response.data["data"]["can_retry"] is False
+    assert client.post("/api/v1/fans/kyc/retry/").status_code == status.HTTP_400_BAD_REQUEST
+
+
+def _seed_verified_market_role():
+    role = Role.objects.create(name="Verified Market User", display_name="Verified Market User")
+    participate = Permission.objects.create(
+        code="participate_market",
+        name="Participate market",
+        resource="market",
+        action="participate",
+    )
+    RolePermission.objects.create(role=role, permission=participate)
+    for code in ("manage_market", "approve_market", "verify_results"):
+        Permission.objects.create(code=code, name=code, resource="market", action=code)
+    return role
+
+
+@pytest.mark.django_db(transaction=True)
+def test_manual_approval_grants_only_verified_market_user_role_idempotently():
+    role = _seed_verified_market_role()
+    fan = _make_fan("fan_market_role", "fan_market_role@example.com")
+    admin = _make_admin("admin_market_role", "admin_market_role@example.com")
+    verification = _seed_pending_verification(fan)
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    response = client.post(
+        f"/api/v1/admin/kyc/verifications/{verification.id}/review/",
+        {"decision": "VERIFIED"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert UserRole.objects.filter(user=fan, role=role, is_active=True).count() == 1
+    assert PermissionService.has_permission(fan, "participate_market") is True
+    assert PermissionService.has_permission(fan, "manage_market") is False
+    assert PermissionService.has_permission(fan, "approve_market") is False
+    assert PermissionService.has_permission(fan, "verify_results") is False
 
 
 # ---------------------------------------------------------------------------
@@ -320,7 +441,7 @@ def test_non_admin_cannot_review_kyc():
 
     # canonical record must be untouched
     verification.refresh_from_db()
-    assert verification.status == KYCVerification.Status.PENDING
+    assert verification.status == KYCVerification.Status.REVIEW
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +484,9 @@ def test_kyc_submission_persists_dob_and_gender():
     payload = {
         "document_type": "PASSPORT",
         "document_country": "UGA",
+        "profile_country": "UG",
+        "legal_name": "Test Fan",
+        "identity_number": "CM22345678",
         "document_image": doc_file,
         "selfie_image": selfie_file,
         "date_of_birth": "1990-01-01",
@@ -380,6 +504,7 @@ def test_kyc_submission_persists_dob_and_gender():
 @pytest.mark.django_db
 @patch("kyc.views.threading.Thread", _SyncThread)
 def test_kyc_submission_creates_verification():
+    Country.objects.get_or_create(name="Uganda", iso_code="UG", defaults={"is_active": True})
     user = User.objects.create_user(
         username="fan_market", email="fan_market@example.com", password="Pass123!Password"
     )
@@ -394,6 +519,10 @@ def test_kyc_submission_creates_verification():
     payload = {
         "document_type": "PASSPORT",
         "document_country": "UGA",
+        "profile_country": "UG",
+        "legal_name": "Test Fan",
+        "identity_number": "CM32345678",
+        "date_of_birth": "1990-01-01",
         "document_image": doc_file,
         "selfie_image": selfie_file,
     }
@@ -411,6 +540,7 @@ def test_kyc_submission_creates_verification():
 @pytest.mark.django_db
 @patch("kyc.views.threading.Thread", _SyncThread)
 def test_kyc_multistep_preserves_earlier_information():
+    Country.objects.get_or_create(name="Uganda", iso_code="UG", defaults={"is_active": True})
     user = User.objects.create_user(
         username="fan_multi", email="fan_multi@example.com", password="Pass123!Password"
     )
@@ -427,6 +557,9 @@ def test_kyc_multistep_preserves_earlier_information():
     payload = {
         "document_type": "NATIONAL_ID",
         "document_country": "UGA",
+        "profile_country": "UG",
+        "legal_name": "Test Fan",
+        "identity_number": "CM42345678",
         "document_image": doc_file,
         "selfie_image": selfie_file,
         "date_of_birth": "1992-06-15",
@@ -460,7 +593,7 @@ def test_kyc_admin_review_verifies_user():
     )
     client = APIClient()
 
-    verification = KYCVerification.objects.create(user=user)
+    verification = KYCVerification.objects.create(user=user, status=KYCVerification.Status.REVIEW)
     doc_bytes = create_test_image_bytes(width=800, height=600)
     selfie_bytes = create_test_image_bytes(width=600, height=600)
     KYCVerificationAttempt.objects.create(

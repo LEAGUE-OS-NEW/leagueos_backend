@@ -379,6 +379,18 @@ SPECTACULAR_SETTINGS = {
             ("BUY", "Buy"),
             ("SELL", "Sell"),
         ],
+        "PlatformMembershipPlanStatusEnum": [
+            ("DRAFT", "Draft"),
+            ("ACTIVE", "Active"),
+            ("PAUSED", "Paused"),
+            ("ARCHIVED", "Archived"),
+        ],
+        "PlatformMembershipSubscriptionStatusEnum": [
+            ("ACTIVE", "Active"),
+            ("CANCELLED", "Cancelled"),
+            ("EXPIRED", "Expired"),
+            ("PAST_DUE", "Past due"),
+        ],
     },
 }
 
@@ -402,6 +414,13 @@ SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"].update(
             ("PENDING_APPROVAL", "Pending approval"),
             ("PUBLISHED", "Published"),
             ("ARCHIVED", "Archived"),
+        ],
+        "StatusD00Enum": [
+            ("PENDING", "Pending"),
+            ("PAID", "Paid"),
+            ("FULFILLED", "Fulfilled"),
+            ("CANCELLED", "Cancelled"),
+            ("REFUNDED", "Refunded"),
         ],
     }
 )

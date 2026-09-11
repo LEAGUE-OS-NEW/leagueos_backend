@@ -28,6 +28,7 @@ from discovery.serializers import (
     PlayerSerializer,
     SearchQuerySerializer,
     SearchResponseSerializer,
+    SeasonCreateSerializer,
     SuggestionSerializer,
 )
 from discovery.services.club_service import club_service
@@ -323,6 +324,39 @@ class CompetitionListView(ListAPIView):
             qs = qs.filter(sport_id=sport)
 
         return qs.order_by("sport__name", "name")
+
+
+class SeasonCreateView(APIView):
+    """Admin create endpoint for canonical seasons."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = SeasonCreateSerializer
+
+    def post(self, request):
+        from authentication.services.permission_service import PermissionService
+
+        if not PermissionService.has_permission(request.user, "admin.clubs.manage"):
+            return Response(
+                {"detail": "You do not have permission to manage sports data."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = SeasonCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        season = serializer.save()
+        return Response(
+            {
+                "id": str(season.id),
+                "sport": str(season.sport_id),
+                "competition": str(season.competition_id) if season.competition_id else None,
+                "name": season.name,
+                "slug": season.slug,
+                "starts_on": season.starts_on.isoformat() if season.starts_on else None,
+                "ends_on": season.ends_on.isoformat() if season.ends_on else None,
+                "is_active": season.is_active,
+                "is_verified": season.is_verified,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 # =============================================================================

@@ -60,6 +60,7 @@ from markets.lifecycle_views import (
     MarketOpenView,
     MarketRejectView,
     MarketReopenView,
+    MarketRevertToDraftView,
     MarketSubmitView,
     MarketSuspendView,
 )
@@ -74,6 +75,7 @@ from markets.participation_views import (
     MarketOrderListView,
     MarketPositionDetailView,
     MarketPositionListView,
+    MarketParticipationHistoryListView,
 )
 from markets.portfolio_activity_views import MarketPortfolioActivityListView
 from markets.portfolio_views import (
@@ -120,6 +122,7 @@ from markets.result_dispute_views import (
 )
 from markets.result_verification_views import (
     MarketResultDevelopmentAcceleratorView,
+    MarketResultExposureView,
     MarketResultVerificationQueueView,
 )
 from markets.settlement_views import MarketSettlementView
@@ -149,6 +152,11 @@ urlpatterns = [
         "market-admin/result-verification/<uuid:market_id>/dev-end-dispute-window/",
         MarketResultDevelopmentAcceleratorView.as_view(),
         name="admin-result-verification-dev-end-window",
+    ),
+    path(
+        "market-admin/result-verification/<uuid:market_id>/exposure/",
+        MarketResultExposureView.as_view(),
+        name="admin-result-verification-exposure",
     ),
     path(
         "admin/compliance/risk-profiles/",
@@ -429,6 +437,11 @@ urlpatterns = [
         name="market-position-list",
     ),
     path(
+        "market-participations/history/",
+        MarketParticipationHistoryListView.as_view(),
+        name="market-participation-history",
+    ),
+    path(
         "market-positions/<uuid:position_id>/",
         MarketPositionDetailView.as_view(),
         name="market-position-detail",
@@ -507,6 +520,11 @@ urlpatterns = [
         ("market-admin/markets/" "<uuid:market_id>/open/"),
         MarketOpenView.as_view(),
         name="admin-market-open",
+    ),
+    path(
+        ("market-admin/markets/" "<uuid:market_id>/revert-to-draft/"),
+        MarketRevertToDraftView.as_view(),
+        name="admin-market-revert-to-draft",
     ),
     path(
         ("market-admin/markets/" "<uuid:market_id>/suspend/"),

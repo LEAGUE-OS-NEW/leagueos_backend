@@ -27,6 +27,7 @@ urlpatterns = [
     path("api/v1/auth/", include("authentication.urls")),
     path("api/v1/auth/admin/", include("authentication.admin_urls")),
     path("api/v1/admin/", include("platform_admin.urls")),
+    path("api/v1/membership/", include("platform_admin.membership_urls")),
     path("api/v1/", include("dashboard.urls")),
     path("api/v1/", include("clubs.urls")),
     path("api/v1/", include("discovery.urls")),

@@ -7,6 +7,8 @@ from django.core.management.base import (
 )
 from django.db import transaction
 from django.utils import timezone
+from uuid import UUID, uuid5
+from decimal import Decimal
 
 from authentication.services.permission_service import (
     PermissionService,
@@ -16,6 +18,7 @@ from markets.models import (
     MarketCategory,
     MarketScope,
     MarketTemplate,
+    MarketLiquidityProvider,
 )
 from markets.services.catalog_service import (
     MarketCatalogService,
@@ -23,6 +26,9 @@ from markets.services.catalog_service import (
 from markets.services.lifecycle_service import (
     MarketLifecycleService,
 )
+from markets.services.liquidity_service import MarketLiquidityService
+from markets.services.opening_pricing_service import MarketOpeningPricingService
+from wallets.services.wallet_service import WalletService
 from sports.models import (
     Competition,
     EventParticipant,
@@ -32,6 +38,18 @@ from sports.models import (
 )
 
 DEMO_SOURCE = "LEAGUE_OS_DEMO"
+DEMO_LIQUIDITY_NAMESPACE = UUID("8ed08c99-2518-44a0-8922-bc1c81bf68fb")
+DEMO_INITIAL_LIQUIDITY = Decimal("500000")
+DEMO_YES_PROBABILITY = {
+    "Will Vipers SC beat KCCA FC?": 58,
+    "Will Vipers SC vs KCCA FC have over 2.5 goals?": 52,
+    "Will KOBS Rugby Club beat Platinum Credit Heathens?": 55,
+    "Will City Oilers beat Namuwongo Blazers?": 64,
+    "Will KOBS Rugby Club score 3 or more tries in their next league match?": 62,
+    "Will City Oilers win the National Basketball League?": 71,
+    "Will KOBS Rugby Club win the Nile Special Rugby Premiership?": 58,
+    "Will Vipers SC win the Uganda Premier League?": 66,
+}
 
 
 COMPETITIONS = [
@@ -272,6 +290,11 @@ class Command(BaseCommand):
             default="admin@leagueos.com",
             help=("Existing administrator used as the " "creator/approver of demo markets."),
         )
+        parser.add_argument(
+            "--presentation-only",
+            action="store_true",
+            help="Create only the four curated long-horizon presentation markets.",
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -353,21 +376,30 @@ class Command(BaseCommand):
         participants = self._seed_participants(
             sports,
         )
-        events = self._seed_events(
-            sports=sports,
-            competitions=competitions,
-            participants=participants,
-        )
         templates = self._seed_templates(
             categories,
         )
 
-        created_markets = self._seed_event_markets(
-            creator=creator,
-            events=events,
-            categories=categories,
-            templates=templates,
-        )
+        if options["presentation_only"]:
+            created_markets = self._seed_long_horizon_markets(
+                creator=creator,
+                competitions=competitions,
+                participants=participants,
+                categories=categories,
+                templates=templates,
+            )
+        else:
+            events = self._seed_events(
+                sports=sports,
+                competitions=competitions,
+                participants=participants,
+            )
+            created_markets = self._seed_event_markets(
+                creator=creator,
+                events=events,
+                categories=categories,
+                templates=templates,
+            )
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -758,6 +790,39 @@ class Command(BaseCommand):
         market,
         creator,
     ):
+        provider_user, _ = get_user_model().objects.get_or_create(
+            email="liquidity.demo@leagueos.test",
+            defaults={"username": "liquidity.demo@leagueos.test", "is_active": True},
+        )
+        provider, _ = MarketLiquidityProvider.objects.update_or_create(
+            code="DEMO_PLATFORM_TREASURY",
+            defaults={
+                "provider_type": MarketLiquidityProvider.ProviderType.PLATFORM_TREASURY,
+                "user": provider_user,
+                "is_active": True,
+                "display_name": "League OS Demo Liquidity",
+            },
+        )
+        WalletService.credit(
+            user=provider_user,
+            currency="UGX",
+            amount=DEMO_INITIAL_LIQUIDITY,
+            idempotency_reference=uuid5(DEMO_LIQUIDITY_NAMESPACE, str(market.id)),
+            market=market,
+        )
+        MarketOpeningPricingService.configure(
+            market=market,
+            actor=creator,
+            face_value_ugx=market.face_value_ugx,
+            yes_probability=DEMO_YES_PROBABILITY[market.question],
+        )
+        MarketLiquidityService.configure(
+            market=market,
+            actor=creator,
+            initial_liquidity_ugx=DEMO_INITIAL_LIQUIDITY,
+            opening_spread_bps=100,
+            provider=provider,
+        )
         market = MarketLifecycleService.submit(
             market_id=market.id,
             actor=creator,

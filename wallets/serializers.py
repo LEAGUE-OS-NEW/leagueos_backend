@@ -38,17 +38,43 @@ class WalletReadSerializer(serializers.ModelSerializer):
 
 
 class LedgerEntryReadSerializer(serializers.ModelSerializer):
+    transaction_reference = serializers.SerializerMethodField()
+    market_question = serializers.SerializerMethodField()
+
     class Meta:
         model = LedgerEntry
         fields = (
             "id",
+            "entry_type",
             "debit_account",
             "credit_account",
             "amount",
             "currency",
+            "available_balance_before",
+            "available_balance_after",
+            "reserved_balance_before",
+            "reserved_balance_after",
+            "idempotency_reference",
+            "market",
+            "market_question",
+            "order",
+            "fill",
+            "transaction_reference",
             "created_at",
         )
         read_only_fields = fields
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_transaction_reference(self, entry):
+        if entry.transaction_id and entry.transaction:
+            return entry.transaction.reference
+        return None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_market_question(self, entry):
+        if entry.market_id and entry.market:
+            return entry.market.question
+        return None
 
 
 class LedgerEntryFilterSerializer(serializers.Serializer):
@@ -102,6 +128,29 @@ class WithdrawalRequestSerializer(serializers.Serializer):
     currency = serializers.CharField(max_length=3)
     destination = serializers.JSONField()
     idempotency_key = serializers.UUIDField(required=False)
+
+
+class WalletSpendSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        max_digits=16,
+        decimal_places=4,
+        min_value=Decimal("0.01"),
+    )
+    currency = serializers.CharField(max_length=3)
+    description = serializers.CharField(
+        allow_blank=True,
+        required=False,
+        max_length=500,
+    )
+    idempotency_key = serializers.UUIDField(required=False)
+
+
+class WalletSpendReadSerializer(serializers.Serializer):
+    transaction_id = serializers.UUIDField()
+    amount = serializers.DecimalField(max_digits=16, decimal_places=4)
+    currency = serializers.CharField()
+    available_balance = serializers.DecimalField(max_digits=16, decimal_places=4)
+    reference = serializers.CharField()
 
 
 class WithdrawalRequestFilterSerializer(serializers.Serializer):

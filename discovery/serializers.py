@@ -13,6 +13,7 @@ from discovery.models import (
     MatchTimelineEvent,
     News,
     NewsCategory,
+    Season,
 )
 from onboarding.models import UserClubPreference
 from profiles.models import Club
@@ -265,6 +266,62 @@ class CompetitionSerializer(serializers.ModelSerializer):
             "country_code",
             "sport",
         ]
+
+
+class SeasonCreateSerializer(serializers.ModelSerializer):
+    """Admin create serializer for canonical seasons."""
+
+    sport = serializers.PrimaryKeyRelatedField(queryset=Sport.objects.filter(is_active=True))
+    competition = serializers.PrimaryKeyRelatedField(
+        queryset=Competition.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = Season
+        fields = [
+            "id",
+            "sport",
+            "competition",
+            "name",
+            "slug",
+            "starts_on",
+            "ends_on",
+            "is_active",
+            "is_verified",
+        ]
+        read_only_fields = ["id"]
+        extra_kwargs = {
+            # allow_blank=True + default="" lets DRF accept a missing or empty
+            # slug.  The UniqueTogetherValidator for unique_season_identity
+            # (sport + competition + slug) needs to see the *real* slug so it
+            # can actually detect duplicates — that is injected in
+            # to_internal_value() below before the validators run.
+            "slug": {"required": False, "allow_blank": True, "default": ""},
+            # Admin-authored seasons are verified on creation.
+            "is_verified": {"default": True},
+        }
+
+    def to_internal_value(self, data):
+        from django.utils.text import slugify
+
+        # Derive slug from name before UniqueTogetherValidator runs so the
+        # validator can correctly detect duplicates.  The model's save() does
+        # the same derivation, so this is always consistent.
+        mutable = data.copy() if hasattr(data, "copy") else dict(data)
+        if not mutable.get("slug") and mutable.get("name"):
+            mutable["slug"] = slugify(mutable["name"])
+        return super().to_internal_value(mutable)
+
+    def validate(self, attrs):
+        competition = attrs.get("competition")
+        sport = attrs.get("sport")
+        if competition and sport and competition.sport_id != sport.id:
+            raise serializers.ValidationError(
+                {"competition": "Competition sport must match the season sport."}
+            )
+        return attrs
 
 
 # =============================================================================

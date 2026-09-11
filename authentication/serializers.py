@@ -26,14 +26,19 @@ class LoginSerializer(serializers.Serializer):
 
 
 class DashboardEntitlementSerializer(serializers.Serializer):
-    role = serializers.CharField()
-    dashboard_url = serializers.CharField()
+    id = serializers.CharField()
+    dashboard = serializers.CharField()
+    route = serializers.CharField()
+    scope_type = serializers.CharField(allow_null=True)
+    scope_id = serializers.CharField(allow_null=True)
+    workspace_role = serializers.CharField(allow_null=True)
+    permissions = serializers.ListField(child=serializers.CharField())
 
 
 class DashboardAccessSerializer(serializers.Serializer):
+    version = serializers.IntegerField()
+    default_entitlement_id = serializers.CharField(allow_null=True)
     entitlements = DashboardEntitlementSerializer(many=True)
-    default_entitlement = serializers.CharField(allow_null=True)
-    default_route = serializers.CharField()
 
 
 class OnboardingAuthContextSerializer(serializers.Serializer):

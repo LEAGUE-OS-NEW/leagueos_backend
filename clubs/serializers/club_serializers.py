@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from clubs.models import (
     ClubAuditLog,
     ClubMedia,
     ClubNews,
+    ClubPlayer,
     ClubProfileVersion,
     ClubWorkspace,
     MembershipPlan,
@@ -15,6 +19,8 @@ from clubs.models import (
     ProductCategory,
     StaffInvitation,
     StoreOrder,
+    StoreOrderItem,
+    TicketOrder,
     TicketProduct,
 )
 from profiles.models import Club
@@ -207,15 +213,102 @@ class TicketProductSerializer(serializers.ModelSerializer):
         ]
 
 
+class TicketOrderSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    buyer_email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = TicketOrder
+        fields = [
+            "id",
+            "product",
+            "product_name",
+            "buyer_email",
+            "quantity",
+            "unit_price",
+            "total_amount",
+            "currency",
+            "status",
+            "code",
+            "fulfilled_at",
+            "cancelled_at",
+            "checked_in_at",
+            "checked_in_by",
+            "metadata",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "unit_price",
+            "total_amount",
+            "currency",
+            "status",
+            "code",
+            "fulfilled_at",
+            "cancelled_at",
+            "checked_in_at",
+            "checked_in_by",
+            "created_at",
+        ]
+
+
+class FanTicketOrderSerializer(serializers.ModelSerializer):
+    """A fan's own ticket order, shaped for the fan dashboard's "My Tickets"
+    list — sourced from the real event/product relations rather than a
+    per-seat QR/check-in model, which doesn't exist for TicketOrder (one
+    order can cover `quantity` > 1 tickets)."""
+
+    ticket_code = serializers.CharField(source="code", read_only=True)
+    ticket_type_name = serializers.CharField(source="product.name", read_only=True)
+    match_label = serializers.SerializerMethodField()
+    match_date = serializers.SerializerMethodField()
+    venue = serializers.SerializerMethodField()
+    competition_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TicketOrder
+        fields = [
+            "id",
+            "ticket_code",
+            "ticket_type_name",
+            "match_label",
+            "match_date",
+            "venue",
+            "competition_name",
+            "quantity",
+            "status",
+            "created_at",
+        ]
+
+    def get_match_label(self, obj) -> str:
+        event = obj.product.event
+        return (event.name if event else "") or obj.product.name
+
+    def get_match_date(self, obj) -> datetime | None:
+        event = obj.product.event
+        return event.starts_at if event else None
+
+    def get_venue(self, obj) -> str:
+        return obj.product.venue or (obj.product.event.venue if obj.product.event else "")
+
+    def get_competition_name(self, obj) -> str:
+        event = obj.product.event
+        return event.competition.name if event and event.competition else ""
+
+
 class MerchandiseProductSerializer(serializers.ModelSerializer):
     available_stock = serializers.IntegerField(read_only=True)
     is_low_stock = serializers.BooleanField(read_only=True)
+    club_slug = serializers.CharField(source="club.slug", read_only=True)
+    club_name = serializers.CharField(source="club.name", read_only=True)
 
     class Meta:
         model = MerchandiseProduct
         fields = [
             "id",
             "club",
+            "club_slug",
+            "club_name",
             "category",
             "name",
             "slug",
@@ -247,23 +340,155 @@ class MerchandiseProductSerializer(serializers.ModelSerializer):
             "created_by",
         ]
 
+    def validate_sku(self, value):
+        normalized = value.strip().upper()
+        if not normalized:
+            return ""
+        club = self.context.get("club") or getattr(self.instance, "club", None)
+        duplicate = MerchandiseProduct.objects.filter(club=club, sku__iexact=normalized)
+        if self.instance:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if club and duplicate.exists():
+            raise serializers.ValidationError("This SKU already exists for the club.")
+        return normalized
+
+
+class StoreOrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_sku = serializers.CharField(source="product.sku", read_only=True)
+
+    class Meta:
+        model = StoreOrderItem
+        fields = [
+            "id",
+            "product",
+            "product_name",
+            "product_sku",
+            "quantity",
+            "unit_price",
+            "total_price",
+        ]
+        read_only_fields = fields
+
+
+class ClubPlayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClubPlayer
+        fields = [
+            "id",
+            "club",
+            "name",
+            "position",
+            "nationality",
+            "status",
+            "contract_end",
+            "market_value",
+            "jersey_number",
+            "photo",
+        ]
+        read_only_fields = ["id", "club"]
+
 
 class StoreOrderSerializer(serializers.ModelSerializer):
+    items = StoreOrderItemSerializer(many=True, read_only=True)
+    status_history = serializers.SerializerMethodField()
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    club_name = serializers.CharField(source="club.name", read_only=True)
+    payment_reference = serializers.CharField(
+        source="payment_transaction.reference", read_only=True
+    )
+    refund_reference = serializers.CharField(source="refund_transaction.reference", read_only=True)
+    payment = serializers.SerializerMethodField()
+    refund = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_status_history(self, obj):
+        return [
+            {
+                "previous_status": row.previous_status,
+                "new_status": row.new_status,
+                "changed_by": str(row.changed_by_id),
+                "changed_by_email": row.changed_by.email,
+                "note": row.note,
+                "created_at": row.created_at,
+            }
+            for row in obj.status_history.all()
+        ]
+
+    @staticmethod
+    def _transaction(value):
+        if not value:
+            return None
+        return {
+            "id": str(value.id),
+            "reference": value.reference,
+            "provider_reference": value.provider_reference,
+            "amount": str(value.amount),
+            "currency": value.currency,
+            "status": value.status,
+            "created_at": value.created_at,
+            "completed_at": value.completed_at,
+            "ledger_entries": [str(entry.id) for entry in value.ledger_entries.all()],
+        }
+
+    @extend_schema_field(serializers.DictField(allow_null=True))
+    def get_payment(self, obj):
+        return self._transaction(obj.payment_transaction)
+
+    @extend_schema_field(serializers.DictField(allow_null=True))
+    def get_refund(self, obj):
+        return self._transaction(obj.refund_transaction)
+
     class Meta:
         model = StoreOrder
         fields = [
             "id",
             "user",
+            "user_email",
             "club",
+            "club_name",
             "status",
             "total_amount",
             "currency",
             "shipping_address",
             "metadata",
+            "payment_transaction",
+            "payment_reference",
+            "payment",
+            "refund_transaction",
+            "refund_reference",
+            "refund",
+            "checkout_group",
+            "delivery_reference",
+            "status_history",
+            "items",
             "fulfilled_at",
             "cancelled_at",
+            "created_at",
+            "updated_at",
         ]
-        read_only_fields = ["id", "total_amount", "fulfilled_at", "cancelled_at"]
+        read_only_fields = fields
+
+
+class StoreCheckoutItemSerializer(serializers.Serializer):
+    product = serializers.UUIDField()
+    quantity = serializers.IntegerField(min_value=1)
+    size = serializers.CharField(required=False, allow_blank=True)
+
+
+class StoreCheckoutSerializer(serializers.Serializer):
+    idempotency_key = serializers.UUIDField()
+    items = StoreCheckoutItemSerializer(many=True, allow_empty=False)
+    shipping_address = serializers.JSONField(required=False)
+    metadata = serializers.JSONField(required=False)
+
+
+class StoreFulfilmentSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=["PROCESSING", "READY_FOR_COLLECTION", "SHIPPED", "DELIVERED", "CANCELLED"]
+    )
+    note = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    delivery_reference = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
 class ClubAuditLogSerializer(serializers.ModelSerializer):

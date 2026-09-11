@@ -25,6 +25,7 @@ from markets.services.provisional_result_service import (
 from markets.services.result_dispute_service import (
     MarketResultDisputeService,
 )
+from wallets.models import WalletTransaction
 from wallets.services.wallet_service import WalletService
 
 
@@ -139,17 +140,29 @@ class MarketSettlementService:
         ledger_entry = None
 
         if net_payout > Decimal("0.0000"):
+            payout_reference = cls.payout_idempotency_reference(
+                market_id=market.id,
+                position_id=position.id,
+                winning_outcome_id=market.winning_outcome_id,
+                payout_per_unit=cls.PAYOUT_PER_UNIT,
+            )
+            wallet_transaction = WalletTransaction.objects.create(
+                wallet=WalletService.get_or_create_wallet(position.user, cls.MARKET_CURRENCY),
+                reference=str(payout_reference),
+                transaction_type=WalletTransaction.TransactionType.SETTLEMENT_PAYOUT,
+                amount=net_payout,
+                currency=cls.MARKET_CURRENCY,
+                status=WalletTransaction.Status.COMPLETED,
+                completed_at=timezone.now(),
+                description=f"Market settlement payout — {market.question}",
+            )
             ledger_entry = WalletService.credit(
                 user=position.user,
                 currency=cls.MARKET_CURRENCY,
                 amount=net_payout,
-                idempotency_reference=cls.payout_idempotency_reference(
-                    market_id=market.id,
-                    position_id=position.id,
-                    winning_outcome_id=market.winning_outcome_id,
-                    payout_per_unit=cls.PAYOUT_PER_UNIT,
-                ),
+                idempotency_reference=payout_reference,
                 market=market,
+                transaction=wallet_transaction,
             )
 
         if payout_amount > Decimal("0.0000"):
@@ -225,18 +238,25 @@ class MarketSettlementService:
             raise PermissionDenied("You do not have permission to verify or reject results.")
 
     @staticmethod
-    def _require_settleable_market(market):
+    def settleability_errors(market, *, now=None):
+        """Return the non-locking prerequisites shared by reads and execution."""
         errors = {}
+        now = now or timezone.now()
         if market.status != Market.Status.RESOLVED:
             errors["status"] = "Only a resolved market can be settled."
         if not market.winning_outcome_id:
             errors["winning_outcome"] = "A confirmed winning outcome is required."
         elif market.winning_outcome.market_id != market.id:
             errors["winning_outcome"] = "The winning outcome must belong to the market."
-        if market.settles_by is not None and timezone.now() < market.settles_by:
+        if market.settles_by is not None and now < market.settles_by:
             errors["settles_by"] = (
-                "Settlement cannot execute before the configured settlement time."
+                f"Settlement becomes available at {market.settles_by.isoformat()}."
             )
+        return errors
+
+    @classmethod
+    def _require_settleable_market(cls, market):
+        errors = cls.settleability_errors(market)
         if errors:
             raise ValidationError(errors)
 

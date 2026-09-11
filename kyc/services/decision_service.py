@@ -4,6 +4,7 @@ from django.utils import timezone
 from typing import TYPE_CHECKING
 
 from kyc.models import KYCCheckResult, KYCConfiguration, KYCVerification
+from kyc.services.market_access_service import KYCMarketAccessService
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ class KYCDecisionService:
             if not user.is_verified:
                 user.is_verified = True
                 user.save(update_fields=["is_verified", "updated_at"])
+            KYCMarketAccessService.grant_verified_participant_role(user=user)
         elif final_status == KYCVerification.Status.RETRY_REQUIRED:
             verification.retry_reason = reason_code
         elif final_status in (KYCVerification.Status.REJECTED, KYCVerification.Status.REVIEW):
@@ -149,26 +151,19 @@ class KYCDecisionService:
 
         # 3. No hard failures, no fixable retry conditions — the checks that
         # ran all look clean, but a human still makes the final call.
-        # UNCERTAIN face match is accepted (not a hard failure) to avoid blocking users.
-        quality_ok = quality_check and quality_check.status in (
-            KYCCheckResult.Status.PASSED,
-            KYCCheckResult.Status.UNCERTAIN,
-            KYCCheckResult.Status.NOT_APPLICABLE,
-        )
-        face_det_ok = face_det and face_det.status in (
-            KYCCheckResult.Status.PASSED,
-            KYCCheckResult.Status.NOT_APPLICABLE,
-        )
-        face_match_ok = face_match and face_match.status in (
-            KYCCheckResult.Status.PASSED,
-            KYCCheckResult.Status.UNCERTAIN,
-            KYCCheckResult.Status.NOT_APPLICABLE,
-        )
+        # Required checks must positively pass. Missing, unavailable or uncertain
+        # evidence is routed to human review the same as everything else here.
+        quality_ok = quality_check and quality_check.status == KYCCheckResult.Status.PASSED
+        face_det_ok = face_det and face_det.status == KYCCheckResult.Status.PASSED
+        face_match_ok = face_match and face_match.status == KYCCheckResult.Status.PASSED
 
         if quality_ok and face_det_ok and face_match_ok:
             return cls.make_decision(
                 attempt, KYCVerification.Status.REVIEW, "automated_checks_passed"
             )
 
-        # Fallback: no hard failures detected, no fixable retry conditions met.
-        return cls.make_decision(attempt, KYCVerification.Status.REVIEW, "automated_checks_passed")
+        # Fallback: no hard failures detected, no fixable retry conditions met,
+        # but not every required check positively passed either.
+        return cls.make_decision(
+            attempt, KYCVerification.Status.REVIEW, "required_checks_incomplete_or_uncertain"
+        )

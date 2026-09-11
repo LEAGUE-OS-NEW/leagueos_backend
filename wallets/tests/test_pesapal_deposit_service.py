@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from rest_framework.test import APIClient
 
 from authentication.tests.factories import (
     UserFactory,
@@ -219,6 +220,50 @@ class PesapalDepositServiceTests(TestCase):
         self.assertEqual(
             LedgerEntry.objects.filter(entry_type=LedgerEntry.EntryType.CREDIT).count(),
             1,
+        )
+
+    def test_mocked_deposit_is_identical_in_super_admin_finance_report(self):
+        """Acceptance 2: provider reconciliation through ledger through reporting."""
+        deposit, _ = self.start_deposit()
+        self.client.get_transaction_status.return_value = {
+            "payment_method": "Visa",
+            "amount": 10000,
+            "confirmation_code": "CONF-ACCEPT-2",
+            "payment_status_description": "Completed",
+            "description": "",
+            "payment_account": "mock",
+            "status_code": 1,
+            "merchant_reference": deposit.merchant_reference,
+            "currency": "UGX",
+            "status": "200",
+        }
+        PesapalDepositService.reconcile_notification(
+            order_tracking_id="tracking-123",
+            merchant_reference=deposit.merchant_reference,
+            client=self.client,
+        )
+        transaction = WalletTransaction.objects.get(
+            transaction_type=WalletTransaction.TransactionType.DEPOSIT
+        )
+        wallet = Wallet.objects.get(user=self.user, currency="UGX")
+        self.assertEqual(wallet.available_balance, Decimal("10000.0000"))
+        self.assertTrue(transaction.ledger_entries.exists())
+
+        administrator = UserFactory(is_superuser=True, is_staff=True)
+        api = APIClient()
+        api.force_authenticate(administrator)
+        response = api.get(
+            "/api/v1/admin/finance/", {"resource": "deposits", "search": transaction.reference}
+        )
+        self.assertEqual(response.status_code, 200)
+        row = response.data["results"][0]
+        self.assertEqual(row["amount"], "10000.0000")
+        self.assertEqual(row["currency"], "UGX")
+        self.assertEqual(row["internal_reference"], transaction.reference)
+        self.assertEqual(row["provider_reference"], "tracking-123")
+        self.assertEqual(
+            row["ledger_entries"],
+            [str(value) for value in transaction.ledger_entries.values_list("id", flat=True)],
         )
 
     def test_amount_mismatch_never_credits(self):

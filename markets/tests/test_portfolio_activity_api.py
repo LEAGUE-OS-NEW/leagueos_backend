@@ -75,7 +75,16 @@ class MarketPortfolioActivityFixtureMixin(MarketOrderHistoryFixtureMixin):
             price=Decimal(price),
         )
 
-    def settlement(self, *, user=None, outcome=None, winner=True, payout="4.0000", pnl="1.5000"):
+    def settlement(
+        self,
+        *,
+        user=None,
+        outcome=None,
+        winner=True,
+        payout="4.0000",
+        net_payout=None,
+        pnl="1.5000",
+    ):
         parent, _ = MarketSettlement.objects.get_or_create(
             market=self.market,
             defaults={
@@ -104,11 +113,12 @@ class MarketPortfolioActivityFixtureMixin(MarketOrderHistoryFixtureMixin):
             settled_quantity=Decimal("4.0000"),
             payout_per_unit=Decimal("1.0000"),
             payout_amount=Decimal(payout),
+            net_payout_amount=Decimal(net_payout) if net_payout is not None else Decimal(payout),
             cost_basis=Decimal("2.5000"),
             realized_pnl_delta=Decimal(pnl),
         )
 
-    def refund(self, *, user=None, outcome=None, position=None):
+    def refund(self, *, user=None, outcome=None, position=None, net_refund=None):
         parent, _ = MarketVoidRefund.objects.get_or_create(
             market=self.market,
             defaults={"refund_currency": "UGX", "executed_by": self.approver_user},
@@ -131,6 +141,9 @@ class MarketPortfolioActivityFixtureMixin(MarketOrderHistoryFixtureMixin):
             refunded_quantity=Decimal("5.0000"),
             cost_basis=Decimal("2.7500"),
             refund_amount=Decimal("2.7500"),
+            net_refund_amount=(
+                Decimal(net_refund) if net_refund is not None else Decimal("2.7500")
+            ),
             realized_pnl_delta=Decimal("0.0000"),
         )
 
@@ -272,6 +285,19 @@ class MarketPortfolioActivityAPITests(MarketPortfolioActivityFixtureMixin, APITe
         self.assertEqual(event["id"], f"position-void-refund:{row.id}:refund")
         self.assertEqual(event["wallet_amount"], "2.7500")
         self.assertEqual(event["realized_pnl_delta"], "0.0000")
+
+    def test_settlement_and_refund_wallet_amount_is_net_not_gross(self):
+        win = self.settlement(winner=True, payout="4.0000", net_payout="3.8000")
+        event = self.results()["results"][0]
+        self.assertEqual(event["id"], f"position-settlement:{win.id}:win")
+        self.assertEqual(event["wallet_amount"], "3.8000")
+
+        refund_user = UserFactory()
+        row = self.refund(user=refund_user, net_refund="2.6000")
+        self.authenticate(refund_user)
+        event = self.results()["results"][0]
+        self.assertEqual(event["id"], f"position-void-refund:{row.id}:refund")
+        self.assertEqual(event["wallet_amount"], "2.6000")
 
     def test_every_event_type_filter_is_exact_and_participant_scoped(self):
         self.fill()

@@ -5,6 +5,7 @@ from .views import (
     CorrectionViewSet,
     GameweekViewSet,
     LeagueViewSet,
+    MatchStatisticViewSet,
     PlayerViewSet,
     ScoringRuleViewSet,
     TeamViewSet,
@@ -19,4 +20,9 @@ router.register("fantasy/teams", TeamViewSet, basename="fantasy-team")
 router.register("fantasy/leagues", LeagueViewSet, basename="fantasy-league")
 router.register("fantasy/admin/scoring-rules", ScoringRuleViewSet, basename="fantasy-scoring-rule")
 router.register("fantasy/admin/corrections", CorrectionViewSet, basename="fantasy-correction")
+router.register(
+    "fantasy/admin/match-statistics",
+    MatchStatisticViewSet,
+    basename="fantasy-match-statistic",
+)
 urlpatterns = router.urls

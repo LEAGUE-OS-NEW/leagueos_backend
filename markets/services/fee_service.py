@@ -45,16 +45,22 @@ class MarketFeeService:
         }
 
     @classmethod
-    def preview(cls, *, market, quantity, limit_price):
+    def preview(cls, *, market, quantity, limit_price, side="BUY"):
         notional = (Decimal(quantity) * Decimal(limit_price)).quantize(cls.MONEY_QUANTUM)
         schedule, rates = cls.rates(market=market)
         maker_fee = cls.calculate_fee(notional, rates["maker"])
         taker_fee = cls.calculate_fee(notional, rates["taker"])
+        effective_rate = max(rates["maker"], rates["taker"])
+        estimated_fee = max(maker_fee, taker_fee)
         return {
             "estimated_order_notional": notional,
             "estimated_maximum_buyer_reservation": notional + max(maker_fee, taker_fee),
             "estimated_maker_fee": maker_fee,
             "estimated_taker_fee": taker_fee,
+            "effective_fee_bps": effective_rate,
+            "estimated_fee": estimated_fee,
+            "estimated_total_debit": notional + estimated_fee if side == "BUY" else Decimal("0"),
+            "estimated_net_proceeds": notional - estimated_fee if side == "SELL" else Decimal("0"),
             "schedule_id": schedule.id if schedule else None,
             "schedule_version": schedule.version if schedule else 0,
             "currency": cls.CURRENCY,

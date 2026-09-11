@@ -1,6 +1,7 @@
 from django.urls import path
 from kyc.views import (
     AdminKYCDetailView,
+    AdminKYCDocumentServeView,
     AdminKYCDocumentUrlView,
     AdminKYCListView,
     AdminKYCReviewActionView,
@@ -29,6 +30,11 @@ urlpatterns = [
         "admin/kyc/verifications/<uuid:verification_id>/document-url/",
         AdminKYCDocumentUrlView.as_view(),
         name="admin-kyc-document-url",
+    ),
+    path(
+        "admin/kyc/verifications/<uuid:verification_id>/document/",
+        AdminKYCDocumentServeView.as_view(),
+        name="admin-kyc-document-serve",
     ),
     path(
         "admin/kyc/verifications/<uuid:verification_id>/review/",

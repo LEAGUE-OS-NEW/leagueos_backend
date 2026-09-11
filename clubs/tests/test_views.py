@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
+from uuid import uuid4
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -15,9 +18,12 @@ from clubs.models import (
     MembershipPlan,
     MerchandiseProduct,
     StaffInvitation,
+    StoreOrder,
+    StoreOrderItem,
     TicketProduct,
 )
 from profiles.models import Club
+from wallets.services.wallet_service import WalletService
 
 
 @pytest.fixture
@@ -167,6 +173,63 @@ class TestTicketProductViewSet:
         assert response.status_code == 201
         assert TicketProduct.objects.count() == 1
 
+    def test_publish_ticket(self, api_client, user, club, admin_workspace):
+        product = TicketProduct.objects.create(
+            club=club, name="Final", price=Decimal("10000.00"), created_by=user
+        )
+        api_client.force_authenticate(user=user)
+        url = reverse("clubs:ticket-product-publish", kwargs={"club_pk": club.id, "pk": product.id})
+        response = api_client.post(url)
+        assert response.status_code == 200
+        assert response.data["status"] == "ACTIVE"
+
+    def test_purchase_and_scan_flow(self, api_client, user, club, admin_workspace):
+        from uuid import uuid4
+
+        from wallets.services.wallet_service import WalletService
+
+        product = TicketProduct.objects.create(
+            club=club,
+            name="Final",
+            price=Decimal("10000.00"),
+            status=TicketProduct.Status.ACTIVE,
+            created_by=user,
+        )
+        buyer = User.objects.create_user(
+            username="buyer", email="buyer@example.com", password="testpass123"
+        )
+        WalletService.credit(
+            user=buyer,
+            currency="UGX",
+            amount=Decimal("10000.00"),
+            idempotency_reference=uuid4(),
+        )
+
+        api_client.force_authenticate(user=buyer)
+        purchase_url = reverse(
+            "clubs:ticket-product-purchase", kwargs={"club_pk": club.id, "pk": product.id}
+        )
+        purchase_response = api_client.post(purchase_url, {"quantity": 1}, format="json")
+        assert purchase_response.status_code == 201
+        assert purchase_response.data["status"] == "PAID"
+        code = purchase_response.data["code"]
+
+        api_client.force_authenticate(user=user)
+        orders_url = reverse(
+            "clubs:ticket-product-orders", kwargs={"club_pk": club.id, "pk": product.id}
+        )
+        orders_response = api_client.get(orders_url)
+        assert orders_response.status_code == 200
+        assert len(orders_response.data) == 1
+
+        scan_url = reverse("clubs:ticket-order-scan", kwargs={"club_pk": club.id})
+        scan_response = api_client.post(scan_url, {"code": code}, format="json")
+        assert scan_response.status_code == 200
+        assert scan_response.data["status"] == "FULFILLED"
+
+        second_scan = api_client.post(scan_url, {"code": code}, format="json")
+        assert second_scan.status_code == 400
+
 
 class TestMerchandiseProductViewSet:
     def test_create_product(self, api_client, user, club, admin_workspace):
@@ -182,6 +245,107 @@ class TestMerchandiseProductViewSet:
         response = api_client.post(url, data, format="json")
         assert response.status_code == 201
         assert MerchandiseProduct.objects.count() == 1
+
+
+class TestPublicMerchandiseProductListView:
+    def test_list_public_products_without_authentication(self, api_client, club):
+        MerchandiseProduct.objects.create(
+            club=club,
+            name="Public Jersey",
+            description="Visible to fans",
+            price="75000.00",
+            stock=100,
+            sku="PUBLIC-2026",
+            status=MerchandiseProduct.Status.ACTIVE,
+        )
+        MerchandiseProduct.objects.create(
+            club=club,
+            name="Draft Jersey",
+            description="Hidden from fans",
+            price="75000.00",
+            stock=100,
+            sku="DRAFT-2026",
+            status=MerchandiseProduct.Status.DRAFT,
+        )
+
+        url = reverse("clubs:public-merchandise-list")
+        response = api_client.get(url)
+
+        assert response.status_code == 200
+        assert len(response.data) == 1
+        assert response.data[0]["name"] == "Public Jersey"
+        assert response.data[0]["club_slug"] == club.slug
+
+
+class TestPublicStoreOrderCreateView:
+    def test_create_paid_store_order(self, api_client, user, club):
+        api_client.force_authenticate(user=user)
+        WalletService.credit(
+            user=user, currency="UGX", amount="200000.00", idempotency_reference=uuid4()
+        )
+        product = MerchandiseProduct.objects.create(
+            club=club,
+            name="Public Jersey",
+            description="Visible to fans",
+            price="75000.00",
+            stock=100,
+            sku="PUBLIC-2026",
+            status=MerchandiseProduct.Status.ACTIVE,
+        )
+
+        url = reverse("clubs:public-store-order-create")
+        response = api_client.post(
+            url,
+            {
+                "idempotency_key": str(uuid4()),
+                "items": [{"product": str(product.id), "quantity": 2, "size": "M"}],
+                "metadata": {"walletIdempotencyKey": "cart-key"},
+            },
+            format="json",
+        )
+
+        assert response.status_code == 201
+        assert StoreOrder.objects.count() == 1
+        assert StoreOrderItem.objects.count() == 1
+        order = StoreOrder.objects.get()
+        assert order.status == StoreOrder.OrderStatus.PAID
+        assert order.total_amount == product.price * 2
+        product.refresh_from_db()
+        assert product.reserved_stock == 2
+        assert response.data["orders"][0]["items"][0]["product_name"] == "Public Jersey"
+
+    def test_rejects_mixed_club_order(self, api_client, user, club):
+        other_club = Club.objects.create(name="Other Club", slug="other-club")
+        api_client.force_authenticate(user=user)
+        first = MerchandiseProduct.objects.create(
+            club=club,
+            name="Home Jersey",
+            price="75000.00",
+            stock=100,
+            status=MerchandiseProduct.Status.ACTIVE,
+        )
+        second = MerchandiseProduct.objects.create(
+            club=other_club,
+            name="Away Jersey",
+            price="75000.00",
+            stock=100,
+            status=MerchandiseProduct.Status.ACTIVE,
+        )
+
+        url = reverse("clubs:public-store-order-create")
+        response = api_client.post(
+            url,
+            {
+                "items": [
+                    {"product": str(first.id), "quantity": 1},
+                    {"product": str(second.id), "quantity": 1},
+                ],
+            },
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert StoreOrder.objects.count() == 0
 
 
 class TestStaffInvitationViewSet:

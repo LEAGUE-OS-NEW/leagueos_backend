@@ -9,6 +9,7 @@ from .models import (
     FantasyPlayerGameweekPoints,
     FantasyScoringCorrection,
     FantasyScoringRule,
+    FantasyStatisticReview,
     FantasyTeam,
     FantasyTeamGameweekScore,
     FantasyTeamPlayer,
@@ -28,5 +29,6 @@ for model in [
     FantasyPlayerGameweekPoints,
     FantasyScoringCorrection,
     FantasyTeamGameweekScore,
+    FantasyStatisticReview,
 ]:
     admin.site.register(model)

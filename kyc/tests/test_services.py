@@ -8,6 +8,8 @@ from kyc.services.risk_engine import KYCRiskEngine
 from kyc.services.decision_service import KYCDecisionService
 from kyc.services.ocr_service import OCRService
 from kyc.tests.helpers import create_test_image_bytes
+from authentication.models import Permission, Role, RolePermission, UserRole
+from authentication.services.permission_service import PermissionService
 
 User = get_user_model()
 
@@ -177,7 +179,7 @@ def test_auto_verify_high_risk_passing_checks():
 
 
 @pytest.mark.django_db
-def test_auto_verify_uncertain_face_match():
+def test_uncertain_face_match_requires_review():
     user = User.objects.create_user(
         username="uncertain_user", email="uncertain@example.com", password="Pass123!Password"
     )
@@ -217,7 +219,7 @@ def test_auto_verify_uncertain_face_match():
 
 
 @pytest.mark.django_db
-def test_auto_verify_fallback_requires_review():
+def test_incomplete_checks_fallback_to_review():
     user = User.objects.create_user(
         username="fallback_user", email="fallback@example.com", password="Pass123!Password"
     )
@@ -234,3 +236,69 @@ def test_auto_verify_fallback_requires_review():
     decision = KYCDecisionService.run_decision_engine(attempt)
     assert decision.status == KYCVerification.Status.REVIEW
     assert user.is_verified is False
+
+
+@pytest.mark.django_db
+def test_recoverable_quality_failure_requires_retry_before_attempt_cap():
+    user = User.objects.create_user(
+        username="quality_retry", email="quality_retry@example.com", password="Pass123!Password"
+    )
+    verification = KYCVerification.objects.create(user=user)
+    img_bytes = create_test_image_bytes()
+    attempt = KYCVerificationAttempt.objects.create(
+        kyc_verification=verification,
+        attempt_number=1,
+        document_type=KYCVerification.DocumentType.PASSPORT,
+        document_image=SimpleUploadedFile("doc.jpg", img_bytes),
+        selfie_image=SimpleUploadedFile("selfie.jpg", img_bytes),
+    )
+    KYCCheckResult.objects.create(
+        kyc_verification=verification,
+        kyc_attempt=attempt,
+        check_type=KYCCheckResult.CheckType.IMAGE_QUALITY,
+        status=KYCCheckResult.Status.FAILED,
+    )
+
+    decision = KYCDecisionService.run_decision_engine(attempt)
+
+    assert decision.status == KYCVerification.Status.RETRY_REQUIRED
+    assert decision.retry_reason == "poor_image_quality"
+
+
+@pytest.mark.django_db
+def test_automated_verification_grants_participant_role_idempotently_without_admin_access():
+    role = Role.objects.create(name="Verified Market User", display_name="Verified Market User")
+    participate = Permission.objects.create(
+        code="participate_market",
+        name="Participate market",
+        resource="market",
+        action="participate",
+    )
+    RolePermission.objects.create(role=role, permission=participate)
+    for code in ("manage_market", "approve_market", "verify_results"):
+        Permission.objects.create(code=code, name=code, resource="market", action=code)
+    user = User.objects.create_user(
+        username="automated_role", email="automated_role@example.com", password="Pass123!Password"
+    )
+    verification = KYCVerification.objects.create(user=user)
+    img_bytes = create_test_image_bytes()
+    attempt = KYCVerificationAttempt.objects.create(
+        kyc_verification=verification,
+        attempt_number=1,
+        document_type=KYCVerification.DocumentType.PASSPORT,
+        document_image=SimpleUploadedFile("doc.jpg", img_bytes),
+        selfie_image=SimpleUploadedFile("selfie.jpg", img_bytes),
+    )
+
+    KYCDecisionService.make_decision(
+        attempt, KYCVerification.Status.VERIFIED, "automated_checks_passed"
+    )
+    KYCDecisionService.make_decision(
+        attempt, KYCVerification.Status.VERIFIED, "automated_checks_passed"
+    )
+
+    assert UserRole.objects.filter(user=user, role=role, is_active=True).count() == 1
+    assert PermissionService.has_permission(user, "participate_market") is True
+    assert PermissionService.has_permission(user, "manage_market") is False
+    assert PermissionService.has_permission(user, "approve_market") is False
+    assert PermissionService.has_permission(user, "verify_results") is False

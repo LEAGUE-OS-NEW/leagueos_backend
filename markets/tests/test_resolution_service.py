@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -30,6 +31,7 @@ from markets.services.lifecycle_service import (
 from markets.services.resolution_service import (
     MarketResolutionService,
 )
+from notifications.models import NotificationCategory
 from sports.models import (
     Competition,
     Sport,
@@ -81,6 +83,10 @@ class MarketResolutionServiceTests(TestCase):
         UserRoleFactory(
             user=self.approver_user,
             role=self.approval_role,
+        )
+
+        NotificationCategory.objects.get_or_create(
+            code="MARKET_SETTLEMENTS", defaults={"name": "Market Settlements"}
         )
 
         self.football = Sport.objects.create(
@@ -638,3 +644,41 @@ class MarketResolutionServiceTests(TestCase):
             voided_market.status,
             Market.Status.VOIDED,
         )
+
+    def test_resolve_requests_a_market_awaiting_settlement_alert(self):
+        # OperationalAlertService.create() schedules its actual notification
+        # creation on transaction.on_commit(), iterating a permission-scoped
+        # queryset internally — a pre-existing Django test-transaction quirk
+        # (unrelated to this call site) makes that unreliable to exercise
+        # end-to-end under TestCase's savepoint-wrapped transactions, even
+        # though it's confirmed correct live against the real database. So
+        # this asserts the call itself, not the notification it schedules —
+        # the notification delivery mechanism is covered separately in
+        # markets/tests/test_market_settlement.py and test_void_refund.py.
+        market = self.close_market(self.create_market(question="Alert resolve market"))
+
+        with patch(
+            "notifications.services.operational_alert_service.OperationalAlertService.create"
+        ) as mock_create:
+            self.resolve_market(market)
+
+        mock_create.assert_called_once()
+        call_kwargs = mock_create.call_args.kwargs
+        self.assertEqual(call_kwargs["event_type"], "MARKET_AWAITING_SETTLEMENT")
+        self.assertEqual(
+            set(call_kwargs["permissions"]),
+            {"approve_market", "verify_results", "reject_result"},
+        )
+
+    def test_void_requests_a_market_awaiting_refund_alert(self):
+        market = self.approve_market(self.create_market(question="Alert void market"))
+
+        with patch(
+            "notifications.services.operational_alert_service.OperationalAlertService.create"
+        ) as mock_create:
+            self.void_market(market)
+
+        mock_create.assert_called_once()
+        call_kwargs = mock_create.call_args.kwargs
+        self.assertEqual(call_kwargs["event_type"], "MARKET_AWAITING_REFUND")
+        self.assertEqual(call_kwargs["permissions"], ("approve_market",))

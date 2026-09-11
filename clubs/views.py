@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
+from django.db.models import F
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from discovery.models import News
@@ -20,6 +24,7 @@ from clubs.models import (
     ClubAuditLog,
     ClubMedia,
     ClubNews,
+    ClubPlayer,
     ClubProfileVersion,
     ClubWorkspace,
     MembershipPlan,
@@ -27,6 +32,7 @@ from clubs.models import (
     ProductCategory,
     StaffInvitation,
     StoreOrder,
+    TicketOrder,
     TicketProduct,
 )
 from clubs.permissions import IsClubAdmin, IsClubStaff
@@ -39,16 +45,22 @@ from clubs.serializers.club_serializers import (
     ClubLogoUploadSerializer,
     ClubMediaSerializer,
     ClubNewsSerializer,
+    ClubPlayerSerializer,
     ClubProfileVersionSerializer,
     ClubWorkspaceSerializer,
+    FanTicketOrderSerializer,
     MembershipPlanSerializer,
     MerchandiseProductSerializer,
     ProductCategorySerializer,
+    StoreCheckoutSerializer,
+    StoreFulfilmentSerializer,
     StaffInvitationAcceptSerializer,
     StaffInvitationSerializer,
     StoreOrderSerializer,
+    TicketOrderSerializer,
     TicketProductSerializer,
 )
+from clubs.services.store_service import store_service
 from profiles.models import Club
 
 
@@ -273,6 +285,93 @@ class TicketProductViewSet(viewsets.ModelViewSet):
         club = Club.objects.get(id=club_id)
         serializer.save(club=club, created_by=self.request.user)
 
+    def get_permissions(self):
+        # The manual `path()` routing in clubs/urls.py doesn't go through a
+        # DRF router, so `@action(permission_classes=...)` kwargs never
+        # reach the view — override explicitly for the one action (buying a
+        # ticket) that isn't club-staff-only.
+        if self.action == "purchase":
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
+    @action(detail=True, methods=["post"], permission_classes=[IsClubStaff])
+    def publish(self, request, club_pk=None, pk=None):
+        product = self.get_object()
+        from clubs.services.ticket_service import TicketService
+
+        published = TicketService.publish_product(product, request.user)
+        serializer = self.get_serializer(published)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], permission_classes=[IsClubStaff])
+    def orders(self, request, club_pk=None, pk=None):
+        product = self.get_object()
+        orders = product.orders.select_related("user").order_by("-created_at")
+        serializer = TicketOrderSerializer(orders, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def purchase(self, request, club_pk=None, pk=None):
+        product = self.get_object()
+        quantity = int(request.data.get("quantity") or 1)
+        if quantity < 1:
+            return Response(
+                {"quantity": "Quantity must be at least 1."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from clubs.services.ticket_service import TicketService
+
+        try:
+            order = TicketService.create_order(request.user, product, quantity=quantity)
+        except (ValueError, DjangoValidationError) as exc:
+            detail = exc.message_dict if isinstance(exc, DjangoValidationError) else str(exc)
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = TicketOrderSerializer(order)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class TicketOrderScanView(APIView):
+    permission_classes = [IsClubStaff]
+    serializer_class = TicketOrderSerializer
+
+    def post(self, request, club_pk=None):
+        code = str(request.data.get("code") or "").strip()
+        if not code:
+            return Response({"code": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            order = TicketOrder.objects.select_related("product").get(
+                code=code, product__club_id=club_pk
+            )
+        except TicketOrder.DoesNotExist:
+            return Response(
+                {"detail": "No ticket found for this code."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        from clubs.services.ticket_service import TicketService
+
+        try:
+            checked_in = TicketService.check_in(order, request.user)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = TicketOrderSerializer(checked_in)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class FanTicketOrderListView(generics.ListAPIView):
+    """A fan's own ticket purchases across every club — distinct from the
+    club-scoped, IsClubStaff-gated `orders` action on TicketProductViewSet."""
+
+    serializer_class = FanTicketOrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.ticket_orders.select_related(
+            "product", "product__event", "product__event__competition"
+        ).order_by("-created_at")
+
 
 class MerchandiseProductViewSet(viewsets.ModelViewSet):
     serializer_class = MerchandiseProductSerializer
@@ -283,10 +382,93 @@ class MerchandiseProductViewSet(viewsets.ModelViewSet):
             "-is_featured", "name"
         )
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["club"] = Club.objects.get(id=self.kwargs.get("club_pk"))
+        return context
+
     def perform_create(self, serializer):
         club_id = self.kwargs.get("club_pk")
         club = Club.objects.get(id=club_id)
-        serializer.save(club=club, created_by=self.request.user)
+        try:
+            serializer.save(club=club, created_by=self.request.user)
+        except IntegrityError as exc:
+            raise DRFValidationError({"sku": "This SKU already exists for the club."}) from exc
+
+
+class PublicMerchandiseProductListView(generics.ListAPIView):
+    """Public catalog of active, in-stock club merchandise."""
+
+    serializer_class = MerchandiseProductSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        queryset = (
+            MerchandiseProduct.objects.filter(
+                status=MerchandiseProduct.Status.ACTIVE,
+                stock__gt=F("reserved_stock"),
+                club__is_active=True,
+            )
+            .select_related("club", "category")
+            .order_by("-is_featured", "-created_at", "name")
+        )
+
+        club = self.request.query_params.get("club")
+        category = self.request.query_params.get("category")
+        if club:
+            queryset = queryset.filter(club__slug=club)
+        if category:
+            queryset = queryset.filter(metadata__cat=category)
+
+        return queryset
+
+
+class PublicStoreOrderCreateView(APIView):
+    """Atomically price, debit and create one or more club orders."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = StoreCheckoutSerializer
+
+    def post(self, request):
+        serializer = StoreCheckoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            orders = store_service.checkout(
+                user=request.user,
+                items_data=serializer.validated_data["items"],
+                idempotency_key=serializer.validated_data["idempotency_key"],
+                shipping_address=serializer.validated_data.get("shipping_address") or {},
+                metadata=serializer.validated_data.get("metadata") or {},
+            )
+        except (ValueError, DjangoValidationError) as exc:
+            detail = (
+                getattr(exc, "message_dict", None) or getattr(exc, "messages", None) or str(exc)
+            )
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"orders": StoreOrderSerializer(orders, many=True).data}, status=status.HTTP_201_CREATED
+        )
+
+
+@extend_schema_view(
+    list=extend_schema(operation_id="api_v1_club_players_list"),
+    retrieve=extend_schema(operation_id="api_v1_club_players_retrieve"),
+)
+class ClubPlayerViewSet(viewsets.ModelViewSet):
+    serializer_class = ClubPlayerSerializer
+    permission_classes = [IsClubStaff]
+
+    def get_queryset(self):
+        return ClubPlayer.objects.filter(club_id=self.kwargs.get("club_pk")).order_by(
+            "jersey_number", "name"
+        )
+
+    def perform_create(self, serializer):
+        club_id = self.kwargs.get("club_pk")
+        club = Club.objects.get(id=club_id)
+        serializer.save(club=club)
 
 
 class ProductCategoryViewSet(viewsets.ModelViewSet):
@@ -309,7 +491,28 @@ class StoreOrderViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsClubStaff]
 
     def get_queryset(self):
-        return StoreOrder.objects.filter(club_id=self.kwargs.get("club_pk")).order_by("-created_at")
+        return (
+            StoreOrder.objects.filter(club_id=self.kwargs.get("club_pk"))
+            .select_related("user", "club", "payment_transaction")
+            .prefetch_related("items__product", "status_history")
+            .order_by("-created_at")
+        )
+
+    @action(detail=True, methods=["post"])
+    def fulfilment(self, request, club_pk=None, pk=None):
+        serializer = StoreFulfilmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            order = store_service.transition_order(
+                order=self.get_object(),
+                actor=request.user,
+                new_status=serializer.validated_data["status"],
+                note=serializer.validated_data.get("note", ""),
+                delivery_reference=serializer.validated_data.get("delivery_reference", ""),
+            )
+        except DjangoValidationError as exc:
+            return Response(getattr(exc, "message_dict", {"detail": exc.messages}), status=400)
+        return Response(StoreOrderSerializer(order).data)
 
 
 class ClubAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
@@ -526,3 +729,204 @@ class StaffInvitationAcceptView(APIView):
             return Response({"detail": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(ClubWorkspaceSerializer(workspace).data, status=status.HTTP_200_OK)
+
+
+# =============================================================================
+# Match Data Upload (Club Admin CSV import)
+# =============================================================================
+
+
+class ClubFixtureListView(APIView):
+    """Return fixtures that involve the requesting Club Admin's club.
+
+    Used to populate the fixture-picker dropdown before uploading a CSV.
+
+    GET /api/v1/<club_pk>/match-data/fixtures/
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="List fixtures available for match data upload",
+        responses={200: {"type": "array", "items": {"type": "object"}}},
+    )
+    def get(self, request, club_pk=None):
+        club = _get_club_or_404(club_pk)
+
+        from discovery.models import ClubProfile
+        from sports.models import EventParticipant, Participant, SportingEvent
+
+        # Collect all participant IDs (ATHLETE + TEAM) linked to this club
+        athlete_ids = set(
+            Participant.objects.filter(player_profile__club=club).values_list("id", flat=True)
+        )
+
+        # Events where any of the club's athletes participate directly
+        fixture_ids_via_athletes = set(
+            EventParticipant.objects.filter(participant_id__in=athlete_ids).values_list(
+                "event_id", flat=True
+            )
+        )
+
+        # Events in the club's league (ClubProfile.league)
+        club_profile = ClubProfile.objects.filter(club=club).first()
+        league_id = club_profile.league_id if club_profile else None
+        fixture_ids_via_league: set = set()
+        if league_id:
+            fixture_ids_via_league = set(
+                SportingEvent.objects.filter(competition_id=league_id).values_list("id", flat=True)
+            )
+
+        all_fixture_ids = fixture_ids_via_athletes | fixture_ids_via_league
+
+        fixtures = (
+            SportingEvent.objects.filter(
+                id__in=all_fixture_ids,
+            )
+            .select_related("competition")
+            .prefetch_related("event_participants__participant")
+            .order_by("-starts_at")
+        )
+
+        data = []
+        for f in fixtures:
+            participants = list(f.event_participants.select_related("participant").all())
+            home_team = next(
+                (ep.participant.name for ep in participants if ep.role == "HOME"), None
+            )
+            away_team = next(
+                (ep.participant.name for ep in participants if ep.role == "AWAY"), None
+            )
+            data.append(
+                {
+                    "id": str(f.id),
+                    "name": f.name,
+                    "starts_at": f.starts_at,
+                    "status": f.status,
+                    "competition": f.competition.name if f.competition else None,
+                    "home_team": home_team,
+                    "away_team": away_team,
+                }
+            )
+
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class ClubMatchDataUploadView(APIView):
+    """Accept a CSV file and import match player statistics for a fixture.
+
+    The entire file is validated before any row is written.  On success,
+    ``SportsFeedService.complete_ingestion()`` is called inside the same
+    ``transaction.atomic()`` block, which schedules
+    ``score_affected_gameweeks.delay()`` via ``transaction.on_commit()``.
+    The Club Admin never needs to click Recalculate.
+
+    POST /api/v1/<club_pk>/match-data/upload/
+    Content-Type: multipart/form-data
+    Body: file=<csv>
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="Upload match player statistics CSV",
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {"file": {"type": "string", "format": "binary"}},
+            }
+        },
+        responses={
+            202: {"description": "Import accepted; fantasy scoring scheduled."},
+            400: {"description": "Validation failure with row-level errors."},
+        },
+    )
+    def post(self, request, club_pk=None):
+        from clubs.serializers.match_data_serializers import MatchDataUploadSerializer
+        from clubs.services.match_data_service import import_csv_for_club
+
+        club = _get_club_or_404(club_pk)
+
+        serializer = MatchDataUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        result = import_csv_for_club(
+            file_obj=serializer.validated_data["file"],
+            club=club,
+            uploaded_by=request.user,
+        )
+
+        if not result.success:
+            payload = {
+                "success": False,
+                "message": result.message,
+                "records_received": result.records_received,
+                "row_errors": result.row_errors,
+            }
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        payload = {
+            "success": True,
+            "message": result.message,
+            "records_received": result.records_received,
+            "records_processed": result.records_processed,
+            "ingestion_id": result.ingestion_id,
+            "fixture_ids": result.fixture_ids,
+        }
+        return Response(payload, status=status.HTTP_202_ACCEPTED)
+
+
+class ClubMatchDataTemplateView(APIView):
+    """Return a downloadable CSV template for the Club Admin.
+
+    GET /api/v1/<club_pk>/match-data/template/
+
+    Optionally pass ?sport=<sport_slug_or_name> to get sport-specific
+    example stat_type values.
+    """
+
+    permission_classes = [IsClubAdmin]
+
+    @extend_schema(
+        tags=["Club Match Data"],
+        summary="Download CSV template for match data upload",
+        responses={200: {"description": "CSV file download."}},
+    )
+    def get(self, request, club_pk=None):
+        from django.http import HttpResponse
+
+        from clubs.services.match_data_service import generate_csv_template
+        from sports.models import Sport
+
+        _get_club_or_404(club_pk)  # permission check: club must exist
+
+        sport_param = request.query_params.get("sport", "")
+        sport = None
+        if sport_param:
+            sport = (
+                Sport.objects.filter(slug__iexact=sport_param).first()
+                or Sport.objects.filter(name__iexact=sport_param).first()
+            )
+
+        csv_content = generate_csv_template(sport=sport)
+        response = HttpResponse(csv_content, content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="match_data_template.csv"'
+        return response
+
+
+# ---------------------------------------------------------------------------
+# Internal helper used by the three views above
+# ---------------------------------------------------------------------------
+
+
+def _get_club_or_404(club_pk):
+    """Return the Club instance or raise Http404."""
+    from django.http import Http404
+
+    try:
+        return Club.objects.get(id=club_pk)
+    except Club.DoesNotExist as err:
+        raise Http404(f"Club {club_pk} not found.") from err
