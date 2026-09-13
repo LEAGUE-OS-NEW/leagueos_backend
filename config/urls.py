@@ -1,5 +1,7 @@
 from django.contrib import admin
-from django.urls import include, path
+from django.conf import settings
+from django.urls import include, path, re_path
+from django.views.static import serve
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -47,3 +49,12 @@ urlpatterns = [
     path("api/v1/system/", include("system.urls")),
     path("api/v1/", include("kyc.urls")),
 ]
+
+if getattr(settings, "STORAGE_BACKEND", "local") == "local":
+    urlpatterns += [
+        re_path(
+            r"^media/(?P<path>.*)$",
+            serve,
+            {"document_root": settings.MEDIA_ROOT},
+        ),
+    ]
