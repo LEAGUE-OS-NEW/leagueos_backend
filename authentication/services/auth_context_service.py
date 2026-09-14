@@ -39,7 +39,11 @@ class AuthContextService:
     """Build the single authenticated-user contract used by auth endpoints."""
 
     @staticmethod
-    def _build_dashboard_access(roles, permissions_by_role_id: dict) -> dict:
+    def _build_dashboard_access(
+        roles,
+        permissions_by_role_id: dict,
+        club_workspaces=None,
+    ) -> dict:
         """
         Build the dashboard_access contract that the frontend's
         validateDashboardAccess() accepts.
@@ -63,6 +67,8 @@ class AuthContextService:
         """
         entitlements = []
         seen_dashboards: set[str] = set()
+        seen_club_workspaces: set[str] = set()
+        club_workspaces = list(club_workspaces or [])
 
         for role in roles:
             dashboard = _ROLE_NAME_TO_DASHBOARD_IDENTIFIER.get(role.name)
@@ -71,6 +77,49 @@ class AuthContextService:
                 # Holder) produce no entitlement — the frontend has no route
                 # for them.
                 continue
+            route = _DASHBOARD_IDENTIFIER_TO_ROUTE.get(dashboard, "")
+            role_permissions = permissions_by_role_id.get(role.id, [])
+
+            if dashboard == "CLUB_ADMIN" and club_workspaces:
+                for workspace in club_workspaces:
+                    workspace_id = str(workspace.id)
+                    if workspace_id in seen_club_workspaces:
+                        continue
+
+                    seen_club_workspaces.add(workspace_id)
+                    workspace_permissions = (
+                        workspace.permissions
+                        if isinstance(workspace.permissions, list)
+                        else []
+                    )
+                    workspace_role = (
+                        "CLUB_ADMIN"
+                        if workspace.role == "ADMIN"
+                        else "CLUB_SPECIALIST_STAFF"
+                    )
+
+                    entitlements.append(
+                        {
+                            "id": f"{dashboard.lower()}-{workspace_id[:8]}",
+                            "dashboard": dashboard,
+                            "route": route,
+                            "scope_type": "CLUB",
+                            "scope_id": str(workspace.club_id),
+                            "workspace_role": workspace_role,
+                            "permissions": sorted(
+                                {
+                                    *role_permissions,
+                                    *[
+                                        permission
+                                        for permission in workspace_permissions
+                                        if isinstance(permission, str)
+                                    ],
+                                }
+                            ),
+                        }
+                    )
+                continue
+
             # Deduplicate: multiple roles that map to the same dashboard
             # (e.g. Club Admin + Club Specialist Staff → CLUB_ADMIN) only
             # produce one entitlement.  The first (highest-priority) wins.
@@ -78,9 +127,7 @@ class AuthContextService:
                 continue
             seen_dashboards.add(dashboard)
 
-            route = _DASHBOARD_IDENTIFIER_TO_ROUTE.get(dashboard, "")
             entitlement_id = f"{dashboard.lower()}-{str(role.id)[:8]}"
-            role_permissions = permissions_by_role_id.get(role.id, [])
 
             entitlements.append(
                 {
@@ -127,8 +174,13 @@ class AuthContextService:
 
     @staticmethod
     def user_context(user) -> dict:
+        from clubs.models import ClubWorkspace
+
         roles = RoleService.get_user_roles(user)
         role_ids = [role.id for role in roles]
+        club_workspaces = list(
+            ClubWorkspace.objects.filter(user=user, is_active=True).select_related("club")
+        )
 
         # Fetch all permissions for this user's roles in one query, grouped
         # by role id so _build_dashboard_access can embed them per-entitlement.
@@ -161,7 +213,7 @@ class AuthContextService:
             "permissions": permissions,
             "club": AuthContextService._active_club(user),
             "dashboard_access": AuthContextService._build_dashboard_access(
-                roles, permissions_by_role_id
+                roles, permissions_by_role_id, club_workspaces
             ),
             "onboarding": {
                 "completed": bool(onboarding and onboarding.completed),
