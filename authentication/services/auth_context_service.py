@@ -88,14 +88,10 @@ class AuthContextService:
 
                     seen_club_workspaces.add(workspace_id)
                     workspace_permissions = (
-                        workspace.permissions
-                        if isinstance(workspace.permissions, list)
-                        else []
+                        workspace.permissions if isinstance(workspace.permissions, list) else []
                     )
                     workspace_role = (
-                        "CLUB_ADMIN"
-                        if workspace.role == "ADMIN"
-                        else "CLUB_SPECIALIST_STAFF"
+                        "CLUB_ADMIN" if workspace.role == "ADMIN" else "CLUB_SPECIALIST_STAFF"
                     )
 
                     entitlements.append(
