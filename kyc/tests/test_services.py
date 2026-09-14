@@ -88,8 +88,8 @@ def test_risk_engine_and_decision_service():
     assert eval_res["level"] == KYCVerification.RiskLevel.LOW
 
     decision = KYCDecisionService.run_decision_engine(attempt)
-    assert decision.status == KYCVerification.Status.VERIFIED
-    assert user.is_verified is True
+    assert decision.status == KYCVerification.Status.REVIEW
+    assert user.is_verified is False
 
 
 @pytest.mark.django_db

@@ -55,7 +55,9 @@ class MarketPortfolioService:
     def list_positions(cls, *, user, filters=None, as_of=None):
         filters = filters or {}
         as_of = as_of or timezone.now()
-        queryset = MarketPosition.objects.filter(user=user, quantity__gt=Decimal("0"))
+        queryset = MarketPosition.objects.filter(user=user).filter(
+            Q(quantity__gt=Decimal("0")) | Q(settlement_record__isnull=False)
+        )
         for field in ("market_id", "outcome_id"):
             value = filters.get(field)
             if value is not None:
@@ -134,7 +136,7 @@ class MarketPortfolioService:
             .annotate(total=Sum(remaining))
             .values("total")[:1]
         )
-        return queryset.select_related("market", "outcome").annotate(
+        return queryset.select_related("market", "outcome", "settlement_record").annotate(
             external_best_bid=Subquery(
                 external_bid,
                 output_field=DecimalField(max_digits=6, decimal_places=5),

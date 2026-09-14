@@ -11,7 +11,13 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
-from markets.models import MarketFill, MarketOrder, MarketPosition
+from markets.models import (
+    MarketFill,
+    MarketOrder,
+    MarketPosition,
+    MarketPositionSettlement,
+    MarketSettlement,
+)
 from markets.portfolio_position_serializers import MarketPortfolioPositionSerializer
 from markets.tests.test_order_history_api import MarketOrderHistoryFixtureMixin
 from wallets.models import LedgerEntry, Wallet
@@ -138,6 +144,54 @@ class MarketPortfolioPositionAPITests(
         for forbidden in ("email", "phone", "username", "display_name", "wallet", "ledger"):
             self.assertNotIn(forbidden, payload)
         position.refresh_from_db()
+
+    def test_settled_zero_quantity_positions_are_listed_with_settlement_snapshot(self):
+        position = self.position(
+            quantity=Decimal("0.0000"),
+            reserved_quantity=Decimal("0.0000"),
+            average_entry_price=Decimal("0.00000"),
+            total_cost=Decimal("0.0000"),
+            realized_pnl=Decimal("2.1000"),
+        )
+        settlement = MarketSettlement.objects.create(
+            market=self.market,
+            winning_outcome=self.outcome,
+            payout_per_unit=Decimal("1.0000"),
+            settlement_currency="UGX",
+            total_position_count=1,
+            winning_position_count=1,
+            losing_position_count=0,
+            total_winning_quantity=Decimal("3.0000"),
+            total_payout_amount=Decimal("3.0000"),
+            executed_by=self.approver_user,
+        )
+        MarketPositionSettlement.objects.create(
+            market_settlement=settlement,
+            market_position=position,
+            participant=self.owner,
+            outcome=self.outcome,
+            was_winner=True,
+            settled_quantity=Decimal("3.0000"),
+            payout_per_unit=Decimal("1.0000"),
+            payout_amount=Decimal("3.0000"),
+            payout_fee_amount=Decimal("0.0000"),
+            net_payout_amount=Decimal("3.0000"),
+            cost_basis=Decimal("1.2000"),
+            realized_pnl_delta=Decimal("1.8000"),
+        )
+
+        response = self.get_positions()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["count"], 1)
+        item = response.data["results"][0]
+        self.assertEqual(item["id"], str(position.id))
+        self.assertEqual(item["quantity"], "3.0000")
+        self.assertEqual(item["reserved_quantity"], "0.0000")
+        self.assertEqual(item["available_quantity"], "0.0000")
+        self.assertEqual(item["average_entry_price"], "0.40000")
+        self.assertEqual(item["total_cost_basis"], "1.2000")
+        self.assertEqual(item["realized_pnl"], "1.8000")
 
     def test_resolution_winner_loser_and_void_cost_basis_marks(self):
         winner = self.position()

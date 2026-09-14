@@ -6,6 +6,7 @@ import io
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from PIL import Image
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -184,6 +185,23 @@ class TestAvatarUpload:
         response_data = response.data["data"]
         assert "fan_avatar.jpg" not in str(response_data.get("avatar_url", ""))
         assert "otheruser" not in str(response_data)
+
+    @override_settings(STORAGE_BACKEND="local")
+    def test_uploaded_avatar_url_serves_public_media_file(self, api_client, fan_user):
+        api_client.force_authenticate(user=fan_user)
+
+        img_bytes = _create_image_bytes(format_name="JPEG")
+        avatar_file = SimpleUploadedFile("avatar.jpg", img_bytes, content_type="image/jpeg")
+
+        response = api_client.post(AVATAR_URL, {"avatar": avatar_file}, format="multipart")
+
+        assert response.status_code == status.HTTP_200_OK
+        avatar_url = response.data["data"]["avatar_url"]
+
+        served_response = api_client.get(avatar_url)
+
+        assert served_response.status_code == status.HTTP_200_OK
+        assert served_response["Content-Type"] == "image/jpeg"
 
 
 @pytest.mark.django_db
