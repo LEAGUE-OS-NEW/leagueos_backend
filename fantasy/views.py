@@ -85,6 +85,96 @@ class CompetitionViewSet(viewsets.ModelViewSet):
         ).prefetch_related("scoring_rules", "gameweeks__fixtures")
         return Response(self.get_serializer(queryset, many=True).data)
 
+    @action(detail=False, methods=["get"], url_path="overview-stats")
+    def overview_stats(self, request):
+        """
+        Global admin overview aggregates — used by the Fantasy Admin Overview cards.
+
+        All four values are computed with DB-level aggregation so this is a single
+        round-trip regardless of how many competitions exist.
+
+        Returns:
+            total_players       — total FantasyPlayer records across ALL competitions
+            active_gameweeks    — gameweeks in OPEN, LOCKED, LIVE, or SCORING state
+                                  (globally, across all competitions)
+            awaiting_scoring    — gameweeks in LOCKED, LIVE, or SCORING state
+                                  (globally, subset of active_gameweeks)
+            competition_warnings — per-competition data needed to build accurate
+                                   operational warnings without N+1 frontend calls:
+                                   id, name, player_count, scoring_rule_count,
+                                   and a list of gameweek-level warning objects
+                                   (id, name, status, fixture_count) for every
+                                   non-DRAFT, non-FINALIZED gameweek in that comp.
+        """
+        # ── scalar aggregates ────────────────────────────────────────────
+        active_statuses = {
+            FantasyGameweek.Status.OPEN,
+            FantasyGameweek.Status.LOCKED,
+            FantasyGameweek.Status.LIVE,
+            FantasyGameweek.Status.SCORING,
+        }
+        awaiting_statuses = {
+            FantasyGameweek.Status.LOCKED,
+            FantasyGameweek.Status.LIVE,
+            FantasyGameweek.Status.SCORING,
+        }
+
+        total_players = FantasyPlayer.objects.count()
+        active_gameweeks = FantasyGameweek.objects.filter(
+            status__in=active_statuses
+        ).count()
+        awaiting_scoring = FantasyGameweek.objects.filter(
+            status__in=awaiting_statuses
+        ).count()
+
+        # ── per-competition warning data ─────────────────────────────────
+        # Fetch all competitions with their player + scoring-rule counts in
+        # two queries (annotate), then one prefetch for the actionable gameweeks.
+        competitions_qs = (
+            FantasyCompetition.objects.annotate(
+                player_count=Count("player_pool", distinct=True),
+                scoring_rule_count=Count("scoring_rules", distinct=True),
+            )
+            .prefetch_related("gameweeks__fixtures")
+            .order_by("name")
+        )
+
+        competition_warnings = []
+        for comp in competitions_qs:
+            # Collect gameweeks that may need admin attention:
+            # exclude DRAFT (not yet published) and FINALIZED (complete).
+            actionable_gameweeks = [
+                {
+                    "id": str(gw.id),
+                    "name": gw.name,
+                    "status": gw.status,
+                    "fixture_count": gw.fixtures.count(),
+                }
+                for gw in comp.gameweeks.all()
+                if gw.status not in {
+                    FantasyGameweek.Status.DRAFT,
+                    FantasyGameweek.Status.FINALIZED,
+                }
+            ]
+            competition_warnings.append(
+                {
+                    "id": str(comp.id),
+                    "name": comp.name,
+                    "player_count": comp.player_count,
+                    "scoring_rule_count": comp.scoring_rule_count,
+                    "actionable_gameweeks": actionable_gameweeks,
+                }
+            )
+
+        return Response(
+            {
+                "total_players": total_players,
+                "active_gameweeks": active_gameweeks,
+                "awaiting_scoring": awaiting_scoring,
+                "competition_warnings": competition_warnings,
+            }
+        )
+
     @action(detail=False, methods=["get"], url_path="canonical-options")
     def canonical_options(self, request):
         competitions = Competition.objects.select_related("sport").order_by("sport__name", "name")
