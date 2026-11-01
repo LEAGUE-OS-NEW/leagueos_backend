@@ -23,6 +23,14 @@ SECRET_KEY = env(
 
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
+# Enable only behind a trusted proxy that overwrites X-Forwarded-Proto, as the
+# droplet's Nginx does. Direct HTTP deployments keep the default disabled.
+SECURE_PROXY_SSL_HEADER = (
+    ("HTTP_X_FORWARDED_PROTO", "https")
+    if env.bool("DJANGO_TRUST_PROXY_SSL_HEADER", default=False)
+    else None
+)
+
 ALLOWED_HOSTS = env.list(
     "DJANGO_ALLOWED_HOSTS",
     default=["localhost", "127.0.0.1", "0.0.0.0"],
@@ -700,6 +708,8 @@ else:
 # Automated KYC & Identity Verification Settings
 # =============================================================================
 KYC_ENABLED = env.bool("KYC_ENABLED", default=True)
+KYC_FACE_MATCH_TIMEOUT_SECONDS = env.int("KYC_FACE_MATCH_TIMEOUT_SECONDS", default=90)
+KYC_OCR_TIMEOUT_SECONDS = env.int("KYC_OCR_TIMEOUT_SECONDS", default=15)
 REVIEW_WORKFLOW_TOOLS_ENABLED = env.bool("REVIEW_WORKFLOW_TOOLS_ENABLED", default=False)
 DEV_KYC_BYPASS_ENABLED = env.bool("DEV_KYC_BYPASS_ENABLED", default=False)
 DEV_RESULT_ACCELERATOR_ENABLED = env.bool("DEV_RESULT_ACCELERATOR_ENABLED", default=False)

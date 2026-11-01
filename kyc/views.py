@@ -1,8 +1,12 @@
 import logging
+import mimetypes
+import threading
 from django.conf import settings
-from django.core.signing import TimestampSigner
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import transaction
+from django.http import FileResponse
 from django.utils import timezone
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import permissions, serializers, status, throttling
 from rest_framework.response import Response
@@ -19,7 +23,8 @@ from kyc.serializers import (
     KYCSubmissionSerializer,
 )
 from kyc.tasks import process_kyc_attempt
-from markets.services.compliance_service import MarketComplianceService
+from kyc.services.market_access_service import KYCMarketAccessService
+from kyc.services.duplicate_service import DuplicateService
 from markets.permissions import HasManageCompliancePermission
 
 logger = logging.getLogger(__name__)
@@ -79,7 +84,7 @@ class FanKYCSubmitView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = KYCSubmissionSerializer(data=request.data)
+        serializer = KYCSubmissionSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         user = request.user
@@ -88,7 +93,7 @@ class FanKYCSubmitView(APIView):
         with transaction.atomic():
             verification, _ = KYCVerification.objects.select_for_update().get_or_create(
                 user=user,
-                defaults={"status": KYCVerification.Status.PENDING},
+                defaults={"status": KYCVerification.Status.NOT_STARTED},
             )
 
             # Enforce max attempt limit
@@ -109,9 +114,14 @@ class FanKYCSubmitView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            if verification.status == KYCVerification.Status.PROCESSING:
+            if verification.status not in (
+                KYCVerification.Status.NOT_STARTED,
+                KYCVerification.Status.RETRY_REQUIRED,
+            ):
                 return Response(
-                    build_response(False, "Your KYC verification is currently being processed."),
+                    build_response(
+                        False, "Your KYC verification does not allow another submission."
+                    ),
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -130,6 +140,14 @@ class FanKYCSubmitView(APIView):
             verification.status = KYCVerification.Status.PENDING
             verification.document_type = serializer.validated_data["document_type"]
             verification.document_country = serializer.validated_data["document_country"]
+            identity_number = serializer.validated_data.get("identity_number")
+            if identity_number:
+                verification.document_number_hash = DuplicateService.generate_document_hash(
+                    attempt.document_type, attempt.document_country, identity_number
+                )
+                verification.document_number_last4 = identity_number[-4:]
+            if "legal_name" in serializer.validated_data:
+                verification.extracted_full_name = serializer.validated_data["legal_name"]
             verification.save()
 
             profile, _ = Profile.objects.get_or_create(user=user)
@@ -137,7 +155,9 @@ class FanKYCSubmitView(APIView):
                 profile.date_of_birth = serializer.validated_data["date_of_birth"]
             if "gender" in serializer.validated_data:
                 profile.gender = serializer.validated_data["gender"]
-            profile.save(update_fields=["date_of_birth", "gender", "updated_at"])
+            if "profile_country" in serializer.validated_data:
+                profile.country = serializer.validated_data["profile_country"]
+            profile.save(update_fields=["date_of_birth", "gender", "country", "updated_at"])
 
         log_kyc_audit(
             user=user,
@@ -147,14 +167,22 @@ class FanKYCSubmitView(APIView):
             request=request,
         )
 
-        # Trigger processing task (asynchronously or inline fallback)
+        # Trigger processing task. The response below promises "PROCESSING
+        # started" and returns immediately, so the Celery-unavailable
+        # fallback must not block this request on the pipeline itself
+        # (OCR, face comparison, liveness — the first DeepFace call alone
+        # can take 60-90s loading its model) — it runs in a background
+        # thread instead, same as a Celery worker would run it.
         try:
             process_kyc_attempt.delay(str(attempt.id))
         except Exception as exc:
             logger.warning(
-                "Celery queue unavailable, executing process_kyc_attempt inline: %s", exc
+                "Celery queue unavailable, running process_kyc_attempt in a background thread: %s",
+                exc,
             )
-            process_kyc_attempt(str(attempt.id))
+            threading.Thread(
+                target=process_kyc_attempt, args=(str(attempt.id),), daemon=True
+            ).start()
 
         from authentication.services.auth_context_service import AuthContextService
         from authentication.services.token_service import TokenService
@@ -211,6 +239,9 @@ class FanKYCDevelopmentBypassView(APIView):
             user = request.user
             user.is_verified = True
             user.save(update_fields=["is_verified", "updated_at"])
+            KYCMarketAccessService.grant_verified_participant_role(
+                user=user, assigned_by=request.user
+            )
             log_kyc_audit(
                 user=request.user,
                 action="KYC_VERIFIED",
@@ -446,6 +477,68 @@ class AdminKYCDocumentUrlView(APIView):
         )
 
 
+class AdminKYCDocumentServeView(APIView):
+    """Streams a private KYC document/selfie image after validating a signed token
+    minted by AdminKYCDocumentUrlView. The token binds verification_id, target and
+    attempt_id together, so it can't be replayed against a different record."""
+
+    permission_classes = [HasManageCompliancePermission]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("verification_id", type={"type": "string", "format": "uuid"}),
+            OpenApiParameter("token", type=str),
+            OpenApiParameter("target", type=str, description="document or selfie"),
+        ],
+        responses={200: OpenApiTypes.BINARY, 400: dict, 403: dict, 404: dict},
+        tags=["KYC"],
+    )
+    def get(self, request, verification_id):
+        token = request.query_params.get("token", "")
+        target = request.query_params.get("target", "document")
+
+        try:
+            payload = signer.unsign(token, max_age=300)
+        except (BadSignature, SignatureExpired):
+            return Response(
+                build_response(False, "Invalid or expired document access token."),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            token_verification_id, token_target, attempt_id = payload.split(":", 2)
+        except ValueError:
+            return Response(
+                build_response(False, "Malformed document access token."),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if token_verification_id != str(verification_id) or token_target != target:
+            return Response(
+                build_response(False, "Token does not match the requested document."),
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        attempt = KYCVerificationAttempt.objects.filter(
+            id=attempt_id, kyc_verification_id=verification_id
+        ).first()
+        if not attempt:
+            return Response(
+                build_response(False, "Document not found."), status=status.HTTP_404_NOT_FOUND
+            )
+
+        file_obj = attempt.selfie_image if target == "selfie" else attempt.document_image
+        if not file_obj or not file_obj.name:
+            return Response(
+                build_response(False, "Requested file not found."), status=status.HTTP_404_NOT_FOUND
+            )
+
+        content_type = mimetypes.guess_type(file_obj.name)[0] or "application/octet-stream"
+        response = FileResponse(file_obj.open("rb"), content_type=content_type)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
 class AdminKYCReviewActionView(APIView):
     """Admin endpoint to perform manual review decision override on REVIEW state verifications."""
 
@@ -473,13 +566,15 @@ class AdminKYCReviewActionView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # 1. Update the canonical KYC record (kyc app).
-            verification.status = decision
-            if decision == KYCVerification.Status.VERIFIED:
-                verification.verified_at = timezone.now()
-                user = verification.user
-                user.is_verified = True
-                user.save(update_fields=["is_verified", "updated_at"])
+            if verification.status != KYCVerification.Status.REVIEW:
+                return Response(
+                    build_response(
+                        False,
+                        "Only a verification awaiting manual review can be approved or rejected.",
+                        data={"status": verification.status},
+                    ),
+                    status=status.HTTP_409_CONFLICT,
+                )
 
             verification.status = decision
             verification.verification_source = KYCVerification.VerificationSource.MANUAL
@@ -492,42 +587,18 @@ class AdminKYCReviewActionView(APIView):
                 if not user.is_verified:
                     user.is_verified = True
                     user.save(update_fields=["is_verified", "updated_at"])
+                KYCMarketAccessService.grant_verified_participant_role(
+                    user=user, assigned_by=request.user
+                )
             elif decision == KYCVerification.Status.REJECTED:
                 verification.rejection_reason = (
                     f"Manual admin rejection: {notes}" if notes else "Manual admin rejection"
                 )
             verification.save()
 
-            # 2. Map the decision to the markets compliance kyc_status and
-            #    persist it on MarketParticipantCompliance so that
-            #    MarketEligibilityService.evaluate() sees the updated state.
-            #    REVIEW stays as PENDING in the compliance system — the
-            #    participant is not yet verified but not blocked either.
-            _COMPLIANCE_STATUS_MAP = {
-                KYCVerification.Status.VERIFIED: "VERIFIED",
-                KYCVerification.Status.REJECTED: "REJECTED",
-                KYCVerification.Status.REVIEW: "PENDING",
-            }
-            compliance_kyc_status = _COMPLIANCE_STATUS_MAP.get(decision)
-            if compliance_kyc_status:
-                MarketComplianceService.update(
-                    participant=verification.user,
-                    actor=request.user,
-                    source="ADMIN",
-                    changes={"kyc_status": compliance_kyc_status},
-                    reason=notes or f"Admin KYC review decision: {decision}",
-                )
-
-            # 3. Transition any open KYCVerificationSession (markets app) to
-            #    the same terminal state so the admin queue and session list
-            #    reflect the manual decision.
             log_kyc_audit(
                 user=request.user,
-                action=(
-                    "KYC_REVIEW_REQUIRED"
-                    if decision == "REVIEW"
-                    else ("KYC_VERIFIED" if decision == "VERIFIED" else "KYC_REJECTED")
-                ),
+                action=("KYC_VERIFIED" if decision == "VERIFIED" else "KYC_REJECTED"),
                 resource_id=verification.id,
                 metadata={"admin_decision": decision, "notes": notes},
                 request=request,

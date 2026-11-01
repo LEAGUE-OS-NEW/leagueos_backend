@@ -3,6 +3,7 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from accounts.models import AuditLog
+from authentication.models import Role, UserRole
 from kyc.models import KYCCheckResult, KYCVerification
 
 User = get_user_model()
@@ -72,3 +73,22 @@ class KYCDevelopmentBypassTests(APITestCase):
         self.assertFalse(KYCCheckResult.objects.filter(kyc_verification=verification).exists())
         audit = AuditLog.objects.get(resource_id=verification.id, action="KYC_VERIFIED")
         self.assertEqual(audit.metadata["verification_source"], "DEVELOPMENT_BYPASS")
+
+    @override_settings(DEBUG=True, DEV_KYC_BYPASS_ENABLED=True)
+    def test_synthetic_fan_is_granted_verified_market_user_role(self):
+        role = Role.objects.create(name="Verified Market User", display_name="Verified Market User")
+        self.authenticate()
+
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(UserRole.objects.filter(user=self.fan, role=role, is_active=True).exists())
+
+    @override_settings(DEBUG=True, DEV_KYC_BYPASS_ENABLED=True)
+    def test_bypass_does_not_500_when_verified_market_user_role_is_unseeded(self):
+        self.assertFalse(Role.objects.filter(name="Verified Market User").exists())
+        self.authenticate()
+
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, 200)

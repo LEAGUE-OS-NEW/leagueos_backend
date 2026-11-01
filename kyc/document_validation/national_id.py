@@ -8,7 +8,7 @@ class NationalIDValidator(BaseDocumentValidator):
 
     COUNTRY_PATTERNS = {
         "UGA": {
-            "doc_number_regex": r"\bCM\d{13}\b|\bCF\d{13}\b|\b[A-Z]{2}\d{13}\b",
+            "doc_number_regex": r"\b(?=[A-Z0-9]{0,13}\d)[A-Z0-9]{14}\b",
             "keywords": ["republic of uganda", "national identity card", "national id", "nin"],
         },
         "KEN": {
@@ -47,7 +47,7 @@ class NationalIDValidator(BaseDocumentValidator):
         pattern_info = self.COUNTRY_PATTERNS.get(self.country_code, {})
         doc_regex = pattern_info.get("doc_number_regex", r"\b[A-Z0-9]{8,14}\b")
 
-        doc_num_match = re.search(doc_regex, raw_text)
+        doc_num_match = re.search(doc_regex, raw_text.upper())
         dob_match = re.search(
             r"(?:dob|birth|date of birth)[:\s]*(\d{2}[/-]\d{2}[/-]\d{4}|\d{4}[/-]\d{2}[/-]\d{2})",
             raw_text,

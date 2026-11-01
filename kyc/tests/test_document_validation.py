@@ -33,10 +33,10 @@ def test_passport_mrz_valid_parsing():
 
 def test_national_id_validator():
     validator = NationalIDValidator(country_code="UGA")
-    text = "REPUBLIC OF UGANDA\nNATIONAL IDENTITY CARD\nNIN: CM9001011234567\nNAME: FAITH AKIROR"
+    text = "REPUBLIC OF UGANDA\nNATIONAL IDENTITY CARD\nNIN: AB12CD34EF5678\nNAME: FAITH AKIROR"
     parsed = validator.parse_fields(text)
 
-    assert parsed["document_number"] == "CM9001011234567"
+    assert parsed["document_number"] == "AB12CD34EF5678"
     assert parsed["full_name"] == "FAITH AKIROR"
 
 

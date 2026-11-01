@@ -5,6 +5,7 @@ from datetime import date
 from typing import TYPE_CHECKING, Any
 
 from PIL import Image, ImageEnhance, ImageFilter
+from django.conf import settings
 
 from kyc.document_validation import get_document_validator
 from kyc.models import KYCCheckResult
@@ -54,14 +55,18 @@ class OCRService:
                 import pytesseract
 
                 custom_config = r"--oem 3 --psm 6"
-                raw_text = pytesseract.image_to_string(processed_img, config=custom_config)
+                raw_text = pytesseract.image_to_string(
+                    processed_img, config=custom_config, timeout=settings.KYC_OCR_TIMEOUT_SECONDS
+                )
             except Exception as tess_err:
                 logger.warning("Tesseract execution error on attempt %s: %s", attempt.id, tess_err)
                 # Fallback to standard pytesseract call
                 try:
                     import pytesseract
 
-                    raw_text = pytesseract.image_to_string(processed_img)
+                    raw_text = pytesseract.image_to_string(
+                        processed_img, timeout=settings.KYC_OCR_TIMEOUT_SECONDS
+                    )
                 except Exception:
                     raw_text = ""
 
@@ -145,7 +150,17 @@ class OCRService:
                 except Exception:
                     pass
 
-            verification.save()
+            verification.save(
+                update_fields=[
+                    "ocr_status",
+                    "mrz_status",
+                    "extracted_full_name",
+                    "extracted_date_of_birth",
+                    "extracted_nationality",
+                    "document_expiry_date",
+                    "updated_at",
+                ]
+            )
 
             return {
                 "raw_text": raw_text,
