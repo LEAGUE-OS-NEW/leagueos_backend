@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import mimetypes
 import threading
@@ -25,6 +24,7 @@ from kyc.serializers import (
 )
 from kyc.tasks import process_kyc_attempt
 from kyc.services.market_access_service import KYCMarketAccessService
+from kyc.services.duplicate_service import DuplicateService
 from markets.permissions import HasManageCompliancePermission
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ class FanKYCSubmitView(APIView):
         with transaction.atomic():
             verification, _ = KYCVerification.objects.select_for_update().get_or_create(
                 user=user,
-                defaults={"status": KYCVerification.Status.PENDING},
+                defaults={"status": KYCVerification.Status.NOT_STARTED},
             )
 
             # Enforce max attempt limit
@@ -114,9 +114,14 @@ class FanKYCSubmitView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            if verification.status == KYCVerification.Status.PROCESSING:
+            if verification.status not in (
+                KYCVerification.Status.NOT_STARTED,
+                KYCVerification.Status.RETRY_REQUIRED,
+            ):
                 return Response(
-                    build_response(False, "Your KYC verification is currently being processed."),
+                    build_response(
+                        False, "Your KYC verification does not allow another submission."
+                    ),
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -136,9 +141,9 @@ class FanKYCSubmitView(APIView):
             verification.document_type = serializer.validated_data["document_type"]
             verification.document_country = serializer.validated_data["document_country"]
             identity_number = serializer.validated_data["identity_number"]
-            verification.document_number_hash = hashlib.sha256(
-                f"{settings.SECRET_KEY}:{identity_number}".encode()
-            ).hexdigest()
+            verification.document_number_hash = DuplicateService.generate_document_hash(
+                attempt.document_type, attempt.document_country, identity_number
+            )
             verification.document_number_last4 = identity_number[-4:]
             verification.extracted_full_name = serializer.validated_data["legal_name"]
             verification.save()

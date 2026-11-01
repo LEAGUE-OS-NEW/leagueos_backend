@@ -1,5 +1,12 @@
 import io
+import base64
+import json
 import logging
+import math
+import subprocess
+import sys
+from pathlib import Path
+from django.conf import settings
 from PIL import Image, ImageStat
 from typing import TYPE_CHECKING, Any
 
@@ -188,51 +195,34 @@ class FaceService:
             with attempt.selfie_image.open("rb") as f_selfie:
                 selfie_bytes = f_selfie.read()
 
-            similarity = 0.0
             confidence = 0.90
-            used_deepface = False
 
-            if np is not None:
-                try:
-                    from deepface import DeepFace
-
-                    doc_img = Image.open(io.BytesIO(doc_bytes)).convert("RGB")
-                    selfie_img = Image.open(io.BytesIO(selfie_bytes)).convert("RGB")
-
-                    res = DeepFace.verify(
-                        img1_path=np.array(doc_img),
-                        img2_path=np.array(selfie_img),
-                        model_name="VGG-Face",
-                        enforce_detection=False,
-                    )
-                    distance = res.get("distance", 0.5)
-                    similarity = max(0.0, min(1.0, 1.0 - float(distance)))
-                    used_deepface = True
-                except Exception:
-                    pass
-
-            if not used_deepface:
-                doc_img = Image.open(io.BytesIO(doc_bytes)).convert("L").resize((128, 128))
-                selfie_img = Image.open(io.BytesIO(selfie_bytes)).convert("L").resize((128, 128))
-
-                if np is not None:
-                    arr_doc = np.array(doc_img, dtype=float)
-                    arr_selfie = np.array(selfie_img, dtype=float)
-                    arr_doc -= np.mean(arr_doc)
-                    arr_selfie -= np.mean(arr_selfie)
-                    denom = np.linalg.norm(arr_doc) * np.linalg.norm(arr_selfie)
-                    corr = np.sum(arr_doc * arr_selfie) / (denom + 1e-7)
-                    similarity = float(max(0.0, min(1.0, (corr + 1.0) / 2.0)))
-                else:
-                    stat_doc = ImageStat.Stat(doc_img)
-                    stat_selfie = ImageStat.Stat(selfie_img)
-                    diff = abs(stat_doc.mean[0] - stat_selfie.mean[0]) / 255.0
-                    similarity = float(max(0.0, min(1.0, 1.0 - diff)))
+            # Model imports/downloads/inference can block or exhaust a worker.
+            # A child process gives this stage a deadline even in the HTTP
+            # fallback thread, where Celery time limits cannot interrupt it.
+            result = subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("face_match_worker.py"))],
+                input=json.dumps(
+                    {
+                        "document": base64.b64encode(doc_bytes).decode("ascii"),
+                        "selfie": base64.b64encode(selfie_bytes).decode("ascii"),
+                    }
+                ).encode("utf-8"),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=True,
+                timeout=max(1, settings.KYC_FACE_MATCH_TIMEOUT_SECONDS),
+            )
+            evidence = json.loads(result.stdout)
+            distance = float(evidence["distance"])
+            if not math.isfinite(distance) or distance < 0:
+                raise ValueError("Invalid face distance")
+            similarity = max(0.0, min(1.0, 1.0 - distance))
 
             pass_thresh = config.face_match_pass_threshold
             review_thresh = config.face_match_review_threshold
 
-            passed = similarity >= pass_thresh
+            passed = evidence.get("verified") is True and similarity >= pass_thresh
             uncertain = review_thresh <= similarity < pass_thresh
 
             if passed:
@@ -253,7 +243,7 @@ class FaceService:
                 "similarity_score": round(similarity, 4),
                 "pass_threshold": pass_thresh,
                 "review_threshold": review_thresh,
-                "algorithm": "DeepFace (VGG-Face)" if used_deepface else "Structural Correlation",
+                "algorithm": "DeepFace (VGG-Face)",
             }
             check_result.save()
 
@@ -263,14 +253,29 @@ class FaceService:
             return {"passed": passed, "status": status, "similarity": similarity}
 
         except Exception as e:
-            logger.error("Face matching error for attempt %s: %s", attempt.id, e)
-            check_result.status = KYCCheckResult.Status.FAILED
-            check_result.result_code = "face_match_error"
-            check_result.details = {"error": str(e)}
+            # Missing models, timeouts and invalid output are unavailable
+            # evidence, never a positive match or an asserted mismatch.
+            # Do not retain exception payloads: they may contain image data.
+            logger.warning(
+                "Face matching unavailable for attempt %s: %s", attempt.id, type(e).__name__
+            )
+            check_result.status = KYCCheckResult.Status.UNCERTAIN
+            check_result.score = None
+            check_result.confidence = None
+            check_result.result_code = (
+                "face_match_timeout"
+                if isinstance(e, subprocess.TimeoutExpired)
+                else "face_match_unavailable"
+            )
+            check_result.details = {"reason": check_result.result_code}
             check_result.save()
-            verification.face_match_status = KYCCheckResult.Status.FAILED
+            verification.face_match_status = KYCCheckResult.Status.UNCERTAIN
             verification.save(update_fields=["face_match_status", "updated_at"])
-            return {"passed": False, "status": KYCCheckResult.Status.FAILED, "reason": str(e)}
+            return {
+                "passed": False,
+                "status": KYCCheckResult.Status.UNCERTAIN,
+                "reason": check_result.result_code,
+            }
 
     @classmethod
     def check_liveness(cls, attempt: "KYCVerificationAttempt") -> dict[str, Any]:
