@@ -17,4 +17,5 @@ celery>=5.4,<6.0
 redis>=5.0,<6.0
 pytesseract>=0.3.10,<0.4
 deepface>=0.0.79,<0.1
+tf-keras>=2.16,<3.0
 django-storages[boto3]>=1.14,<2.0
