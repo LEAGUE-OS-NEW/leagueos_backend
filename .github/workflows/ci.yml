@@ -83,6 +83,10 @@ jobs:
       - name: Run Ruff lint checks
         run: ruff check --no-cache .
 
+      - name: Check KYC face runtime imports
+        run: >
+          python -c "from werkzeug.datastructures import FileStorage; from deepface import DeepFace"
+
       - name: Run Black formatting check
         run: black --check --diff .
 
