@@ -41,7 +41,7 @@ from django.db import transaction
 from django.db.utils import OperationalError
 from django.utils import timezone
 
-from kyc.models import KYCVerificationAttempt, KYCVerification
+from kyc.models import KYCVerificationAttempt, KYCVerification, KYCConfiguration
 from kyc.services.barcode_service import BarcodeService
 from kyc.services.decision_service import KYCDecisionService
 from kyc.services.document_service import DocumentService
@@ -83,6 +83,9 @@ def _mark_kyc_failed(attempt_id_str: str) -> None:
                 )
                 return
 
+            if verification.attempts.filter(attempt_number__gt=attempt.attempt_number).exists():
+                return
+
             now = timezone.now()
 
             if attempt.status not in (
@@ -103,9 +106,14 @@ def _mark_kyc_failed(attempt_id_str: str) -> None:
                     ]
                 )
 
-            verification.status = KYCVerification.Status.RETRY_REQUIRED
-            verification.retry_reason = PROCESSING_FAILURE_REASON
-            verification.rejection_reason = ""
+            exhausted = attempt.attempt_number >= KYCConfiguration.load().max_attempts
+            verification.status = (
+                KYCVerification.Status.REVIEW
+                if exhausted
+                else KYCVerification.Status.RETRY_REQUIRED
+            )
+            verification.retry_reason = "" if exhausted else PROCESSING_FAILURE_REASON
+            verification.rejection_reason = PROCESSING_FAILURE_REASON if exhausted else ""
             verification.verification_completed_at = now
             verification.save(
                 update_fields=[
@@ -119,9 +127,10 @@ def _mark_kyc_failed(attempt_id_str: str) -> None:
 
         logger.error(
             "Marked KYC attempt %s as FAILED and verification %s as "
-            "RETRY_REQUIRED after unrecoverable processing failure.",
+            "%s after unrecoverable processing failure.",
             attempt_id,
             verification.id,
+            verification.status,
         )
 
     except Exception as exc:  # noqa: BLE001

@@ -69,7 +69,7 @@ def create_document_image_bytes(
     draw.text((20, 80), "Full Name: TEST USER", fill="black", font=font)
     draw.text((20, 120), "Date of Birth: 1990-01-01", fill="black", font=font)
     draw.text((20, 160), "Sex: M", fill="black", font=font)
-    draw.text((20, 200), "ID Number: CM9001011234567", fill="black", font=font)
+    draw.text((20, 200), "ID Number: AB12CD34EF5678", fill="black", font=font)
     draw.text((20, 240), "Expiry: 2030-01-01", fill="black", font=font)
 
     # Bottom decorative line

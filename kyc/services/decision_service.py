@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 from typing import TYPE_CHECKING
 
-from kyc.models import KYCCheckResult, KYCConfiguration, KYCVerification
+from kyc.models import KYCCheckResult, KYCConfiguration, KYCVerification, KYCVerificationAttempt
 from kyc.services.market_access_service import KYCMarketAccessService
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,28 @@ class KYCDecisionService:
         final_status: str,
         reason_code: str | None = None,
     ) -> KYCVerification:
-        verification = attempt.kyc_verification
+        # Workers can finish after an administrator has decided the case, or
+        # after a newer capture has started. Never trust their cached parent.
+        verification = KYCVerification.objects.select_for_update().get(
+            pk=attempt.kyc_verification_id
+        )
+        attempt = KYCVerificationAttempt.objects.select_for_update().get(pk=attempt.pk)
+        if (
+            verification.status
+            not in (
+                KYCVerification.Status.NOT_STARTED,
+                KYCVerification.Status.PENDING,
+                KYCVerification.Status.PROCESSING,
+            )
+            or attempt.status
+            in (
+                KYCVerificationAttempt.Status.COMPLETED,
+                KYCVerificationAttempt.Status.FAILED,
+                KYCVerificationAttempt.Status.CANCELLED,
+            )
+            or verification.attempts.filter(attempt_number__gt=attempt.attempt_number).exists()
+        ):
+            return verification
         now = timezone.now()
 
         # Update attempt record

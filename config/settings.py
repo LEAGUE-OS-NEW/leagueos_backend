@@ -719,6 +719,8 @@ else:
 # Automated KYC & Identity Verification Settings
 # =============================================================================
 KYC_ENABLED = env.bool("KYC_ENABLED", default=True)
+KYC_FACE_MATCH_TIMEOUT_SECONDS = env.int("KYC_FACE_MATCH_TIMEOUT_SECONDS", default=90)
+KYC_OCR_TIMEOUT_SECONDS = env.int("KYC_OCR_TIMEOUT_SECONDS", default=15)
 REVIEW_WORKFLOW_TOOLS_ENABLED = env.bool("REVIEW_WORKFLOW_TOOLS_ENABLED", default=False)
 DEV_KYC_BYPASS_ENABLED = env.bool("DEV_KYC_BYPASS_ENABLED", default=False)
 DEV_RESULT_ACCELERATOR_ENABLED = env.bool("DEV_RESULT_ACCELERATOR_ENABLED", default=False)
