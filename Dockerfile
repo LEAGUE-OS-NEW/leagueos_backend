@@ -15,9 +15,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements ./requirements
+COPY scripts/check_celery_redis.py ./scripts/check_celery_redis.py
 
 RUN python -m pip install --upgrade pip \
     && python -m pip install -r requirements/dev.txt \
+    && python -m pip check \
+    && python scripts/check_celery_redis.py \
     && python -c "from werkzeug.datastructures import FileStorage; from deepface import DeepFace"
 
 COPY . .

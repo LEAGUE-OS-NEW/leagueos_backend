@@ -83,6 +83,11 @@ jobs:
       - name: Run Ruff lint checks
         run: ruff check --no-cache .
 
+      - name: Check Celery Redis transport and broker
+        run: |
+          python -m pip check
+          python scripts/check_celery_redis.py --broker
+
       - name: Check KYC face runtime imports
         run: >
           python -c "from werkzeug.datastructures import FileStorage; from deepface import DeepFace"
