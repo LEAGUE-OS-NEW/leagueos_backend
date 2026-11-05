@@ -23,6 +23,14 @@ SECRET_KEY = env(
 
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
+# Enable only behind a trusted proxy that overwrites X-Forwarded-Proto, as the
+# droplet's Nginx does. Direct HTTP deployments keep the default disabled.
+SECURE_PROXY_SSL_HEADER = (
+    ("HTTP_X_FORWARDED_PROTO", "https")
+    if env.bool("DJANGO_TRUST_PROXY_SSL_HEADER", default=False)
+    else None
+)
+
 ALLOWED_HOSTS = env.list(
     "DJANGO_ALLOWED_HOSTS",
     default=["localhost", "127.0.0.1", "0.0.0.0"],

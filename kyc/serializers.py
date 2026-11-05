@@ -10,11 +10,16 @@ class KYCSubmissionSerializer(serializers.Serializer):
     document_image = serializers.FileField(required=True)
     selfie_image = serializers.FileField(required=True)
     date_of_birth = serializers.DateField(required=False, allow_null=True)
-    legal_name = serializers.CharField(max_length=255, trim_whitespace=True)
-    identity_number = serializers.CharField(max_length=64, trim_whitespace=True, write_only=True)
+    # Existing production clients upload four fields. Accept newer identity
+    # metadata too, without breaking those clients during a staged deployment.
+    legal_name = serializers.CharField(max_length=255, trim_whitespace=True, required=False)
+    identity_number = serializers.CharField(
+        max_length=64, trim_whitespace=True, write_only=True, required=False
+    )
     profile_country = serializers.SlugRelatedField(
         queryset=Country.objects.filter(is_active=True),
         slug_field="iso_code",
+        required=False,
     )
     gender = serializers.PrimaryKeyRelatedField(
         queryset=Gender.objects.filter(is_active=True),
@@ -41,7 +46,7 @@ class KYCSubmissionSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         user = self.context.get("request").user if self.context.get("request") else None
-        if user:
+        if user and "legal_name" in attrs:
             account_name = " ".join(
                 part for part in (user.first_name.strip(), user.last_name.strip()) if part
             ).casefold()
@@ -49,10 +54,8 @@ class KYCSubmissionSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {"legal_name": "Legal name must match the authenticated account profile."}
                 )
-        if not attrs.get("date_of_birth"):
-            profile = getattr(user, "profile", None)
-            if profile is None or not profile.date_of_birth:
-                raise serializers.ValidationError({"date_of_birth": "Date of birth is required."})
+        # DOB can already have been saved through the profile endpoint. Market
+        # eligibility still independently enforces a known adult date of birth.
         return attrs
 
     def validate_document_image(self, value):

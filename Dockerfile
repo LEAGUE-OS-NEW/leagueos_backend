@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim-trixie
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -7,10 +7,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# pytesseract invokes a system executable. OpenCV also needs these runtime libs.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        tesseract-ocr tesseract-ocr-eng libgl1 libglib2.0-0t64 \
+    && tesseract --version \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements ./requirements
 
 RUN python -m pip install --upgrade pip \
-    && python -m pip install -r requirements/dev.txt
+    && python -m pip install -r requirements/dev.txt \
+    && python -c "from werkzeug.datastructures import FileStorage; from deepface import DeepFace"
 
 COPY . .
 

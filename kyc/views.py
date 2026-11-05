@@ -140,12 +140,14 @@ class FanKYCSubmitView(APIView):
             verification.status = KYCVerification.Status.PENDING
             verification.document_type = serializer.validated_data["document_type"]
             verification.document_country = serializer.validated_data["document_country"]
-            identity_number = serializer.validated_data["identity_number"]
-            verification.document_number_hash = DuplicateService.generate_document_hash(
-                attempt.document_type, attempt.document_country, identity_number
-            )
-            verification.document_number_last4 = identity_number[-4:]
-            verification.extracted_full_name = serializer.validated_data["legal_name"]
+            identity_number = serializer.validated_data.get("identity_number")
+            if identity_number:
+                verification.document_number_hash = DuplicateService.generate_document_hash(
+                    attempt.document_type, attempt.document_country, identity_number
+                )
+                verification.document_number_last4 = identity_number[-4:]
+            if "legal_name" in serializer.validated_data:
+                verification.extracted_full_name = serializer.validated_data["legal_name"]
             verification.save()
 
             profile, _ = Profile.objects.get_or_create(user=user)
@@ -153,7 +155,8 @@ class FanKYCSubmitView(APIView):
                 profile.date_of_birth = serializer.validated_data["date_of_birth"]
             if "gender" in serializer.validated_data:
                 profile.gender = serializer.validated_data["gender"]
-            profile.country = serializer.validated_data["profile_country"]
+            if "profile_country" in serializer.validated_data:
+                profile.country = serializer.validated_data["profile_country"]
             profile.save(update_fields=["date_of_birth", "gender", "country", "updated_at"])
 
         log_kyc_audit(
@@ -531,7 +534,9 @@ class AdminKYCDocumentServeView(APIView):
             )
 
         content_type = mimetypes.guess_type(file_obj.name)[0] or "application/octet-stream"
-        return FileResponse(file_obj.open("rb"), content_type=content_type)
+        response = FileResponse(file_obj.open("rb"), content_type=content_type)
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
 class AdminKYCReviewActionView(APIView):
