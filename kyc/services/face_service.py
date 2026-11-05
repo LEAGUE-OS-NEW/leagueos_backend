@@ -3,11 +3,12 @@ import base64
 import json
 import logging
 import math
+import os
 import subprocess
 import sys
 from pathlib import Path
 from django.conf import settings
-from PIL import Image, ImageStat
+from PIL import Image, ImageOps, ImageStat
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -28,89 +29,53 @@ class FaceService:
     """Orchestrates face detection, selfie validation, face matching, and liveness."""
 
     @classmethod
-    def _detect_face_bounding_regions(cls, img_bytes: bytes) -> tuple[int, float, list]:
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    def _detect_face_bounding_regions(cls, img_bytes: bytes) -> tuple[int | None, float, list]:
+        img = ImageOps.exif_transpose(Image.open(io.BytesIO(img_bytes))).convert("RGB")
         w, h = img.size
+        if np is None:
+            return None, 0.0, []
+        try:
+            import cv2
 
-        if np is not None:
-            img_np = np.array(img)
-
-            try:
-                import cv2
-
-                gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-                cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-                face_cascade = cv2.CascadeClassifier(cascade_path)
-                faces = face_cascade.detectMultiScale(
-                    gray,
-                    scaleFactor=1.1,
-                    minNeighbors=5,
-                    minSize=(int(w * 0.15), int(h * 0.15)),
-                )
-                if len(faces) > 0:
-                    regions = [
-                        {"x": int(x), "y": int(y), "w": int(fw), "h": int(fh)}
-                        for (x, y, fw, fh) in faces
-                    ]
-                    quality = float(min(1.0, max(0.5, (faces[0][2] * faces[0][3]) / (w * h * 0.1))))
-                    return len(faces), quality, regions
-            except Exception:
-                pass
-
-            center_h_start, center_h_end = int(h * 0.15), int(h * 0.85)
-            center_w_start, center_w_end = int(w * 0.15), int(w * 0.85)
-            crop = img_np[center_h_start:center_h_end, center_w_start:center_w_end]
-
-            if crop.size == 0:
-                return 0, 0.0, []
-
-            r, g, b = crop[:, :, 0], crop[:, :, 1], crop[:, :, 2]
-            skin_mask = (
-                (r > 60)
-                & (g > 40)
-                & (b > 20)
-                & (r > g)
-                & (r > b)
-                & (np.abs(r.astype(int) - g.astype(int)) > 10)
+            candidates = []
+            bundled = getattr(getattr(cv2, "data", None), "haarcascades", None)
+            if bundled:
+                candidates.append(Path(bundled) / "haarcascade_frontalface_default.xml")
+            # OpenCV 5 wheels no longer bundle these XML files. Use the same
+            # persistent cache as DeepFace without importing TensorFlow here.
+            home = Path(os.environ.get("DEEPFACE_HOME", str(Path.home())))
+            candidates.append(home / ".deepface/weights/haarcascade_frontalface_default.xml")
+            cascade = None
+            for path in candidates:
+                if not path.is_file():
+                    continue
+                try:
+                    loaded = cv2.CascadeClassifier(str(path))
+                    if not loaded.empty():
+                        cascade = loaded
+                        break
+                except Exception:
+                    continue
+            if cascade is None:
+                return None, 0.0, []
+            gray = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
+            faces = cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.1,
+                minNeighbors=5,
+                minSize=(int(w * 0.15), int(h * 0.15)),
             )
-            skin_ratio = float(np.sum(skin_mask) / crop[:, :, 0].size)
-
-            if skin_ratio >= 0.12:
-                return (
-                    1,
-                    round(skin_ratio, 2),
-                    [
-                        {
-                            "x": center_w_start,
-                            "y": center_h_start,
-                            "w": int(w * 0.7),
-                            "h": int(h * 0.7),
-                        }
-                    ],
-                )
-            else:
-                return 0, round(skin_ratio, 2), []
-        else:
-            # Pure PIL luminance/skin region fallback
-            center_box = (int(w * 0.15), int(h * 0.15), int(w * 0.85), int(h * 0.85))
-            crop = img.crop(center_box)
-            stat = ImageStat.Stat(crop)
-            r_m, g_m, b_m = stat.mean[:3] if len(stat.mean) >= 3 else (100, 100, 100)
-
-            if r_m > g_m and r_m > b_m and (r_m - g_m) > 8:
-                return (
-                    1,
-                    0.85,
-                    [
-                        {
-                            "x": center_box[0],
-                            "y": center_box[1],
-                            "w": center_box[2] - center_box[0],
-                            "h": center_box[3] - center_box[1],
-                        }
-                    ],
-                )
-            return 0, 0.0, []
+            if len(faces) == 0:
+                return 0, 0.0, []
+            regions = [
+                {"x": int(x), "y": int(y), "w": int(fw), "h": int(fh)} for x, y, fw, fh in faces
+            ]
+            quality = float(min(1.0, max(0.5, (faces[0][2] * faces[0][3]) / (w * h * 0.1))))
+            return len(faces), quality, regions
+        except Exception:
+            # Unavailable detection is evidence for review, not a positive
+            # face count inferred from skin colour or an asserted mismatch.
+            return None, 0.0, []
 
     @classmethod
     def validate_selfie(cls, attempt: "KYCVerificationAttempt") -> dict[str, Any]:
@@ -133,6 +98,21 @@ class FaceService:
             )
 
             face_count, quality_score, regions = cls._detect_face_bounding_regions(file_bytes)
+
+            if face_count is None:
+                check_result.status = KYCCheckResult.Status.UNCERTAIN
+                check_result.score = None
+                check_result.confidence = None
+                check_result.result_code = "face_detection_unavailable"
+                check_result.details = {"reason": "face_detection_unavailable"}
+                check_result.save()
+                verification.face_detection_status = KYCCheckResult.Status.UNCERTAIN
+                verification.save(update_fields=["face_detection_status", "updated_at"])
+                return {
+                    "passed": False,
+                    "status": "UNCERTAIN",
+                    "reason": "face_detection_unavailable",
+                }
 
             if face_count == 0:
                 raise KYCValidationError(
